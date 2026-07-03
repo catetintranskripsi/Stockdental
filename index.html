@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StockDental</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- ============ AUTH SECTION ============ -->
+  <div class="container" id="authContainer">
+
+    <!-- LOGIN FORM -->
+    <div id="loginView">
+      <h1>StockDental</h1>
+      <h2>Login</h2>
+
+      <form id="formLogin">
+        <div class="form-group">
+          <label for="loginEmail">Email</label>
+          <input type="email" id="loginEmail" required placeholder="email@klinik.com">
+        </div>
+
+        <div class="form-group">
+          <label for="loginPassword">Password</label>
+          <input type="password" id="loginPassword" required placeholder="Minimal 6 karakter">
+        </div>
+
+        <button type="submit" id="loginBtn">Login</button>
+      </form>
+
+      <p class="switch-text">Belum punya akun? <a href="#" id="showSignup">Daftar di sini</a></p>
+      <div id="loginStatus" class="status-message"></div>
+    </div>
+
+    <!-- SIGNUP FORM -->
+    <div id="signupView" style="display:none;">
+      <h1>StockDental</h1>
+      <h2>Daftar Akun Baru</h2>
+
+      <form id="formSignup">
+        <div class="form-group">
+          <label for="signupEmail">Email</label>
+          <input type="email" id="signupEmail" required placeholder="email@klinik.com">
+        </div>
+
+        <div class="form-group">
+          <label for="signupPassword">Password</label>
+          <input type="password" id="signupPassword" required placeholder="Minimal 6 karakter" minlength="6">
+        </div>
+
+        <div class="form-group">
+          <label for="signupPasswordConfirm">Konfirmasi Password</label>
+          <input type="password" id="signupPasswordConfirm" required minlength="6">
+        </div>
+
+        <button type="submit" id="signupBtn">Daftar</button>
+      </form>
+
+      <p class="switch-text">Sudah punya akun? <a href="#" id="showLogin">Login di sini</a></p>
+      <div id="signupStatus" class="status-message"></div>
+    </div>
+
+  </div>
+
+  <!-- ============ APP SECTION (tampil setelah login) ============ -->
+  <div class="container" id="appContainer" style="display:none;">
+
+    <div class="app-header">
+      <div>
+        <h1>StockDental</h1>
+        <h2>Input Barang Masuk (Manual)</h2>
+      </div>
+      <button id="logoutBtn" class="btn-secondary">Logout</button>
+    </div>
+
+    <form id="formStockIn">
+      <div class="form-group">
+        <label for="productName">Nama Barang</label>
+        <input type="text" id="productName" required placeholder="Contoh: Sarung Tangan Latex M">
+      </div>
+
+      <div class="form-group">
+        <label for="category">Kategori</label>
+        <input type="text" id="category" placeholder="Contoh: Alat Pelindung Diri">
+      </div>
+
+      <div class="form-group">
+        <label for="quantity">Jumlah</label>
+        <input type="number" id="quantity" required min="0" step="0.01">
+      </div>
+
+      <div class="form-group">
+        <label for="unit">Satuan</label>
+        <input type="text" id="unit" placeholder="pcs / box / botol" value="pcs">
+      </div>
+
+      <div class="form-group">
+        <label for="expiryDate">Tanggal Kedaluwarsa (opsional)</label>
+        <input type="date" id="expiryDate">
+      </div>
+
+      <div class="form-group">
+        <label for="storageLocation">Lokasi Penyimpanan</label>
+        <input type="text" id="storageLocation" placeholder="Contoh: Lemari A - Rak 2">
+      </div>
+
+      <div class="form-group">
+        <label for="minimumStock">Stok Minimum (opsional, buat alert)</label>
+        <input type="number" id="minimumStock" min="0" step="0.01" value="0">
+      </div>
+
+      <button type="submit" id="submitBtn">Simpan Barang</button>
+    </form>
+
+    <div id="statusMessage"></div>
+  </div>
+
+  <!-- Supabase library dari CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase-client.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
