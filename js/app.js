@@ -1,17 +1,23 @@
 // ============================================
 // APP LOGIC - Form Input Stok (3 jenis transaksi)
 // stock_movements: in, out, opname_adjustment
+// Versi: searchable dropdown untuk pilih barang
 // ============================================
 
 let CURRENT_CLINIC_ID = null;
 let CURRENT_USER_ID = null;
+let ALL_PRODUCTS = []; // cache semua produk untuk difilter di searchable dropdown
 
 const movementTypeSelect = document.getElementById('movementType');
 const form = document.getElementById('formStockMovement');
 const statusDiv = document.getElementById('statusMessage');
 const submitBtn = document.getElementById('submitBtn');
-const productSelect = document.getElementById('productSelect');
 const productSelectGroup = document.getElementById('productSelectGroup');
+
+// Elemen searchable dropdown
+const productSearchInput = document.getElementById('productSearchInput');
+const productSelectedId = document.getElementById('productSelectedId');
+const productSearchResults = document.getElementById('productSearchResults');
 
 // Field groups (tampil/sembunyi tergantung movementType)
 const fieldsIn = document.getElementById('fieldsIn');
@@ -43,7 +49,7 @@ async function onUserLoggedIn() {
   await loadProductOptions();
 }
 
-// Load daftar produk existing untuk dropdown (dipakai di Out & Opname)
+// Load daftar produk existing ke cache ALL_PRODUCTS (dipakai untuk filter search)
 async function loadProductOptions() {
   const { data: products, error } = await supabaseClient
     .from('products')
@@ -57,18 +63,96 @@ async function loadProductOptions() {
     return;
   }
 
-  productSelect.innerHTML = '<option value="">-- Pilih Barang --</option>';
-  products.forEach(p => {
-    const opt = document.createElement('option');
-    opt.value = p.id;
-    opt.textContent = `${p.name} (stok: ${p.current_stock} ${p.unit})`;
-    opt.dataset.currentStock = p.current_stock;
-    opt.dataset.unit = p.unit;
-    productSelect.appendChild(opt);
-  });
+  ALL_PRODUCTS = products || [];
 }
 
-// Toggle field groups berdasarkan movement_type yang dipilih
+// ============================================
+// SEARCHABLE DROPDOWN LOGIC
+// ============================================
+
+// Render daftar hasil filter di bawah input search
+function renderProductResults(filterText) {
+  const keyword = filterText.trim().toLowerCase();
+
+  // Kalau kosong, tampilkan semua (dibatasi 50 biar tidak berat)
+  const filtered = keyword === ''
+    ? ALL_PRODUCTS.slice(0, 50)
+    : ALL_PRODUCTS.filter(p => p.name.toLowerCase().includes(keyword)).slice(0, 50);
+
+  productSearchResults.innerHTML = '';
+
+  if (filtered.length === 0) {
+    const noResult = document.createElement('div');
+    noResult.className = 'product-search-no-result';
+    noResult.textContent = 'Barang tidak ditemukan.';
+    productSearchResults.appendChild(noResult);
+    productSearchResults.style.display = 'block';
+    return;
+  }
+
+  filtered.forEach(p => {
+    const item = document.createElement('div');
+    item.className = 'product-search-item';
+    item.textContent = `${p.name} (stok: ${p.current_stock} ${p.unit})`;
+    item.dataset.id = p.id;
+    item.dataset.currentStock = p.current_stock;
+    item.dataset.unit = p.unit;
+    item.dataset.name = p.name;
+
+    item.addEventListener('click', () => {
+      selectProduct(p);
+    });
+
+    productSearchResults.appendChild(item);
+  });
+
+  productSearchResults.style.display = 'block';
+}
+
+// Set produk yang terpilih (dipanggil saat user klik salah satu hasil)
+function selectProduct(product) {
+  productSelectedId.value = product.id;
+  productSearchInput.value = `${product.name} (stok: ${product.current_stock} ${product.unit})`;
+  productSearchInput.dataset.currentStock = product.current_stock;
+  productSearchResults.style.display = 'none';
+
+  // Trigger update preview opname kalau lagi di mode itu
+  updateOpnamePreview();
+}
+
+// Reset pilihan produk (dipanggil saat form direset atau ganti jenis transaksi)
+function resetProductSelection() {
+  productSelectedId.value = '';
+  productSearchInput.value = '';
+  delete productSearchInput.dataset.currentStock;
+  productSearchResults.style.display = 'none';
+  productSearchResults.innerHTML = '';
+}
+
+// Buka daftar saat input di-fokus
+productSearchInput.addEventListener('focus', () => {
+  renderProductResults('');
+});
+
+// Filter saat user ketik
+productSearchInput.addEventListener('input', () => {
+  // Kalau user mulai ngetik lagi, anggap pilihan sebelumnya batal sampai klik ulang
+  productSelectedId.value = '';
+  renderProductResults(productSearchInput.value);
+});
+
+// Tutup dropdown kalau klik di luar area search
+document.addEventListener('click', (e) => {
+  const isClickInside = productSearchInput.contains(e.target) || productSearchResults.contains(e.target);
+  if (!isClickInside) {
+    productSearchResults.style.display = 'none';
+  }
+});
+
+// ============================================
+// TOGGLE FIELD GROUPS
+// ============================================
+
 movementTypeSelect.addEventListener('change', () => {
   const type = movementTypeSelect.value;
 
@@ -82,17 +166,17 @@ movementTypeSelect.addEventListener('change', () => {
 
   // Untuk 'in', boleh input nama barang baru
   newProductFields.style.display = (type === 'in') ? 'block' : 'none';
+
+  // Reset pilihan produk setiap ganti jenis transaksi
+  resetProductSelection();
 });
 
 // Live preview selisih opname saat user ketik jumlah fisik
-document.getElementById('opnamePhysicalCount').addEventListener('input', () => {
-  const selectedOption = productSelect.selectedOptions[0];
-  if (!selectedOption || !selectedOption.value) return;
-
-  const currentStock = parseFloat(selectedOption.dataset.currentStock);
+function updateOpnamePreview() {
+  const currentStock = parseFloat(productSearchInput.dataset.currentStock);
   const physicalCount = parseFloat(document.getElementById('opnamePhysicalCount').value);
 
-  if (isNaN(physicalCount)) {
+  if (isNaN(currentStock) || isNaN(physicalCount)) {
     opnamePreview.textContent = '';
     return;
   }
@@ -101,7 +185,13 @@ document.getElementById('opnamePhysicalCount').addEventListener('input', () => {
   const arah = selisih > 0 ? 'lebih' : selisih < 0 ? 'kurang' : 'sama';
   opnamePreview.textContent = `Selisih: ${selisih > 0 ? '+' : ''}${selisih} (${arah}). Stok akan disesuaikan dari ${currentStock} → ${physicalCount}.`;
   opnamePreview.className = 'opname-preview ' + (selisih === 0 ? 'preview-neutral' : (selisih > 0 ? 'preview-plus' : 'preview-minus'));
-});
+}
+
+document.getElementById('opnamePhysicalCount').addEventListener('input', updateOpnamePreview);
+
+// ============================================
+// FORM SUBMIT
+// ============================================
 
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -137,6 +227,7 @@ form.addEventListener('submit', async (e) => {
     fieldsOpname.style.display = 'none';
     productSelectGroup.style.display = 'none';
     newProductFields.style.display = 'none';
+    resetProductSelection();
     document.getElementById('unit').value = 'pcs';
     await loadProductOptions();
 
@@ -225,12 +316,16 @@ async function handleStockIn() {
 // HANDLER: Penggunaan Barang (out)
 // ============================================
 async function handleStockOut() {
-  const productId = productSelect.value;
+  const productId = productSelectedId.value;
   const quantity = parseFloat(document.getElementById('outQuantity').value);
   const reason = document.getElementById('outReason').value;
 
-  if (!productId || isNaN(quantity) || quantity <= 0) {
-    throw new Error('Pilih barang dan isi jumlah dengan benar.');
+  if (!productId) {
+    throw new Error('Pilih barang dari daftar terlebih dahulu (klik salah satu hasil pencarian).');
+  }
+
+  if (isNaN(quantity) || quantity <= 0) {
+    throw new Error('Isi jumlah dengan benar.');
   }
 
   const { data: product, error: fetchError } = await supabaseClient
@@ -270,12 +365,16 @@ async function handleStockOut() {
 // HANDLER: Stok Opname
 // ============================================
 async function handleOpname() {
-  const productId = productSelect.value;
+  const productId = productSelectedId.value;
   const physicalCount = parseFloat(document.getElementById('opnamePhysicalCount').value);
   const opnameNote = document.getElementById('opnameNote').value.trim() || null;
 
-  if (!productId || isNaN(physicalCount) || physicalCount < 0) {
-    throw new Error('Pilih barang dan isi jumlah fisik dengan benar.');
+  if (!productId) {
+    throw new Error('Pilih barang dari daftar terlebih dahulu (klik salah satu hasil pencarian).');
+  }
+
+  if (isNaN(physicalCount) || physicalCount < 0) {
+    throw new Error('Isi jumlah fisik dengan benar.');
   }
 
   const { data: product, error: fetchError } = await supabaseClient
@@ -314,5 +413,4 @@ function showStatus(message, type) {
     statusDiv.className = '';
     statusDiv.textContent = '';
   }, 4000);
-      }
-
+}
