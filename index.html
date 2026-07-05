@@ -70,48 +70,112 @@
     <div class="app-header">
       <div>
         <h1>StockDental</h1>
-        <h2>Input Barang Masuk (Manual)</h2>
+        <h2>Input Transaksi Stok</h2>
       </div>
       <button id="logoutBtn" class="btn-secondary">Logout</button>
     </div>
 
-    <form id="formStockIn">
+    <form id="formStockMovement">
+
+      <!-- PILIHAN JENIS TRANSAKSI -->
       <div class="form-group">
-        <label for="productName">Nama Barang</label>
-        <input type="text" id="productName" required placeholder="Contoh: Sarung Tangan Latex M">
+        <label for="movementType">Jenis Transaksi</label>
+        <select id="movementType" required>
+          <option value="">-- Pilih Jenis Transaksi --</option>
+          <option value="in">Tambah Barang (Barang Masuk)</option>
+          <option value="out">Penggunaan Barang (Barang Keluar)</option>
+          <option value="opname_adjustment">Stok Opname</option>
+        </select>
       </div>
 
-      <div class="form-group">
-        <label for="category">Kategori</label>
-        <input type="text" id="category" placeholder="Contoh: Alat Pelindung Diri">
+      <!-- DROPDOWN PILIH BARANG EXISTING (dipakai untuk Out & Opname) -->
+      <div class="form-group" id="productSelectGroup" style="display:none;">
+        <label for="productSelect">Pilih Barang</label>
+        <select id="productSelect">
+          <option value="">-- Pilih Barang --</option>
+        </select>
       </div>
 
-      <div class="form-group">
-        <label for="quantity">Jumlah</label>
-        <input type="number" id="quantity" required min="0" step="0.01">
+      <!-- ========== FIELD: TAMBAH BARANG (in) ========== -->
+      <div id="fieldsIn" style="display:none;">
+
+        <div id="newProductFields">
+          <div class="form-group">
+            <label for="productName">Nama Barang</label>
+            <input type="text" id="productName" placeholder="Contoh: Sarung Tangan Latex M">
+          </div>
+
+          <div class="form-group">
+            <label for="category">Kategori</label>
+            <input type="text" id="category" placeholder="Contoh: Alat Pelindung Diri">
+          </div>
+
+          <div class="form-group">
+            <label for="storageLocation">Lokasi Penyimpanan</label>
+            <input type="text" id="storageLocation" placeholder="Contoh: Lemari A - Rak 2">
+          </div>
+
+          <div class="form-group">
+            <label for="minimumStock">Stok Minimum (opsional, buat alert)</label>
+            <input type="number" id="minimumStock" min="0" step="0.01" value="0">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="quantity">Jumlah Masuk</label>
+          <input type="number" id="quantity" min="0" step="0.01">
+        </div>
+
+        <div class="form-group">
+          <label for="unit">Satuan</label>
+          <input type="text" id="unit" placeholder="pcs / box / botol" value="pcs">
+        </div>
+
+        <div class="form-group">
+          <label for="expiryDate">Tanggal Kedaluwarsa (opsional)</label>
+          <input type="date" id="expiryDate">
+        </div>
+
+        <div class="form-group">
+          <label for="batchNumber">Nomor Batch (opsional)</label>
+          <input type="text" id="batchNumber" placeholder="Contoh: BTC-2026-001">
+        </div>
       </div>
 
-      <div class="form-group">
-        <label for="unit">Satuan</label>
-        <input type="text" id="unit" placeholder="pcs / box / botol" value="pcs">
+      <!-- ========== FIELD: PENGGUNAAN BARANG (out) ========== -->
+      <div id="fieldsOut" style="display:none;">
+        <div class="form-group">
+          <label for="outQuantity">Jumlah Dipakai</label>
+          <input type="number" id="outQuantity" min="0" step="0.01">
+        </div>
+
+        <div class="form-group">
+          <label for="outReason">Alasan</label>
+          <select id="outReason">
+            <option value="pemakaian_pasien">Pemakaian Pasien</option>
+            <option value="rusak">Rusak</option>
+            <option value="hilang">Hilang</option>
+            <option value="lainnya">Lainnya</option>
+          </select>
+        </div>
       </div>
 
-      <div class="form-group">
-        <label for="expiryDate">Tanggal Kedaluwarsa (opsional)</label>
-        <input type="date" id="expiryDate">
+      <!-- ========== FIELD: STOK OPNAME ========== -->
+      <div id="fieldsOpname" style="display:none;">
+        <div class="form-group">
+          <label for="opnamePhysicalCount">Jumlah Fisik (Hasil Hitung Riil)</label>
+          <input type="number" id="opnamePhysicalCount" min="0" step="0.01">
+        </div>
+
+        <div id="opnamePreview" class="opname-preview"></div>
+
+        <div class="form-group">
+          <label for="opnameNote">Catatan (opsional)</label>
+          <input type="text" id="opnameNote" placeholder="Contoh: Hasil opname bulanan Juli">
+        </div>
       </div>
 
-      <div class="form-group">
-        <label for="storageLocation">Lokasi Penyimpanan</label>
-        <input type="text" id="storageLocation" placeholder="Contoh: Lemari A - Rak 2">
-      </div>
-
-      <div class="form-group">
-        <label for="minimumStock">Stok Minimum (opsional, buat alert)</label>
-        <input type="number" id="minimumStock" min="0" step="0.01" value="0">
-      </div>
-
-      <button type="submit" id="submitBtn">Simpan Barang</button>
+      <button type="submit" id="submitBtn">Simpan Transaksi</button>
     </form>
 
     <div id="statusMessage"></div>
