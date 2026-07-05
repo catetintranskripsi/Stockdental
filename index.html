@@ -88,13 +88,13 @@
         </select>
       </div>
 
-      <!-- DROPDOWN PILIH BARANG EXISTING (dipakai untuk Out & Opname) -->
-      <div class="form-group" id="productSelectGroup" style="display:none;">
-        <label for="productSelect">Pilih Barang</label>
-        <select id="productSelect">
-          <option value="">-- Pilih Barang --</option>
-        </select>
-      </div>
+      <!-- SEARCHABLE PILIH BARANG (dipakai untuk Out & Opname) -->
+<div class="form-group" id="productSelectGroup" style="display:none; position:relative;">
+  <label for="productSearchInput">Pilih Barang</label>
+  <input type="text" id="productSearchInput" placeholder="Ketik nama barang..." autocomplete="off">
+  <input type="hidden" id="productSelectedId">
+  <div id="productSearchResults" class="product-search-results" style="display:none;"></div>
+</div>
 
       <!-- ========== FIELD: TAMBAH BARANG (in) ========== -->
       <div id="fieldsIn" style="display:none;">
