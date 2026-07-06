@@ -46,3 +46,194 @@ body {
   color: #888;
   font-style: italic;
 }
+/* ============================================
+   BOTTOM NAVIGATION
+   ============================================ */
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  background: white;
+  border-top: 1px solid #ddd;
+  z-index: 100;
+}
+
+.nav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px 0;
+  text-decoration: none;
+  color: #888;
+  font-size: 12px;
+}
+
+.nav-item.active {
+  color: #2563eb;
+  font-weight: bold;
+}
+
+.nav-icon {
+  font-size: 22px;
+  margin-bottom: 2px;
+}
+
+/* ============================================
+   INVENTARIS PAGE
+   ============================================ */
+.inventaris-summary {
+  margin: 12px 0;
+}
+
+.summary-ok {
+  color: #16a34a;
+  font-weight: bold;
+}
+
+.summary-warning {
+  color: #b45309;
+  font-weight: bold;
+}
+
+.inventaris-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.inventaris-item {
+  border: 1px solid #e5e5e5;
+  border-left-width: 4px;
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+
+.inventaris-item.status-kritis {
+  border-left-color: #dc2626;
+  background: #fef2f2;
+}
+
+.inventaris-item.status-menipis {
+  border-left-color: #d97706;
+  background: #fffbeb;
+}
+
+.inventaris-item.status-normal {
+  border-left-color: #16a34a;
+  background: #f0fdf4;
+}
+
+.inventaris-item-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.inventaris-item-name {
+  font-weight: bold;
+}
+
+.inventaris-badge {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  color: white;
+}
+
+.badge-kritis { background: #dc2626; }
+.badge-menipis { background: #d97706; }
+.badge-normal { background: #16a34a; }
+
+.inventaris-item-detail {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: #555;
+}
+
+/* ============================================
+   HISTORY PAGE
+   ============================================ */
+.filter-row {
+  display: flex;
+  gap: 10px;
+}
+
+.filter-row .form-group {
+  flex: 1;
+}
+
+.history-summary {
+  margin: 12px 0;
+  font-size: 14px;
+  color: #555;
+}
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.history-item {
+  border: 1px solid #e5e5e5;
+  border-left-width: 4px;
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+
+.history-item.type-in { border-left-color: #16a34a; }
+.history-item.type-out { border-left-color: #dc2626; }
+.history-item.type-opname_adjustment { border-left-color: #2563eb; }
+
+.history-item-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.history-badge {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  color: white;
+}
+
+.badge-in { background: #16a34a; }
+.badge-out { background: #dc2626; }
+.badge-opname_adjustment { background: #2563eb; }
+
+.history-date {
+  font-size: 12px;
+  color: #888;
+}
+
+.history-item-name {
+  font-weight: bold;
+  margin-bottom: 4px;
+}
+
+.history-item-detail {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: #555;
+}
+
+/* ============================================
+   SHARED
+   ============================================ */
+.loading-text, .error-text {
+  text-align: center;
+  color: #888;
+  padding: 20px 0;
+}
+
+.error-text {
+  color: #dc2626;
+  }
