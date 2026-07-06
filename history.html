@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StockDental - Riwayat</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- ============ AUTH CHECK SECTION ============ -->
+  <div class="container" id="authContainer">
+    <div id="loginRequiredView">
+      <h1>StockDental</h1>
+      <h2>Silakan login terlebih dahulu</h2>
+      <p><a href="index.html">Kembali ke halaman login</a></p>
+    </div>
+  </div>
+
+  <!-- ============ APP SECTION (tampil setelah login) ============ -->
+  <div class="container" id="appContainer" style="display:none; padding-bottom: 80px;">
+
+    <div class="app-header">
+      <div>
+        <h1>StockDental</h1>
+        <h2>Riwayat Transaksi</h2>
+      </div>
+      <button id="logoutBtn" class="btn-secondary">Logout</button>
+    </div>
+
+    <!-- FILTER BULAN & TAHUN -->
+    <div class="filter-row">
+      <div class="form-group">
+        <label for="filterMonth">Bulan</label>
+        <select id="filterMonth">
+          <option value="0">Januari</option>
+          <option value="1">Februari</option>
+          <option value="2">Maret</option>
+          <option value="3">April</option>
+          <option value="4">Mei</option>
+          <option value="5">Juni</option>
+          <option value="6">Juli</option>
+          <option value="7">Agustus</option>
+          <option value="8">September</option>
+          <option value="9">Oktober</option>
+          <option value="10">November</option>
+          <option value="11">Desember</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="filterYear">Tahun</label>
+        <select id="filterYear"></select>
+      </div>
+    </div>
+
+    <!-- RINGKASAN -->
+    <div id="historySummary" class="history-summary"></div>
+
+    <!-- LIST RIWAYAT -->
+    <div id="historyList" class="history-list">
+      <p class="loading-text">Memuat data...</p>
+    </div>
+
+  </div>
+
+  <!-- ============ BOTTOM NAVIGATION ============ -->
+  <nav class="bottom-nav" id="bottomNav" style="display:none;">
+    <a href="index.html" class="nav-item">
+      <span class="nav-icon">📝</span>
+      <span class="nav-label">Input</span>
+    </a>
+    <a href="inventaris.html" class="nav-item">
+      <span class="nav-icon">📦</span>
+      <span class="nav-label">Inventaris</span>
+    </a>
+    <a href="history.html" class="nav-item active">
+      <span class="nav-icon">📊</span>
+      <span class="nav-label">Riwayat</span>
+    </a>
+  </nav>
+
+  <!-- Supabase library dari CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase-client.js"></script>
+  <script src="js/auth-check.js"></script>
+  <script src="js/history.js"></script>
+</body>
+</html>
