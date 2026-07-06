@@ -65,7 +65,7 @@
   </div>
 
   <!-- ============ APP SECTION (tampil setelah login) ============ -->
-  <div class="container" id="appContainer" style="display:none;">
+  <div class="container" id="appContainer" style="display:none; padding-bottom: 80px;">
 
     <div class="app-header">
       <div>
@@ -180,6 +180,22 @@
 
     <div id="statusMessage"></div>
   </div>
+
+  <!-- ============ BOTTOM NAVIGATION ============ -->
+  <nav class="bottom-nav" id="bottomNav" style="display:none;">
+    <a href="index.html" class="nav-item active">
+      <span class="nav-icon">📝</span>
+      <span class="nav-label">Input</span>
+    </a>
+    <a href="inventaris.html" class="nav-item">
+      <span class="nav-icon">📦</span>
+      <span class="nav-label">Inventaris</span>
+    </a>
+    <a href="history.html" class="nav-item">
+      <span class="nav-icon">📊</span>
+      <span class="nav-label">Riwayat</span>
+    </a>
+  </nav>
 
   <!-- Supabase library dari CDN -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
