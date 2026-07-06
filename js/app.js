@@ -46,6 +46,10 @@ async function onUserLoggedIn() {
   }
 
   CURRENT_CLINIC_ID = userRow.clinic_id;
+
+  const bottomNav = document.getElementById('bottomNav');
+  if (bottomNav) bottomNav.style.display = 'flex';
+
   await loadProductOptions();
 }
 
