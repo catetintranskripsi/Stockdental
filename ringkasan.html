@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StockDental - Ringkasan</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- ============ AUTH GATE (kalau belum login) ============ -->
+  <div class="container" id="authContainer" style="display:none;">
+    <h1>StockDental</h1>
+    <p>Silakan login terlebih dahulu.</p>
+    <a href="index.html">Ke halaman Login</a>
+  </div>
+
+  <!-- ============ RINGKASAN (tampil setelah login) ============ -->
+  <div class="container" id="appContainer" style="display:none; padding-bottom: 80px;">
+
+    <div class="app-header">
+      <div>
+        <h1>StockDental</h1>
+        <h2>Ringkasan</h2>
+      </div>
+      <button id="logoutBtn" class="btn-secondary">Logout</button>
+    </div>
+
+    <div id="ringkasanLoading" class="loading-text">Memuat ringkasan...</div>
+
+    <div id="ringkasanContent" style="display:none;">
+
+      <!-- Status Stok -->
+      <div class="ringkasan-card">
+        <h3>Status Stok</h3>
+        <div class="ringkasan-status-row">
+          <div class="ringkasan-status-box status-kritis">
+            <span class="ringkasan-status-count" id="countKritis">0</span>
+            <span class="ringkasan-status-label">Kritis</span>
+          </div>
+          <div class="ringkasan-status-box status-menipis">
+            <span class="ringkasan-status-count" id="countMenipis">0</span>
+            <span class="ringkasan-status-label">Menipis</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Transaksi Hari Ini -->
+      <div class="ringkasan-card">
+        <h3>Transaksi Hari Ini</h3>
+        <p class="ringkasan-total-transaksi"><span id="totalTransaksiHariIni">0</span> transaksi</p>
+        <p class="ringkasan-detail-transaksi">
+          <span id="countIn">0</span> masuk ·
+          <span id="countOut">0</span> keluar ·
+          <span id="countOpname">0</span> opname
+        </p>
+      </div>
+
+      <!-- Top 5 Barang -->
+      <div class="ringkasan-card">
+        <h3>Top 5 Barang Paling Sering Dipakai Bulan Ini</h3>
+        <ol id="topProdukList" class="ringkasan-top-list">
+          <!-- diisi via JS -->
+        </ol>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- ============ BOTTOM NAVIGATION ============ -->
+  <nav class="bottom-nav" id="bottomNav" style="display:none;">
+    <a href="ringkasan.html" class="nav-item active">
+      <span class="nav-icon">📊</span>
+      <span class="nav-label">Ringkasan</span>
+    </a>
+    <a href="index.html" class="nav-item">
+      <span class="nav-icon">📝</span>
+      <span class="nav-label">Input</span>
+    </a>
+    <a href="inventaris.html" class="nav-item">
+      <span class="nav-icon">📦</span>
+      <span class="nav-label">Inventaris</span>
+    </a>
+    <a href="history.html" class="nav-item">
+      <span class="nav-icon">📈</span>
+      <span class="nav-label">Riwayat</span>
+    </a>
+  </nav>
+
+  <!-- Supabase library dari CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase-client.js"></script>
+  <script src="js/auth-check.js"></script>
+  <script src="js/ringkasan.js"></script>
+</body>
+  </html>
