@@ -82,6 +82,7 @@ formSignup.addEventListener('submit', async (e) => {
 
 // ---------- LOGIN ----------
 formLogin.addEventListener('submit', async (e) => {
+formLogin.addEventListener('submit', async (e) => {
   e.preventDefault();
   const loginBtn = document.getElementById('loginBtn');
 
@@ -105,9 +106,7 @@ formLogin.addEventListener('submit', async (e) => {
   }
 
   showAuthStatus(loginStatus, 'Login berhasil!', 'success');
-  showAuthStatus(loginStatus, 'Login berhasil!', 'success');
   window.location.href = 'ringkasan.html';
-});
 });
 
 // ---------- LOGOUT ----------
