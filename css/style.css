@@ -228,6 +228,7 @@ body {
 /* ============================================
    SHARED
    ============================================ */
+
 .loading-text, .error-text {
   text-align: center;
   color: #888;
@@ -237,3 +238,76 @@ body {
 .error-text {
   color: #dc2626;
   }
+
+/* ============================================
+   Percakapan 6 - RINGKASAN STYLING
+   ============================================ */
+.ringkasan-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.ringkasan-card h3 {
+  margin: 0 0 12px 0;
+  font-size: 16px;
+  color: #333;
+}
+
+.ringkasan-status-row {
+  display: flex;
+  gap: 12px;
+}
+
+.ringkasan-status-box {
+  flex: 1;
+  text-align: center;
+  padding: 12px;
+  border-radius: 8px;
+}
+
+.ringkasan-status-box.status-kritis {
+  background: #fee2e2;
+}
+
+.ringkasan-status-box.status-menipis {
+  background: #fef3c7;
+}
+
+.ringkasan-status-count {
+  display: block;
+  font-size: 28px;
+  font-weight: bold;
+}
+
+.status-kritis .ringkasan-status-count { color: #dc2626; }
+.status-menipis .ringkasan-status-count { color: #d97706; }
+
+.ringkasan-status-label {
+  font-size: 13px;
+  color: #666;
+}
+
+.ringkasan-total-transaksi {
+  font-size: 24px;
+  font-weight: bold;
+  margin: 0 0 4px 0;
+}
+
+.ringkasan-detail-transaksi {
+  font-size: 13px;
+  color: #666;
+  margin: 0;
+}
+
+.ringkasan-top-list {
+  padding-left: 20px;
+  margin: 0;
+}
+
+.ringkasan-top-list li {
+  padding: 6px 0;
+  font-size: 14px;
+}
