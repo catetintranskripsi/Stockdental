@@ -1,7 +1,7 @@
 // ============================================
 // AUTH LOGIC - Login, Signup, Logout, Session
-// Percakapan 4 - AUTH
-// Fix: bottom nav tetap muncul saat showApp() dipanggil ulang
+// Percakapan 4 - AUTH (awal)
+// Percakapan 6 - tambah clinic_name di signup, redirect ke ringkasan.html
 // ============================================
 
 const loginView = document.getElementById('loginView');
@@ -60,6 +60,7 @@ formSignup.addEventListener('submit', async (e) => {
       }
     }
   });
+
   signupBtn.disabled = false;
   signupBtn.textContent = 'Daftar';
 
@@ -68,12 +69,10 @@ formSignup.addEventListener('submit', async (e) => {
     return;
   }
 
-  // Kalau project Supabase minta konfirmasi email, kasih tau user
   if (data.user && !data.session) {
     showAuthStatus(signupStatus, 'Berhasil daftar! Cek email untuk konfirmasi sebelum login.', 'success');
   } else {
     showAuthStatus(signupStatus, 'Berhasil daftar! Mengalihkan...', 'success');
-    // Kalau langsung dapat session (auto-confirm), langsung ke Ringkasan
     setTimeout(() => {
       window.location.href = 'ringkasan.html';
     }, 1000);
@@ -81,7 +80,6 @@ formSignup.addEventListener('submit', async (e) => {
 });
 
 // ---------- LOGIN ----------
-formLogin.addEventListener('submit', async (e) => {
 formLogin.addEventListener('submit', async (e) => {
   e.preventDefault();
   const loginBtn = document.getElementById('loginBtn');
@@ -148,7 +146,6 @@ function showAuth() {
   loginView.style.display = 'block';
   signupView.style.display = 'none';
 
-  // Sembunyikan bottom nav juga saat belum login
   const bottomNav = document.getElementById('bottomNav');
   if (bottomNav) {
     bottomNav.style.display = 'none';
@@ -161,5 +158,4 @@ function showAuthStatus(el, message, type) {
   el.style.display = 'block';
 }
 
-// Jalankan pengecekan session begitu file ini di-load
-checkSession();
+// Jalankan pengecekan session
