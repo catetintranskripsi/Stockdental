@@ -33,9 +33,15 @@ formSignup.addEventListener('submit', async (e) => {
   e.preventDefault();
   const signupBtn = document.getElementById('signupBtn');
 
+  const clinicName = document.getElementById('signupClinicName').value.trim();
   const email = document.getElementById('signupEmail').value.trim();
   const password = document.getElementById('signupPassword').value;
   const passwordConfirm = document.getElementById('signupPasswordConfirm').value;
+
+  if (!clinicName) {
+    showAuthStatus(signupStatus, 'Nama klinik/rumah sakit wajib diisi!', 'error');
+    return;
+  }
 
   if (password !== passwordConfirm) {
     showAuthStatus(signupStatus, 'Password tidak cocok!', 'error');
@@ -47,9 +53,13 @@ formSignup.addEventListener('submit', async (e) => {
 
   const { data, error } = await supabaseClient.auth.signUp({
     email: email,
-    password: password
+    password: password,
+    options: {
+      data: {
+        clinic_name: clinicName
+      }
+    }
   });
-
   signupBtn.disabled = false;
   signupBtn.textContent = 'Daftar';
 
@@ -115,16 +125,24 @@ async function checkSession() {
 
 // ---------- TAMPILKAN APP (setelah login) ----------
 function showApp() {
+  // Kalau lagi di index.html (halaman Input), redirect ke Ringkasan dulu
+  // supaya user selalu mendarat di Ringkasan setelah login, dari halaman manapun
+  const isIndexPage = window.location.pathname.endsWith('index.html') 
+    || window.location.pathname.endsWith('/');
+
+  if (isIndexPage) {
+    window.location.href = 'ringkasan.html';
+    return;
+  }
+
   authContainer.style.display = 'none';
   appContainer.style.display = 'block';
 
-  // Munculkan bottom nav (kalau elemen ini ada di halaman)
   const bottomNav = document.getElementById('bottomNav');
   if (bottomNav) {
     bottomNav.style.display = 'flex';
   }
 
-  // Kasih tau app.js bahwa user sudah login, biar clinic_id bisa diambil
   if (typeof onUserLoggedIn === 'function') {
     onUserLoggedIn();
   }
