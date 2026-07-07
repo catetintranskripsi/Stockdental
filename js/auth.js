@@ -159,3 +159,4 @@ function showAuthStatus(el, message, type) {
 }
 
 // Jalankan pengecekan session
+checkSession();
