@@ -73,8 +73,10 @@ formSignup.addEventListener('submit', async (e) => {
     showAuthStatus(signupStatus, 'Berhasil daftar! Cek email untuk konfirmasi sebelum login.', 'success');
   } else {
     showAuthStatus(signupStatus, 'Berhasil daftar! Mengalihkan...', 'success');
-    // Kalau langsung dapat session (auto-confirm), langsung masuk app
-    setTimeout(() => checkSession(), 1000);
+    // Kalau langsung dapat session (auto-confirm), langsung ke Ringkasan
+    setTimeout(() => {
+      window.location.href = 'ringkasan.html';
+    }, 1000);
   }
 });
 
@@ -103,7 +105,9 @@ formLogin.addEventListener('submit', async (e) => {
   }
 
   showAuthStatus(loginStatus, 'Login berhasil!', 'success');
-  showApp();
+  showAuthStatus(loginStatus, 'Login berhasil!', 'success');
+  window.location.href = 'ringkasan.html';
+});
 });
 
 // ---------- LOGOUT ----------
@@ -125,16 +129,6 @@ async function checkSession() {
 
 // ---------- TAMPILKAN APP (setelah login) ----------
 function showApp() {
-  // Kalau lagi di index.html (halaman Input), redirect ke Ringkasan dulu
-  // supaya user selalu mendarat di Ringkasan setelah login, dari halaman manapun
-  const isIndexPage = window.location.pathname.endsWith('index.html') 
-    || window.location.pathname.endsWith('/');
-
-  if (isIndexPage) {
-    window.location.href = 'ringkasan.html';
-    return;
-  }
-
   authContainer.style.display = 'none';
   appContainer.style.display = 'block';
 
