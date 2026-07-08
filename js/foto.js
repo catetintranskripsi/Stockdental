@@ -12,7 +12,7 @@
 // ⚠️ GANTI dengan API key Gemini kamu sendiri (dari Google AI Studio)
 const GEMINI_API_KEY = 'AQ.Ab8RN6IafjvsK54WV9sqitcKKuR3-N2GUjgoRLyZb8ZQM0AjsQ';
 const GEMINI_MODEL = 'gemini-flash-latest';
-const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 
 let selectedPhotoBase64 = null;
 let selectedPhotoMimeType = null;
@@ -142,7 +142,10 @@ Kalau tidak ada barang yang bisa dideteksi sama sekali, balas dengan array koson
 
   const response = await fetch(GEMINI_API_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'X-goog-api-key': GEMINI_API_KEY
+    },
     body: JSON.stringify({
       contents: [{
         parts: [
