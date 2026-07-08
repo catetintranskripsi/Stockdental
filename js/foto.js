@@ -3,10 +3,13 @@
 // Percakapan 7 - FOTO KE GEMINI API
 // ⚠️ DEVELOPMENT ONLY: API key di frontend.
 // WAJIB migrate ke Supabase Edge Function sebelum launch/monetisasi.
+//
+// CATATAN: CURRENT_CLINIC_ID, CURRENT_USER_ID, supabaseClient
+// sudah didefinisikan di auth-check.js dan supabase-client.js.
+// File ini TIDAK boleh redeclare variabel itu.
 // ============================================
 
 // ⚠️ GANTI dengan API key Gemini kamu sendiri (dari Google AI Studio)
-// JANGAN commit key asli ke public repo kalau bisa dihindari.
 const GEMINI_API_KEY = 'GANTI_DENGAN_API_KEY_GEMINI_KAMU';
 const GEMINI_MODEL = 'gemini-1.5-flash';
 const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
@@ -15,6 +18,8 @@ let selectedPhotoBase64 = null;
 let selectedPhotoMimeType = null;
 let extractedItems = []; // array hasil ekstraksi yang sedang diedit user
 
+// Elemen-elemen DOM (di-query sekali di top level, aman karena DOM sudah ada
+// walau appContainer masih display:none saat ini)
 const photoInput = document.getElementById('photoInput');
 const photoPreview = document.getElementById('photoPreview');
 const uploadLabel = document.getElementById('uploadLabel');
@@ -30,9 +35,22 @@ const saveAllBtn = document.getElementById('saveAllBtn');
 const saveStatus = document.getElementById('saveStatus');
 
 // ============================================
+// onPageReady() — dipanggil oleh auth-check.js
+// SETELAH CURRENT_CLINIC_ID & CURRENT_USER_ID terisi.
+// Di sinilah semua event listener didaftarkan.
+// ============================================
+function onPageReady() {
+  photoInput.addEventListener('change', handlePhotoSelected);
+  analyzeBtn.addEventListener('click', handleAnalyzeClick);
+  addManualRowBtn.addEventListener('click', handleAddManualRow);
+  cancelResultBtn.addEventListener('click', resetFotoPage);
+  saveAllBtn.addEventListener('click', handleSaveAllClick);
+}
+
+// ============================================
 // STEP 1: User pilih foto → preview
 // ============================================
-photoInput.addEventListener('change', async (e) => {
+async function handlePhotoSelected(e) {
   const file = e.target.files[0];
   if (!file) return;
 
@@ -40,9 +58,8 @@ photoInput.addEventListener('change', async (e) => {
 
   const reader = new FileReader();
   reader.onload = (event) => {
-    // event.target.result = "data:image/jpeg;base64,XXXXX"
     const fullDataUrl = event.target.result;
-    selectedPhotoBase64 = fullDataUrl.split(',')[1]; // ambil base64-nya saja
+    selectedPhotoBase64 = fullDataUrl.split(',')[1];
 
     photoPreview.src = fullDataUrl;
     photoPreview.style.display = 'block';
@@ -51,12 +68,12 @@ photoInput.addEventListener('change', async (e) => {
     analyzeBtn.disabled = false;
   };
   reader.readAsDataURL(file);
-});
+}
 
 // ============================================
 // STEP 2: Kirim ke Gemini API
 // ============================================
-analyzeBtn.addEventListener('click', async () => {
+async function handleAnalyzeClick() {
   if (!selectedPhotoBase64) return;
 
   analyzeBtn.disabled = true;
@@ -96,7 +113,7 @@ analyzeBtn.addEventListener('click', async () => {
     analyzeBtn.disabled = false;
     analyzeBtn.textContent = 'Analisis dengan AI';
   }
-});
+}
 
 // ============================================
 // FUNGSI: Panggil Gemini API, parse JSON hasil
@@ -126,7 +143,7 @@ Kalau tidak ada barang yang bisa dideteksi sama sekali, balas dengan array koson
         ]
       }],
       generationConfig: {
-        temperature: 0.1, // rendah biar hasil konsisten, bukan kreatif
+        temperature: 0.1,
         maxOutputTokens: 2048
       }
     })
@@ -145,7 +162,6 @@ Kalau tidak ada barang yang bisa dideteksi sama sekali, balas dengan array koson
 
   let rawText = data.candidates[0].content.parts[0].text;
 
-  // Bersihkan kemungkinan AI tetap nambahin ```json ... ```
   rawText = rawText.trim();
   rawText = rawText.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '');
 
@@ -227,20 +243,17 @@ function renderExtractedItems() {
       </div>
     `;
 
-    // Event: checkbox include/exclude
     row.querySelector('.item-include').addEventListener('change', (e) => {
       updateItemField(item.tempId, 'included', e.target.checked);
       row.classList.toggle('item-excluded', !e.target.checked);
     });
 
-    // Event: hapus baris
     row.querySelector('.btn-delete-row').addEventListener('click', () => {
       extractedItems = extractedItems.filter(i => i.tempId !== item.tempId);
       row.remove();
       updateResultSummary();
     });
 
-    // Event: tiap field diketik ulang → update ke array extractedItems
     row.querySelector('.item-nama').addEventListener('input', (e) => updateItemField(item.tempId, 'nama', e.target.value));
     row.querySelector('.item-jumlah').addEventListener('input', (e) => updateItemField(item.tempId, 'jumlah', parseFloat(e.target.value) || 0));
     row.querySelector('.item-satuan').addEventListener('change', (e) => updateItemField(item.tempId, 'satuan', e.target.value));
@@ -262,9 +275,9 @@ function updateResultSummary() {
 }
 
 // ============================================
-// Tambah baris manual (kalau AI kelewat 1 barang)
+// Tambah baris manual
 // ============================================
-addManualRowBtn.addEventListener('click', () => {
+function handleAddManualRow() {
   const newItem = {
     tempId: 'item_manual_' + Date.now(),
     nama: '',
@@ -277,20 +290,12 @@ addManualRowBtn.addEventListener('click', () => {
   };
   extractedItems.push(newItem);
   renderExtractedItems();
-});
+}
 
 // ============================================
-// Batal → reset semua
+// SIMPAN SEMUA
 // ============================================
-cancelResultBtn.addEventListener('click', () => {
-  resetFotoPage();
-});
-
-// ============================================
-// SIMPAN SEMUA → proses tiap item ke Supabase
-// (logic sama persis seperti handleStockIn() di app.js)
-// ============================================
-saveAllBtn.addEventListener('click', async () => {
+async function handleSaveAllClick() {
   const itemsToSave = extractedItems.filter(i => i.included);
 
   if (itemsToSave.length === 0) {
@@ -298,7 +303,6 @@ saveAllBtn.addEventListener('click', async () => {
     return;
   }
 
-  // Validasi dasar
   for (const item of itemsToSave) {
     if (!item.nama.trim() || !item.jumlah || item.jumlah <= 0) {
       showSaveStatus(`Barang "${item.nama || '(tanpa nama)'}" harus punya nama dan jumlah > 0.`, 'error');
@@ -333,7 +337,7 @@ saveAllBtn.addEventListener('click', async () => {
   } else {
     showSaveStatus(`${successCount} berhasil, ${failedItems.length} gagal (${failedItems.join(', ')}). Cek koneksi dan coba lagi untuk yang gagal.`, 'error');
   }
-});
+}
 
 // ============================================
 // Simpan 1 item ke products + stock_movements
@@ -347,7 +351,6 @@ async function saveExtractedItemToSupabase(item) {
   const expiryDate = item.expiry_date || null;
   const storageLocation = item.lokasi_penyimpanan.trim() || null;
 
-  // Cek produk existing atau buat baru
   let { data: existingProduct, error: findError } = await supabaseClient
     .from('products')
     .select('id, current_stock')
@@ -437,11 +440,11 @@ function showSaveStatus(message, type) {
 }
 
 // ============================================
-// HELPER: Escape HTML biar aman dari nama barang yang aneh
+// HELPER: Escape HTML
 // ============================================
 function escapeHtml(text) {
   if (!text) return '';
   const div = document.createElement('div');
   div.textContent = text;
   return div.innerHTML;
-        }
+                         }
