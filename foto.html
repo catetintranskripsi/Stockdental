@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Foto Barang - StockDental</title>
+  <title>StockDental - Foto Barang</title>
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="css/foto.css">
 </head>
@@ -13,12 +13,27 @@
   <!-- Percakapan 7 - HALAMAN FOTO EKSTRAKSI AI -->
   <!-- ============================================ -->
 
-  <div id="fotoContainer" class="page-container">
+  <!-- ============ AUTH CHECK SECTION ============ -->
+  <div class="container" id="authContainer">
+    <div id="loginRequiredView">
+      <h1>StockDental</h1>
+      <h2>Silakan login terlebih dahulu</h2>
+      <p><a href="index.html">Kembali ke halaman login</a></p>
+    </div>
+  </div>
 
-    <header class="page-header">
-      <h1>📸 Foto Barang / Faktur</h1>
-      <p class="page-subtitle">Ambil foto barang atau faktur, AI akan bantu baca datanya</p>
-    </header>
+  <!-- ============ APP SECTION (tampil setelah login) ============ -->
+  <div class="container" id="appContainer" style="display:none; padding-bottom: 80px;">
+
+    <div class="app-header">
+      <div>
+        <h1>StockDental</h1>
+        <h2>Foto Barang / Faktur</h2>
+      </div>
+      <button id="logoutBtn" class="btn-secondary">Logout</button>
+    </div>
+
+    <p class="page-subtitle">Ambil foto barang atau faktur, AI akan bantu baca datanya</p>
 
     <!-- STEP 1: Upload/Ambil Foto -->
     <div id="uploadSection" class="card">
@@ -56,11 +71,28 @@
 
   </div>
 
-  <!-- Bottom nav (sama seperti halaman lain) -->
-  <nav id="bottomNav" class="bottom-nav" style="display:none;">
-    <a href="ringkasan.html" class="nav-item">🏠 Ringkasan</a>
-    <a href="input.html" class="nav-item">✏️ Input Manual</a>
-    <a href="foto.html" class="nav-item active">📷 Foto</a>
+  <!-- ============ BOTTOM NAVIGATION ============ -->
+  <nav class="bottom-nav" id="bottomNav" style="display:none;">
+    <a href="ringkasan.html" class="nav-item">
+      <span class="nav-icon">📊</span>
+      <span class="nav-label">Ringkasan</span>
+    </a>
+    <a href="index.html" class="nav-item">
+      <span class="nav-icon">📝</span>
+      <span class="nav-label">Input</span>
+    </a>
+    <a href="inventaris.html" class="nav-item">
+      <span class="nav-icon">📦</span>
+      <span class="nav-label">Inventaris</span>
+    </a>
+    <a href="history.html" class="nav-item">
+      <span class="nav-icon">📈</span>
+      <span class="nav-label">Riwayat</span>
+    </a>
+    <a href="foto.html" class="nav-item active">
+      <span class="nav-icon">📷</span>
+      <span class="nav-label">Foto</span>
+    </a>
   </nav>
 
   <!-- Scripts -->
@@ -70,4 +102,4 @@
   <script src="js/foto.js"></script>
 
 </body>
-  </html>
+</html>
