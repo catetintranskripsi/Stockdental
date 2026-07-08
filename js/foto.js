@@ -1,17 +1,15 @@
 // ============================================
 // AI PHOTO EKSTRAKSI
-// Percakapan 7 - FOTO KE GEMINI API
-// ⚠️ DEVELOPMENT ONLY: API key di frontend.
-// WAJIB migrate ke Supabase Edge Function sebelum launch/monetisasi.
+// Percakapan 7 (revisi) - FOTO KE EDGE FUNCTION
+// API key Gemini sudah dipindah ke Supabase Edge Function (server-side).
+// Browser TIDAK lagi menyimpan/mengirim API key apapun.
 //
 // CATATAN: CURRENT_CLINIC_ID, CURRENT_USER_ID, supabaseClient
 // sudah didefinisikan di auth-check.js dan supabase-client.js.
 // File ini TIDAK boleh redeclare variabel itu.
 // ============================================
 
-// ⚠️ GANTI dengan API key Gemini kamu sendiri (dari Google AI Studio)
-const GEMINI_MODEL = 'gemini-flash-latest';
-const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+const EDGE_FUNCTION_URL = 'https://redocvsmqvjocbenlicw.supabase.co/functions/v1/smooth-responder';
 
 let selectedPhotoBase64 = null;
 let selectedPhotoMimeType = null;
@@ -70,7 +68,7 @@ async function handlePhotoSelected(e) {
 }
 
 // ============================================
-// STEP 2: Kirim ke Gemini API
+// STEP 2: Kirim ke Edge Function (bukan langsung ke Gemini)
 // ============================================
 async function handleAnalyzeClick() {
   if (!selectedPhotoBase64) return;
@@ -106,7 +104,7 @@ async function handleAnalyzeClick() {
     resultSection.scrollIntoView({ behavior: 'smooth' });
 
   } catch (error) {
-    console.error('Gemini error:', error);
+    console.error('Edge Function error:', error);
     showUploadStatus('Gagal menganalisis foto: ' + error.message, 'error');
   } finally {
     analyzeBtn.disabled = false;
@@ -115,79 +113,40 @@ async function handleAnalyzeClick() {
 }
 
 // ============================================
-// FUNGSI: Panggil Gemini API, parse JSON hasil
+// FUNGSI: Panggil Edge Function (proxy Gemini di server)
+// Key Gemini TIDAK ada di sini sama sekali — aman.
 // ============================================
 async function callGeminiExtraction(base64Image, mimeType) {
-  const prompt = `Kamu adalah asisten ekstraksi data untuk klinik gigi.
-Analisis foto ini (bisa berupa foto barang fisik ATAU foto faktur/nota pembelian).
-Untuk setiap barang yang terlihat, ekstrak informasinya.
+  // Ambil token login user saat ini, dikirim ke Edge Function untuk auth check
+  const { data: { session } } = await supabaseClient.auth.getSession();
 
-PENTING - Format nama barang:
-Nama barang HARUS mencakup jenis bahan/tipe barang, merek, dan varian/warna/ukuran jika terlihat, digabung jadi satu string alami. Ini contoh format yang benar:
-- "Komposit 3M A3"
-- "Komposit Palfique A2"
-- "Sarung Tangan Sensi M"
-- "Masker Sensi 3 Ply"
-Jangan pisahkan merek atau jenis bahan ke field lain — semua digabung di field "nama".
+  if (!session) {
+    throw new Error('Sesi login tidak ditemukan. Silakan login ulang.');
+  }
 
-Balas HANYA dengan JSON array valid, TANPA teks lain, TANPA markdown code block (jangan pakai \`\`\`json).
-
-Format setiap item:
-{"nama": "nama barang lengkap dengan jenis bahan+merek+varian jika terlihat", "jumlah": angka, "satuan": "pcs/box/botol/tube/dus/lainnya", "kategori": "kategori barang (misal: APD, Bahan Habis Pakai, Alat, Obat)", "expiry_date": "YYYY-MM-DD atau null jika tidak terlihat", "lokasi_penyimpanan": "lokasi jika terlihat di foto atau sticker, kalau tidak ada isi string kosong"}
-
-Kalau foto adalah faktur/nota dengan banyak item, buat satu object per baris item.
-Kalau info tertentu tidak terlihat, isi null (untuk expiry_date) atau string kosong (untuk field teks lain).
-Kalau tidak ada barang yang bisa dideteksi sama sekali, balas dengan array kosong: []`;
-
-  const response = await fetch(GEMINI_API_URL, {
+  const response = await fetch(EDGE_FUNCTION_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'X-goog-api-key': GEMINI_API_KEY
+      'Authorization': `Bearer ${session.access_token}`
     },
     body: JSON.stringify({
-      contents: [{
-        parts: [
-          { text: prompt },
-          { inline_data: { mime_type: mimeType, data: base64Image } }
-        ]
-      }],
-      generationConfig: {
-        temperature: 0.1,
-        maxOutputTokens: 2048
-      }
+      image_base64: base64Image,
+      mime_type: mimeType
     })
   });
 
-  if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`Gemini API error (${response.status}): ${errText.slice(0, 200)}`);
-  }
-
   const data = await response.json();
 
-  if (!data.candidates || data.candidates.length === 0) {
-    throw new Error('AI tidak memberikan respons. Coba foto lain.');
+  if (!response.ok) {
+    throw new Error(data.error || `Server error (${response.status})`);
   }
 
-  let rawText = data.candidates[0].content.parts[0].text;
-
-  rawText = rawText.trim();
-  rawText = rawText.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '');
-
-  let parsed;
-  try {
-    parsed = JSON.parse(rawText);
-  } catch (parseError) {
-    console.error('Raw response dari Gemini:', rawText);
-    throw new Error('Format hasil AI tidak sesuai (bukan JSON valid). Coba lagi atau pakai input manual.');
+  if (!Array.isArray(data.items)) {
+    throw new Error('Format hasil dari server tidak sesuai.');
   }
 
-  if (!Array.isArray(parsed)) {
-    throw new Error('Format hasil AI tidak sesuai (bukan array).');
-  }
-
-  return parsed;
+  return data.items;
 }
 
 // ============================================
@@ -457,4 +416,5 @@ function escapeHtml(text) {
   const div = document.createElement('div');
   div.textContent = text;
   return div.innerHTML;
-                         }
+              }
+      
