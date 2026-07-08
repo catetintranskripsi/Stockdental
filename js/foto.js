@@ -202,7 +202,7 @@ function renderExtractedItems() {
         <div class="field-row">
           <div class="field-group">
             <label>Tanggal Kedaluwarsa</label>
-            <input type="date" class="item-expiry" value="${item.expiry_date || ''}">
+            <input type="date" class="item-expiry">
           </div>
           <div class="field-group">
             <label>Lokasi Simpan</label>
@@ -229,6 +229,11 @@ function renderExtractedItems() {
     row.querySelector('.item-kategori').addEventListener('input', (e) => updateItemField(item.tempId, 'kategori', e.target.value));
     row.querySelector('.item-expiry').addEventListener('input', (e) => updateItemField(item.tempId, 'expiry_date', e.target.value));
     row.querySelector('.item-lokasi').addEventListener('input', (e) => updateItemField(item.tempId, 'lokasi_penyimpanan', e.target.value));
+    // Set value date terpisah setelah elemen ter-attach, untuk hindari bug WebView Android
+const expiryInput = row.querySelector('.item-expiry');
+if (item.expiry_date) {
+  expiryInput.value = item.expiry_date;
+}
 
     extractedItemsList.appendChild(row);
   });
