@@ -123,10 +123,18 @@ async function callGeminiExtraction(base64Image, mimeType) {
 Analisis foto ini (bisa berupa foto barang fisik ATAU foto faktur/nota pembelian).
 Untuk setiap barang yang terlihat, ekstrak informasinya.
 
+PENTING - Format nama barang:
+Nama barang HARUS mencakup jenis bahan/tipe barang, merek, dan varian/warna/ukuran jika terlihat, digabung jadi satu string alami. Ini contoh format yang benar:
+- "Komposit 3M A3"
+- "Komposit Palfique A2"
+- "Sarung Tangan Sensi M"
+- "Masker Sensi 3 Ply"
+Jangan pisahkan merek atau jenis bahan ke field lain — semua digabung di field "nama".
+
 Balas HANYA dengan JSON array valid, TANPA teks lain, TANPA markdown code block (jangan pakai \`\`\`json).
 
 Format setiap item:
-{"nama": "nama barang", "jumlah": angka, "satuan": "pcs/box/botol/tube/dus/lainnya", "kategori": "kategori barang (misal: APD, Bahan Habis Pakai, Alat, Obat)", "expiry_date": "YYYY-MM-DD atau null jika tidak terlihat", "lokasi_penyimpanan": "lokasi jika terlihat di foto atau sticker, kalau tidak ada isi string kosong"}
+{"nama": "nama barang lengkap dengan jenis bahan+merek+varian jika terlihat", "jumlah": angka, "satuan": "pcs/box/botol/tube/dus/lainnya", "kategori": "kategori barang (misal: APD, Bahan Habis Pakai, Alat, Obat)", "expiry_date": "YYYY-MM-DD atau null jika tidak terlihat", "lokasi_penyimpanan": "lokasi jika terlihat di foto atau sticker, kalau tidak ada isi string kosong"}
 
 Kalau foto adalah faktur/nota dengan banyak item, buat satu object per baris item.
 Kalau info tertentu tidak terlihat, isi null (untuk expiry_date) atau string kosong (untuk field teks lain).
