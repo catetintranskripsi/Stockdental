@@ -10,7 +10,6 @@
 // ============================================
 
 // ⚠️ GANTI dengan API key Gemini kamu sendiri (dari Google AI Studio)
-const GEMINI_API_KEY = 'AQ.Ab8RN6JOzeV5DXD2igIKdLycXAdeFFO5HG9Bf_YfgkEO610Z4g';
 const GEMINI_MODEL = 'gemini-flash-latest';
 const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 
