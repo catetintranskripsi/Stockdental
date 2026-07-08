@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Foto Barang - StockDental</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/foto.css">
+</head>
+<body>
+
+  <!-- ============================================ -->
+  <!-- Percakapan 7 - HALAMAN FOTO EKSTRAKSI AI -->
+  <!-- ============================================ -->
+
+  <div id="fotoContainer" class="page-container">
+
+    <header class="page-header">
+      <h1>📸 Foto Barang / Faktur</h1>
+      <p class="page-subtitle">Ambil foto barang atau faktur, AI akan bantu baca datanya</p>
+    </header>
+
+    <!-- STEP 1: Upload/Ambil Foto -->
+    <div id="uploadSection" class="card">
+      <label for="photoInput" class="upload-box">
+        <span class="upload-icon">📷</span>
+        <span id="uploadLabel">Tap untuk ambil foto atau pilih dari galeri</span>
+        <input type="file" id="photoInput" accept="image/*" capture="environment" hidden>
+      </label>
+
+      <img id="photoPreview" class="photo-preview" style="display:none;" alt="Preview foto">
+
+      <button id="analyzeBtn" class="btn-primary" style="display:none;" disabled>
+        Analisis dengan AI
+      </button>
+
+      <div id="uploadStatus" class="status-message" style="display:none;"></div>
+    </div>
+
+    <!-- STEP 2: Hasil Ekstraksi (editable) -->
+    <div id="resultSection" class="card" style="display:none;">
+      <h2>Hasil Deteksi</h2>
+      <p id="resultSummary" class="result-summary"></p>
+
+      <div id="extractedItemsList"></div>
+
+      <button id="addManualRowBtn" class="btn-secondary">+ Tambah baris manual</button>
+
+      <div class="button-row">
+        <button id="cancelResultBtn" class="btn-cancel">Batal</button>
+        <button id="saveAllBtn" class="btn-primary">Simpan Semua</button>
+      </div>
+
+      <div id="saveStatus" class="status-message" style="display:none;"></div>
+    </div>
+
+  </div>
+
+  <!-- Bottom nav (sama seperti halaman lain) -->
+  <nav id="bottomNav" class="bottom-nav" style="display:none;">
+    <a href="ringkasan.html" class="nav-item">🏠 Ringkasan</a>
+    <a href="input.html" class="nav-item">✏️ Input Manual</a>
+    <a href="foto.html" class="nav-item active">📷 Foto</a>
+  </nav>
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase-client.js"></script>
+  <script src="js/auth-check.js"></script>
+  <script src="js/foto.js"></script>
+
+</body>
+  </html>
