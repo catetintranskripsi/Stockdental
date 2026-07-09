@@ -118,14 +118,14 @@ async function checkSession() {
   const { data: { session } } = await supabaseClient.auth.getSession();
 
   if (session) {
-    showApp();
+    await showApp();
   } else {
     showAuth();
   }
 }
 
 // ---------- TAMPILKAN APP (setelah login) ----------
-function showApp() {
+async function showApp() {
   authContainer.style.display = 'none';
   appContainer.style.display = 'block';
 
@@ -135,7 +135,7 @@ function showApp() {
   }
 
   if (typeof onUserLoggedIn === 'function') {
-    onUserLoggedIn();
+    await onUserLoggedIn();
   }
 }
 
