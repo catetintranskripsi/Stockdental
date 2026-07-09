@@ -371,7 +371,7 @@ async function saveExtractedItemToSupabase(item) {
       stock_before: stockBefore,
       stock_after: stockAfter,
       expiry_date: expiryDate,
-      source_type: 'ai_photo',
+      source_type: 'photo_ai',
       performed_by: CURRENT_USER_ID
     });
 
