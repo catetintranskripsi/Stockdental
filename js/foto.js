@@ -95,6 +95,7 @@ async function handleAnalyzeClick() {
       kategori: item.kategori || '',
       expiry_date: item.expiry_date || '',
       lokasi_penyimpanan: item.lokasi_penyimpanan || '',
+      jenis_transaksi: 'in', // default: Barang Masuk. Bisa diubah ke 'opname' oleh user.
       included: true
     }));
 
@@ -170,6 +171,20 @@ function renderExtractedItems() {
         <button type="button" class="btn-delete-row">🗑️ Hapus</button>
       </div>
 
+      <div class="field-group jenis-transaksi-group">
+        <label>Jenis Transaksi</label>
+        <div class="radio-row">
+          <label class="radio-label">
+            <input type="radio" name="jenis_${item.tempId}" class="item-jenis-in" value="in" ${item.jenis_transaksi === 'in' ? 'checked' : ''}>
+            <span>Barang Masuk</span>
+          </label>
+          <label class="radio-label">
+            <input type="radio" name="jenis_${item.tempId}" class="item-jenis-opname" value="opname" ${item.jenis_transaksi === 'opname' ? 'checked' : ''}>
+            <span>Stok Fisik Saat Ini</span>
+          </label>
+        </div>
+      </div>
+
       <div class="item-fields">
         <div class="field-group">
           <label>Nama Barang</label>
@@ -217,6 +232,13 @@ function renderExtractedItems() {
       row.classList.toggle('item-excluded', !e.target.checked);
     });
 
+    row.querySelector('.item-jenis-in').addEventListener('change', (e) => {
+      if (e.target.checked) updateItemField(item.tempId, 'jenis_transaksi', 'in');
+    });
+    row.querySelector('.item-jenis-opname').addEventListener('change', (e) => {
+      if (e.target.checked) updateItemField(item.tempId, 'jenis_transaksi', 'opname');
+    });
+
     row.querySelector('.btn-delete-row').addEventListener('click', () => {
       extractedItems = extractedItems.filter(i => i.tempId !== item.tempId);
       row.remove();
@@ -229,11 +251,12 @@ function renderExtractedItems() {
     row.querySelector('.item-kategori').addEventListener('input', (e) => updateItemField(item.tempId, 'kategori', e.target.value));
     row.querySelector('.item-expiry').addEventListener('input', (e) => updateItemField(item.tempId, 'expiry_date', e.target.value));
     row.querySelector('.item-lokasi').addEventListener('input', (e) => updateItemField(item.tempId, 'lokasi_penyimpanan', e.target.value));
+
     // Set value date terpisah setelah elemen ter-attach, untuk hindari bug WebView Android
-const expiryInput = row.querySelector('.item-expiry');
-if (item.expiry_date) {
-  expiryInput.value = item.expiry_date;
-}
+    const expiryInput = row.querySelector('.item-expiry');
+    if (item.expiry_date) {
+      expiryInput.value = item.expiry_date;
+    }
 
     extractedItemsList.appendChild(row);
   });
@@ -260,6 +283,7 @@ function handleAddManualRow() {
     kategori: '',
     expiry_date: '',
     lokasi_penyimpanan: '',
+    jenis_transaksi: 'in',
     included: true
   };
   extractedItems.push(newItem);
@@ -359,15 +383,37 @@ async function saveExtractedItemToSupabase(item) {
     stockBefore = 0;
   }
 
-  const stockAfter = stockBefore + quantity;
+  // ============================================
+  // Percabangan: "Barang Masuk" vs "Stok Fisik Saat Ini"
+  // Produk baru (stockBefore selalu 0, baru dibuat barusan) selalu
+  // diperlakukan sebagai "in", karena opname tidak bermakna tanpa
+  // baseline stok sebelumnya (lihat diskusi desain).
+  // ============================================
+  const isNewProduct = !existingProduct;
+  const jenisTransaksi = isNewProduct ? 'in' : item.jenis_transaksi;
+
+  let movementType, movementQuantity, stockAfter;
+
+  if (jenisTransaksi === 'opname') {
+    // Stok Fisik Saat Ini: quantity dari user = jumlah fisik akhir.
+    // Ikut pola handleOpname() di app.js: quantity disimpan sebagai selisih absolut.
+    stockAfter = quantity;
+    movementQuantity = Math.abs(stockAfter - stockBefore);
+    movementType = 'opname_adjustment';
+  } else {
+    // Barang Masuk: quantity ditambahkan ke stok yang ada.
+    stockAfter = stockBefore + quantity;
+    movementQuantity = quantity;
+    movementType = 'in';
+  }
 
   const { error: insertMovementError } = await supabaseClient
     .from('stock_movements')
     .insert({
       clinic_id: CURRENT_CLINIC_ID,
       product_id: productId,
-      movement_type: 'in',
-      quantity: quantity,
+      movement_type: movementType,
+      quantity: movementQuantity,
       stock_before: stockBefore,
       stock_after: stockAfter,
       expiry_date: expiryDate,
@@ -421,5 +467,4 @@ function escapeHtml(text) {
   const div = document.createElement('div');
   div.textContent = text;
   return div.innerHTML;
-              }
-      
+}
