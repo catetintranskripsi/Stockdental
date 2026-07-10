@@ -27,46 +27,30 @@ const opnamePreview = document.getElementById('opnamePreview');
 const newProductFields = document.getElementById('newProductFields');
 
 // Dipanggil dari auth.js setelah user berhasil login
-// Dipanggil dari auth.js setelah user berhasil login
 async function onUserLoggedIn() {
-  try {
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+  const { data: { user } } = await supabaseClient.auth.getUser();
+  if (!user) return;
 
-    if (userError) {
-      alert('DEBUG - Error getUser: ' + userError.message);
-      return;
-    }
+  CURRENT_USER_ID = user.id;
 
-    if (!user) {
-      alert('DEBUG - user kosong (tidak ada session)');
-      return;
-    }
+  const { data: userRow, error } = await supabaseClient
+    .from('users')
+    .select('clinic_id')
+    .eq('id', user.id)
+    .single();
 
-    CURRENT_USER_ID = user.id;
-
-    const { data: userRow, error } = await supabaseClient
-      .from('users')
-      .select('clinic_id')
-      .eq('id', user.id)
-      .single();
-
-    if (error || !userRow) {
-      alert('DEBUG - Error ambil clinic_id: ' + JSON.stringify(error) + ' | userRow: ' + JSON.stringify(userRow));
-      showStatus('Gagal ambil data klinik. Hubungi admin.', 'error');
-      console.error('Error ambil clinic_id:', error);
-      return;
-    }
-
-    CURRENT_CLINIC_ID = userRow.clinic_id;
-    alert('DEBUG - Berhasil! CURRENT_CLINIC_ID = ' + CURRENT_CLINIC_ID);
-
-    const bottomNav = document.getElementById('bottomNav');
-    if (bottomNav) bottomNav.style.display = 'flex';
-
-    await loadProductOptions();
-  } catch (e) {
-    alert('DEBUG - Exception tak terduga: ' + e.message);
+  if (error || !userRow) {
+    showStatus('Gagal ambil data klinik. Hubungi admin.', 'error');
+    console.error('Error ambil clinic_id:', error);
+    return;
   }
+
+  CURRENT_CLINIC_ID = userRow.clinic_id;
+
+  const bottomNav = document.getElementById('bottomNav');
+  if (bottomNav) bottomNav.style.display = 'flex';
+
+  await loadProductOptions();
 }
 
 // Load daftar produk existing ke cache ALL_PRODUCTS (dipakai untuk filter search)
