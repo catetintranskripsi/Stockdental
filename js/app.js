@@ -7,6 +7,10 @@
 //   - deduct_stock_fefo()    -> stock out (potong lot FEFO otomatis)
 //   - adjust_stock_opname()  -> stok opname (selisih via FEFO / lot baru)
 // products.current_stock disinkron otomatis oleh trigger trg_sync_current_stock
+//
+// >>> VERSI DEBUG SEMENTARA <<<
+// onUserLoggedIn() diberi alert() di tiap tahap untuk cari root cause
+// bug "Data klinik belum siap". HAPUS alert-alert ini setelah bug ketemu.
 // ============================================
 
 let CURRENT_CLINIC_ID = null;
@@ -32,7 +36,6 @@ const opnamePreview = document.getElementById('opnamePreview');
 const newProductFields = document.getElementById('newProductFields');
 
 // Dipanggil dari auth.js setelah user berhasil login
-async function onUserLoggedIn() {
 async function onUserLoggedIn() {
   alert('DEBUG 1: onUserLoggedIn mulai jalan');
 
@@ -207,7 +210,7 @@ function updateOpnamePreview() {
 
   const selisih = physicalCount - currentStock;
   const arah = selisih > 0 ? 'lebih' : selisih < 0 ? 'kurang' : 'sama';
-  opnamePreview.textContent = `Selisih: ${selisih > 0 ? '+' : ''}${selisih} (${arah}). Stok akan disesuaikan dari ${currentStock} → ${physicalCount}.`;
+  opnamePreview.textContent = `Selisih: ${selisih > 0 ? '+' : ''}${selisih} (${arah}). Stok akan disesuaikan dari ${currentStock} -> ${physicalCount}.`;
   opnamePreview.className = 'opname-preview ' + (selisih === 0 ? 'preview-neutral' : (selisih > 0 ? 'preview-plus' : 'preview-minus'));
 }
 
@@ -409,3 +412,4 @@ function showStatus(message, type) {
     statusDiv.textContent = '';
   }, 4000);
 }
+
