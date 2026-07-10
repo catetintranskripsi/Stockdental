@@ -33,9 +33,21 @@ const newProductFields = document.getElementById('newProductFields');
 
 // Dipanggil dari auth.js setelah user berhasil login
 async function onUserLoggedIn() {
-  const { data: { user } } = await supabaseClient.auth.getUser();
-  if (!user) return;
+async function onUserLoggedIn() {
+  alert('DEBUG 1: onUserLoggedIn mulai jalan');
 
+  const { data: { user }, error: userAuthError } = await supabaseClient.auth.getUser();
+
+  if (userAuthError) {
+    alert('DEBUG 2a: getUser() ERROR -> ' + userAuthError.message);
+    return;
+  }
+  if (!user) {
+    alert('DEBUG 2b: getUser() sukses tapi user KOSONG (session mungkin tidak valid)');
+    return;
+  }
+
+  alert('DEBUG 2c: getUser() sukses, user.id = ' + user.id);
   CURRENT_USER_ID = user.id;
 
   const { data: userRow, error } = await supabaseClient
@@ -45,17 +57,20 @@ async function onUserLoggedIn() {
     .single();
 
   if (error || !userRow) {
+    alert('DEBUG 3: Gagal ambil clinic_id -> ' + JSON.stringify(error));
     showStatus('Gagal ambil data klinik. Hubungi admin.', 'error');
     console.error('Error ambil clinic_id:', error);
     return;
   }
 
   CURRENT_CLINIC_ID = userRow.clinic_id;
+  alert('DEBUG 4: CURRENT_CLINIC_ID berhasil di-set -> ' + CURRENT_CLINIC_ID);
 
   const bottomNav = document.getElementById('bottomNav');
   if (bottomNav) bottomNav.style.display = 'flex';
 
   await loadProductOptions();
+  alert('DEBUG 5: loadProductOptions selesai, onUserLoggedIn SELESAI TOTAL');
 }
 
 // Load daftar produk existing ke cache ALL_PRODUCTS (dipakai untuk filter search)
