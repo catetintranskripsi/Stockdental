@@ -1,7 +1,12 @@
 // ============================================
 // APP LOGIC - Form Input Stok (3 jenis transaksi)
 // stock_movements: in, out, opname_adjustment
-// Versi: searchable dropdown untuk pilih barang
+// Versi: P9 - Lot/Batch Tracking + FEFO otomatis
+// Semua write lot+movement sekarang lewat RPC (atomik di database):
+//   - add_stock_lot()        -> stock in (bikin lot baru)
+//   - deduct_stock_fefo()    -> stock out (potong lot FEFO otomatis)
+//   - adjust_stock_opname()  -> stok opname (selisih via FEFO / lot baru)
+// products.current_stock disinkron otomatis oleh trigger trg_sync_current_stock
 // ============================================
 
 let CURRENT_CLINIC_ID = null;
@@ -237,20 +242,34 @@ form.addEventListener('submit', async (e) => {
 
   } catch (error) {
     console.error('Error:', error);
-    showStatus('Gagal menyimpan: ' + error.message, 'error');
+    showStatus('Gagal menyimpan: ' + parseErrorMessage(error), 'error');
   } finally {
     submitBtn.disabled = false;
     submitBtn.textContent = 'Simpan Transaksi';
   }
 });
 
+// Ubah pesan error dari Postgres (RAISE EXCEPTION 'STOK_TIDAK_CUKUP: kurang % unit')
+// jadi lebih enak dibaca staff, tanpa kehilangan detail aslinya
+function parseErrorMessage(error) {
+  const msg = error?.message || String(error);
+  if (msg.includes('STOK_TIDAK_CUKUP')) {
+    const match = msg.match(/kurang\s+(-?\d+)\s*unit/i);
+    const kurang = match ? match[1] : '?';
+    return `Stok tidak cukup, kurang ${kurang} unit dari yang diminta.`;
+  }
+  return msg;
+}
+
 // ============================================
 // HANDLER: Tambah Barang (in)
+// Sekarang lewat RPC add_stock_lot -> bikin 1 lot baru + 1 movement 'in'
+// secara atomik. Trigger trg_sync_current_stock yang update products.current_stock.
 // ============================================
 async function handleStockIn() {
   const productName = document.getElementById('productName').value.trim();
   const category = document.getElementById('category').value.trim();
-  const quantity = parseFloat(document.getElementById('quantity').value);
+  const quantity = parseInt(document.getElementById('quantity').value, 10);
   const unit = document.getElementById('unit').value.trim() || 'pcs';
   const expiryDate = document.getElementById('expiryDate').value || null;
   const batchNumber = document.getElementById('batchNumber').value.trim() || null;
@@ -261,21 +280,20 @@ async function handleStockIn() {
     throw new Error('Nama barang dan jumlah wajib diisi dengan benar.');
   }
 
-  // Cari produk existing atau buat baru
+  // Cari produk existing, atau buat baru kalau belum ada
   let { data: existingProduct, error: findError } = await supabaseClient
     .from('products')
-    .select('id, current_stock')
+    .select('id')
     .eq('clinic_id', CURRENT_CLINIC_ID)
     .eq('name', productName)
     .maybeSingle();
 
   if (findError) throw findError;
 
-  let productId, stockBefore;
+  let productId;
 
   if (existingProduct) {
     productId = existingProduct.id;
-    stockBefore = existingProduct.current_stock;
   } else {
     const { data: newProduct, error: insertProductError } = await supabaseClient
       .from('products')
@@ -288,41 +306,35 @@ async function handleStockIn() {
         minimum_stock: minimumStock,
         current_stock: 0
       })
-      .select('id, current_stock')
+      .select('id')
       .single();
 
     if (insertProductError) throw insertProductError;
     productId = newProduct.id;
-    stockBefore = 0;
   }
 
-  const stockAfter = stockBefore + quantity;
+  // Panggil RPC: bikin lot baru + movement 'in', atomik di database
+  const { error: rpcError } = await supabaseClient.rpc('add_stock_lot', {
+    p_clinic_id: CURRENT_CLINIC_ID,
+    p_product_id: productId,
+    p_quantity: quantity,
+    p_batch_number: batchNumber,
+    p_expiry_date: expiryDate,
+    p_user_id: CURRENT_USER_ID
+  });
 
-  const { error: insertMovementError } = await supabaseClient
-    .from('stock_movements')
-    .insert({
-      clinic_id: CURRENT_CLINIC_ID,
-      product_id: productId,
-      movement_type: 'in',
-      quantity: quantity,
-      stock_before: stockBefore,
-      stock_after: stockAfter,
-      expiry_date: expiryDate,
-      batch_number: batchNumber,
-      source_type: 'manual',
-      performed_by: CURRENT_USER_ID
-    });
-
-  if (insertMovementError) throw insertMovementError;
+  if (rpcError) throw rpcError;
 }
 
 // ============================================
 // HANDLER: Penggunaan Barang (out)
+// Sekarang lewat RPC deduct_stock_fefo -> Postgres yang urus alokasi
+// lintas lot (FEFO), bisa hasilkan >1 baris movement, staff cuma lihat 1 hasil.
 // ============================================
 async function handleStockOut() {
   const productId = productSelectedId.value;
-  const quantity = parseFloat(document.getElementById('outQuantity').value);
-  const reason = document.getElementById('outReason').value;
+  const quantity = parseInt(document.getElementById('outQuantity').value, 10);
+  const reason = document.getElementById('outReason').value.trim() || null;
 
   if (!productId) {
     throw new Error('Pilih barang dari daftar terlebih dahulu (klik salah satu hasil pencarian).');
@@ -332,45 +344,27 @@ async function handleStockOut() {
     throw new Error('Isi jumlah dengan benar.');
   }
 
-  const { data: product, error: fetchError } = await supabaseClient
-    .from('products')
-    .select('current_stock')
-    .eq('id', productId)
-    .single();
+  const { error: rpcError } = await supabaseClient.rpc('deduct_stock_fefo', {
+    p_clinic_id: CURRENT_CLINIC_ID,
+    p_product_id: productId,
+    p_quantity: quantity,
+    p_movement_type: 'out',
+    p_user_id: CURRENT_USER_ID,
+    p_reason: reason
+  });
 
-  if (fetchError) throw fetchError;
-
-  const stockBefore = product.current_stock;
-  const stockAfter = stockBefore - quantity;
-
-  // Validasi tidak minus — sesuaikan kalau kamu ingin izinkan dengan warning
-  if (stockAfter < 0) {
-    throw new Error(`Stok tidak cukup. Stok saat ini: ${stockBefore}, diminta keluar: ${quantity}.`);
-  }
-
-  const { error: insertMovementError } = await supabaseClient
-    .from('stock_movements')
-    .insert({
-      clinic_id: CURRENT_CLINIC_ID,
-      product_id: productId,
-      movement_type: 'out',
-      quantity: quantity,
-      stock_before: stockBefore,
-      stock_after: stockAfter,
-      reason: reason,
-      source_type: 'manual',
-      performed_by: CURRENT_USER_ID
-    });
-
-  if (insertMovementError) throw insertMovementError;
+  if (rpcError) throw rpcError;
 }
 
 // ============================================
 // HANDLER: Stok Opname
+// Sekarang lewat RPC adjust_stock_opname -> Postgres hitung selisih sendiri
+// (fisik vs sistem), lalu FEFO stock-out otomatis (kurang) atau bikin lot
+// baru expiry NULL (lebih), sesuai desain P9.
 // ============================================
 async function handleOpname() {
   const productId = productSelectedId.value;
-  const physicalCount = parseFloat(document.getElementById('opnamePhysicalCount').value);
+  const physicalCount = parseInt(document.getElementById('opnamePhysicalCount').value, 10);
   const opnameNote = document.getElementById('opnameNote').value.trim() || null;
 
   if (!productId) {
@@ -381,33 +375,15 @@ async function handleOpname() {
     throw new Error('Isi jumlah fisik dengan benar.');
   }
 
-  const { data: product, error: fetchError } = await supabaseClient
-    .from('products')
-    .select('current_stock')
-    .eq('id', productId)
-    .single();
+  const { error: rpcError } = await supabaseClient.rpc('adjust_stock_opname', {
+    p_clinic_id: CURRENT_CLINIC_ID,
+    p_product_id: productId,
+    p_jumlah_fisik: physicalCount,
+    p_user_id: CURRENT_USER_ID,
+    p_opname_note: opnameNote
+  });
 
-  if (fetchError) throw fetchError;
-
-  const stockBefore = product.current_stock;
-  const stockAfter = physicalCount;
-  const selisih = Math.abs(stockAfter - stockBefore);
-
-  const { error: insertMovementError } = await supabaseClient
-    .from('stock_movements')
-    .insert({
-      clinic_id: CURRENT_CLINIC_ID,
-      product_id: productId,
-      movement_type: 'opname_adjustment',
-      quantity: selisih,
-      stock_before: stockBefore,
-      stock_after: stockAfter,
-      opname_note: opnameNote,
-      source_type: 'manual',
-      performed_by: CURRENT_USER_ID
-    });
-
-  if (insertMovementError) throw insertMovementError;
+  if (rpcError) throw rpcError;
 }
 
 function showStatus(message, type) {
