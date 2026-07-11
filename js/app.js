@@ -7,10 +7,6 @@
 //   - deduct_stock_fefo()    -> stock out (potong lot FEFO otomatis)
 //   - adjust_stock_opname()  -> stok opname (selisih via FEFO / lot baru)
 // products.current_stock disinkron otomatis oleh trigger trg_sync_current_stock
-//
-// >>> VERSI DEBUG SEMENTARA <<<
-// onUserLoggedIn() diberi alert() di tiap tahap untuk cari root cause
-// bug "Data klinik belum siap". HAPUS alert-alert ini setelah bug ketemu.
 // ============================================
 
 let CURRENT_CLINIC_ID = null;
@@ -37,20 +33,13 @@ const newProductFields = document.getElementById('newProductFields');
 
 // Dipanggil dari auth.js setelah user berhasil login
 async function onUserLoggedIn() {
-  console.log('DEBUG 1: onUserLoggedIn mulai jalan');
-
   const { data: { user }, error: userAuthError } = await supabaseClient.auth.getUser();
 
-  if (userAuthError) {
-    console.log('DEBUG 2a: getUser() ERROR ->', userAuthError.message);
-    return;
-  }
-  if (!user) {
-    console.log('DEBUG 2b: getUser() sukses tapi user KOSONG (session mungkin tidak valid)');
+  if (userAuthError || !user) {
+    console.error('Gagal ambil user:', userAuthError);
     return;
   }
 
-  console.log('DEBUG 2c: getUser() sukses, user.id =', user.id);
   CURRENT_USER_ID = user.id;
 
   const { data: userRow, error } = await supabaseClient
@@ -60,20 +49,17 @@ async function onUserLoggedIn() {
     .single();
 
   if (error || !userRow) {
-    console.log('DEBUG 3: Gagal ambil clinic_id ->', JSON.stringify(error));
     showStatus('Gagal ambil data klinik. Hubungi admin.', 'error');
     console.error('Error ambil clinic_id:', error);
     return;
   }
 
   CURRENT_CLINIC_ID = userRow.clinic_id;
-  console.log('DEBUG 4: CURRENT_CLINIC_ID berhasil di-set ->', CURRENT_CLINIC_ID);
 
   const bottomNav = document.getElementById('bottomNav');
   if (bottomNav) bottomNav.style.display = 'flex';
 
   await loadProductOptions();
-  console.log('DEBUG 5: loadProductOptions selesai, onUserLoggedIn SELESAI TOTAL');
 }
 
 // Load daftar produk existing ke cache ALL_PRODUCTS (dipakai untuk filter search)
@@ -281,7 +267,7 @@ function parseErrorMessage(error) {
 
 // ============================================
 // HANDLER: Tambah Barang (in)
-// Sekarang lewat RPC add_stock_lot -> bikin 1 lot baru + 1 movement 'in'
+// Lewat RPC add_stock_lot -> bikin 1 lot baru + 1 movement 'in'
 // secara atomik. Trigger trg_sync_current_stock yang update products.current_stock.
 // ============================================
 async function handleStockIn() {
@@ -346,7 +332,7 @@ async function handleStockIn() {
 
 // ============================================
 // HANDLER: Penggunaan Barang (out)
-// Sekarang lewat RPC deduct_stock_fefo -> Postgres yang urus alokasi
+// Lewat RPC deduct_stock_fefo -> Postgres yang urus alokasi
 // lintas lot (FEFO), bisa hasilkan >1 baris movement, staff cuma lihat 1 hasil.
 // ============================================
 async function handleStockOut() {
@@ -376,7 +362,7 @@ async function handleStockOut() {
 
 // ============================================
 // HANDLER: Stok Opname
-// Sekarang lewat RPC adjust_stock_opname -> Postgres hitung selisih sendiri
+// Lewat RPC adjust_stock_opname -> Postgres hitung selisih sendiri
 // (fisik vs sistem), lalu FEFO stock-out otomatis (kurang) atau bikin lot
 // baru expiry NULL (lebih), sesuai desain P9.
 // ============================================
@@ -411,5 +397,4 @@ function showStatus(message, type) {
     statusDiv.className = '';
     statusDiv.textContent = '';
   }, 4000);
-}
-
+      }
