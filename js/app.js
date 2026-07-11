@@ -7,11 +7,26 @@
 //   - deduct_stock_fefo()    -> stock out (potong lot FEFO otomatis)
 //   - adjust_stock_opname()  -> stok opname (selisih via FEFO / lot baru)
 // products.current_stock disinkron otomatis oleh trigger trg_sync_current_stock
+//
+// Percakapan [lanjutan P10] - AUTOCOMPLETE/CREATABLE DROPDOWN
+// Field Nama Barang, Kategori, Lokasi, Satuan, Nomor Batch sekarang
+// searchable: histori diambil sekali saat load, di-cache, difilter lokal
+// saat user mengetik. User tetap bisa ketik nilai baru yang belum ada.
 // ============================================
 
 let CURRENT_CLINIC_ID = null;
 let CURRENT_USER_ID = null;
 let ALL_PRODUCTS = []; // cache semua produk untuk difilter di searchable dropdown
+
+// Cache untuk autocomplete field-field baru
+let ALL_CATEGORIES = [];
+let ALL_LOCATIONS = [];
+let ALL_UNITS = [];
+let ALL_BATCH_NUMBERS = [];
+
+// Starter list (selalu muncul di awal, digabung dengan histori nyata)
+const STARTER_CATEGORIES = ['APD', 'BMHP', 'Obat', 'Alat Kesehatan', 'Bahan Tambal/Restorasi', 'Lainnya'];
+const STARTER_UNITS = ['pcs', 'box', 'botol', 'tube', 'dus', 'pack', 'set', 'lembar'];
 
 const movementTypeSelect = document.getElementById('movementType');
 const form = document.getElementById('formStockMovement');
@@ -19,7 +34,7 @@ const statusDiv = document.getElementById('statusMessage');
 const submitBtn = document.getElementById('submitBtn');
 const productSelectGroup = document.getElementById('productSelectGroup');
 
-// Elemen searchable dropdown
+// Elemen searchable dropdown "Pilih Barang" (Out & Opname)
 const productSearchInput = document.getElementById('productSearchInput');
 const productSelectedId = document.getElementById('productSelectedId');
 const productSearchResults = document.getElementById('productSearchResults');
@@ -60,6 +75,7 @@ async function onUserLoggedIn() {
   if (bottomNav) bottomNav.style.display = 'flex';
 
   await loadProductOptions();
+  await loadAutocompleteOptions();
 }
 
 // Load daftar produk existing ke cache ALL_PRODUCTS (dipakai untuk filter search)
@@ -80,14 +96,65 @@ async function loadProductOptions() {
 }
 
 // ============================================
-// SEARCHABLE DROPDOWN LOGIC
+// Load histori untuk autocomplete: kategori, lokasi, satuan, batch
+// Satu kali query per kolom, hasilnya di-cache di memori (bukan query ulang
+// tiap ketikan). Nilai kosong/null disaring, duplikat dihapus.
+// ============================================
+async function loadAutocompleteOptions() {
+  const { data: products, error: productsError } = await supabaseClient
+    .from('products')
+    .select('category, storage_location, unit')
+    .eq('clinic_id', CURRENT_CLINIC_ID);
+
+  if (productsError) {
+    console.error('Gagal load histori kategori/lokasi/satuan:', productsError);
+  } else if (products) {
+    const categoriesFromHistory = products.map(p => p.category).filter(Boolean);
+    const locationsFromHistory = products.map(p => p.storage_location).filter(Boolean);
+    const unitsFromHistory = products.map(p => p.unit).filter(Boolean);
+
+    ALL_CATEGORIES = uniqueMerge(STARTER_CATEGORIES, categoriesFromHistory);
+    ALL_LOCATIONS = uniqueMerge([], locationsFromHistory);
+    ALL_UNITS = uniqueMerge(STARTER_UNITS, unitsFromHistory);
+  }
+
+  const { data: lots, error: lotsError } = await supabaseClient
+    .from('product_lots')
+    .select('batch_number')
+    .eq('clinic_id', CURRENT_CLINIC_ID);
+
+  if (lotsError) {
+    console.error('Gagal load histori batch number:', lotsError);
+  } else if (lots) {
+    const batchesFromHistory = lots.map(l => l.batch_number).filter(Boolean);
+    ALL_BATCH_NUMBERS = uniqueMerge([], batchesFromHistory);
+  }
+}
+
+// Gabung starter list + histori, hilangkan duplikat (case-insensitive)
+function uniqueMerge(starterList, historyList) {
+  const combined = [...starterList, ...historyList];
+  const seen = new Set();
+  const result = [];
+
+  combined.forEach(value => {
+    const key = value.toLowerCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      result.push(value);
+    }
+  });
+
+  return result;
+}
+
+// ============================================
+// SEARCHABLE DROPDOWN LOGIC — "Pilih Barang" (Out & Opname)
 // ============================================
 
-// Render daftar hasil filter di bawah input search
 function renderProductResults(filterText) {
   const keyword = filterText.trim().toLowerCase();
 
-  // Kalau kosong, tampilkan semua (dibatasi 50 biar tidak berat)
   const filtered = keyword === ''
     ? ALL_PRODUCTS.slice(0, 50)
     : ALL_PRODUCTS.filter(p => p.name.toLowerCase().includes(keyword)).slice(0, 50);
@@ -122,18 +189,14 @@ function renderProductResults(filterText) {
   productSearchResults.style.display = 'block';
 }
 
-// Set produk yang terpilih (dipanggil saat user klik salah satu hasil)
 function selectProduct(product) {
   productSelectedId.value = product.id;
   productSearchInput.value = `${product.name} (stok: ${product.current_stock} ${product.unit})`;
   productSearchInput.dataset.currentStock = product.current_stock;
   productSearchResults.style.display = 'none';
-
-  // Trigger update preview opname kalau lagi di mode itu
   updateOpnamePreview();
 }
 
-// Reset pilihan produk (dipanggil saat form direset atau ganti jenis transaksi)
 function resetProductSelection() {
   productSelectedId.value = '';
   productSearchInput.value = '';
@@ -142,19 +205,79 @@ function resetProductSelection() {
   productSearchResults.innerHTML = '';
 }
 
-// Buka daftar saat input di-fokus
 productSearchInput.addEventListener('focus', () => {
   renderProductResults('');
 });
 
-// Filter saat user ketik
 productSearchInput.addEventListener('input', () => {
-  // Kalau user mulai ngetik lagi, anggap pilihan sebelumnya batal sampai klik ulang
   productSelectedId.value = '';
   renderProductResults(productSearchInput.value);
 });
 
-// Tutup dropdown kalau klik di luar area search
+// ============================================
+// SEARCHABLE DROPDOWN LOGIC — Generik, dipakai untuk 5 field baru
+// (Nama Barang, Kategori, Lokasi, Satuan, Nomor Batch)
+// Beda dengan "Pilih Barang": field ini SELALU boleh diisi nilai baru
+// yang belum ada di cache (creatable), tidak wajib klik dari dropdown.
+// ============================================
+
+function setupSimpleAutocomplete(inputId, resultsId, getOptionsFn) {
+  const input = document.getElementById(inputId);
+  const resultsDiv = document.getElementById(resultsId);
+
+  function render(filterText) {
+    const keyword = filterText.trim().toLowerCase();
+    const options = getOptionsFn();
+
+    const filtered = keyword === ''
+      ? options.slice(0, 50)
+      : options.filter(v => v.toLowerCase().includes(keyword)).slice(0, 50);
+
+    resultsDiv.innerHTML = '';
+
+    if (filtered.length === 0) {
+      resultsDiv.style.display = 'none';
+      return;
+    }
+
+    filtered.forEach(value => {
+      const item = document.createElement('div');
+      item.className = 'product-search-item';
+      item.textContent = value;
+
+      item.addEventListener('click', () => {
+        input.value = value;
+        resultsDiv.style.display = 'none';
+      });
+
+      resultsDiv.appendChild(item);
+    });
+
+    resultsDiv.style.display = 'block';
+  }
+
+  input.addEventListener('focus', () => render(''));
+  input.addEventListener('input', () => render(input.value));
+
+  document.addEventListener('click', (e) => {
+    const isClickInside = input.contains(e.target) || resultsDiv.contains(e.target);
+    if (!isClickInside) {
+      resultsDiv.style.display = 'none';
+    }
+  });
+}
+
+// Nama Barang pakai cache produk (ambil nama uniknya saja)
+setupSimpleAutocomplete('productName', 'productNameResults', () => {
+  return uniqueMerge([], ALL_PRODUCTS.map(p => p.name));
+});
+
+setupSimpleAutocomplete('category', 'categoryResults', () => ALL_CATEGORIES);
+setupSimpleAutocomplete('storageLocation', 'storageLocationResults', () => ALL_LOCATIONS);
+setupSimpleAutocomplete('unit', 'unitResults', () => ALL_UNITS);
+setupSimpleAutocomplete('batchNumber', 'batchNumberResults', () => ALL_BATCH_NUMBERS);
+
+// Tutup dropdown "Pilih Barang" kalau klik di luar area search
 document.addEventListener('click', (e) => {
   const isClickInside = productSearchInput.contains(e.target) || productSearchResults.contains(e.target);
   if (!isClickInside) {
@@ -174,17 +297,12 @@ movementTypeSelect.addEventListener('change', () => {
   fieldsOpname.style.display = type === 'opname_adjustment' ? 'block' : 'none';
   opnamePreview.textContent = '';
 
-  // Untuk 'out' & 'opname', wajib pilih dari produk existing
   productSelectGroup.style.display = (type === 'out' || type === 'opname_adjustment') ? 'block' : 'none';
-
-  // Untuk 'in', boleh input nama barang baru
   newProductFields.style.display = (type === 'in') ? 'block' : 'none';
 
-  // Reset pilihan produk setiap ganti jenis transaksi
   resetProductSelection();
 });
 
-// Live preview selisih opname saat user ketik jumlah fisik
 function updateOpnamePreview() {
   const currentStock = parseFloat(productSearchInput.dataset.currentStock);
   const physicalCount = parseFloat(document.getElementById('opnamePhysicalCount').value);
@@ -243,6 +361,7 @@ form.addEventListener('submit', async (e) => {
     resetProductSelection();
     document.getElementById('unit').value = 'pcs';
     await loadProductOptions();
+    await loadAutocompleteOptions();
 
   } catch (error) {
     console.error('Error:', error);
@@ -253,8 +372,6 @@ form.addEventListener('submit', async (e) => {
   }
 });
 
-// Ubah pesan error dari Postgres (RAISE EXCEPTION 'STOK_TIDAK_CUKUP: kurang % unit')
-// jadi lebih enak dibaca staff, tanpa kehilangan detail aslinya
 function parseErrorMessage(error) {
   const msg = error?.message || String(error);
   if (msg.includes('STOK_TIDAK_CUKUP')) {
@@ -267,8 +384,6 @@ function parseErrorMessage(error) {
 
 // ============================================
 // HANDLER: Tambah Barang (in)
-// Lewat RPC add_stock_lot -> bikin 1 lot baru + 1 movement 'in'
-// secara atomik. Trigger trg_sync_current_stock yang update products.current_stock.
 // ============================================
 async function handleStockIn() {
   const productName = document.getElementById('productName').value.trim();
@@ -278,13 +393,13 @@ async function handleStockIn() {
   const expiryDate = document.getElementById('expiryDate').value || null;
   const batchNumber = document.getElementById('batchNumber').value.trim() || null;
   const storageLocation = document.getElementById('storageLocation').value.trim();
-  const minimumStock = parseFloat(document.getElementById('minimumStock').value) || 0;
+  const minimumStockRaw = document.getElementById('minimumStock').value;
+  const minimumStock = minimumStockRaw === '' ? 0 : parseFloat(minimumStockRaw);
 
   if (!productName || isNaN(quantity) || quantity <= 0) {
     throw new Error('Nama barang dan jumlah wajib diisi dengan benar.');
   }
 
-  // Cari produk existing, atau buat baru kalau belum ada
   let { data: existingProduct, error: findError } = await supabaseClient
     .from('products')
     .select('id')
@@ -317,7 +432,6 @@ async function handleStockIn() {
     productId = newProduct.id;
   }
 
-  // Panggil RPC: bikin lot baru + movement 'in', atomik di database
   const { error: rpcError } = await supabaseClient.rpc('add_stock_lot', {
     p_clinic_id: CURRENT_CLINIC_ID,
     p_product_id: productId,
@@ -332,8 +446,6 @@ async function handleStockIn() {
 
 // ============================================
 // HANDLER: Penggunaan Barang (out)
-// Lewat RPC deduct_stock_fefo -> Postgres yang urus alokasi
-// lintas lot (FEFO), bisa hasilkan >1 baris movement, staff cuma lihat 1 hasil.
 // ============================================
 async function handleStockOut() {
   const productId = productSelectedId.value;
@@ -362,9 +474,6 @@ async function handleStockOut() {
 
 // ============================================
 // HANDLER: Stok Opname
-// Lewat RPC adjust_stock_opname -> Postgres hitung selisih sendiri
-// (fisik vs sistem), lalu FEFO stock-out otomatis (kurang) atau bikin lot
-// baru expiry NULL (lebih), sesuai desain P9.
 // ============================================
 async function handleOpname() {
   const productId = productSelectedId.value;
@@ -397,4 +506,4 @@ function showStatus(message, type) {
     statusDiv.className = '';
     statusDiv.textContent = '';
   }, 4000);
-      }
+    }
