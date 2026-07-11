@@ -94,35 +94,42 @@
       </div>
 
       <!-- SEARCHABLE PILIH BARANG (dipakai untuk Out & Opname) -->
-<div class="form-group" id="productSelectGroup" style="display:none; position:relative;">
-  <label for="productSearchInput">Pilih Barang</label>
-  <input type="text" id="productSearchInput" placeholder="Ketik nama barang..." autocomplete="off">
-  <input type="hidden" id="productSelectedId">
-  <div id="productSearchResults" class="product-search-results" style="display:none;"></div>
-</div>
+      <div class="form-group" id="productSelectGroup" style="display:none; position:relative;">
+        <label for="productSearchInput">Pilih Barang</label>
+        <input type="text" id="productSearchInput" placeholder="Ketik nama barang..." autocomplete="off">
+        <input type="hidden" id="productSelectedId">
+        <div id="productSearchResults" class="product-search-results" style="display:none;"></div>
+      </div>
 
       <!-- ========== FIELD: TAMBAH BARANG (in) ========== -->
       <div id="fieldsIn" style="display:none;">
 
         <div id="newProductFields">
-          <div class="form-group">
+
+          <!-- NAMA BARANG - searchable, histori dari products.name -->
+          <div class="form-group" style="position:relative;">
             <label for="productName">Nama Barang</label>
-            <input type="text" id="productName" placeholder="Contoh: Sarung Tangan Latex M">
+            <input type="text" id="productName" placeholder="Contoh: Sarung Tangan Latex M" autocomplete="off">
+            <div id="productNameResults" class="product-search-results" style="display:none;"></div>
           </div>
 
-          <div class="form-group">
+          <!-- KATEGORI - searchable, starter list + histori -->
+          <div class="form-group" style="position:relative;">
             <label for="category">Kategori</label>
-            <input type="text" id="category" placeholder="Contoh: Alat Pelindung Diri">
+            <input type="text" id="category" placeholder="Contoh: APD, Obat, BMHP" autocomplete="off">
+            <div id="categoryResults" class="product-search-results" style="display:none;"></div>
           </div>
 
-          <div class="form-group">
+          <!-- LOKASI - searchable, full histori -->
+          <div class="form-group" style="position:relative;">
             <label for="storageLocation">Lokasi Penyimpanan</label>
-            <input type="text" id="storageLocation" placeholder="Contoh: Lemari A - Rak 2">
+            <input type="text" id="storageLocation" placeholder="Contoh: Lemari A - Rak 2" autocomplete="off">
+            <div id="storageLocationResults" class="product-search-results" style="display:none;"></div>
           </div>
 
           <div class="form-group">
             <label for="minimumStock">Stok Minimum (opsional, buat alert)</label>
-            <input type="number" id="minimumStock" min="0" step="0.01" value="0">
+            <input type="number" id="minimumStock" min="0" step="0.01" placeholder="Kosongkan jika belum tahu">
           </div>
         </div>
 
@@ -131,9 +138,11 @@
           <input type="number" id="quantity" min="0" step="0.01">
         </div>
 
-        <div class="form-group">
+        <!-- SATUAN - searchable, starter list + histori -->
+        <div class="form-group" style="position:relative;">
           <label for="unit">Satuan</label>
-          <input type="text" id="unit" placeholder="pcs / box / botol" value="pcs">
+          <input type="text" id="unit" placeholder="pcs / box / botol" value="pcs" autocomplete="off">
+          <div id="unitResults" class="product-search-results" style="display:none;"></div>
         </div>
 
         <div class="form-group">
@@ -141,9 +150,11 @@
           <input type="date" id="expiryDate">
         </div>
 
-        <div class="form-group">
+        <!-- NOMOR BATCH - searchable, full histori -->
+        <div class="form-group" style="position:relative;">
           <label for="batchNumber">Nomor Batch (opsional)</label>
-          <input type="text" id="batchNumber" placeholder="Contoh: BTC-2026-001">
+          <input type="text" id="batchNumber" placeholder="Contoh: BTC-2026-001" autocomplete="off">
+          <div id="batchNumberResults" class="product-search-results" style="display:none;"></div>
         </div>
       </div>
 
@@ -209,7 +220,7 @@
   <!-- Supabase library dari CDN -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/supabase-client.js"></script>
-  <script src="js/app.js?v=2"></script>
+  <script src="js/app.js?v=3"></script>
   <script src="js/auth.js"></script>
 </body>
 </html>
