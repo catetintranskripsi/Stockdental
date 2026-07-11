@@ -1,6 +1,10 @@
 // ============================================
 // AI PHOTO EKSTRAKSI
 // Percakapan 7 (revisi) - FOTO KE EDGE FUNCTION
+// Percakapan [lanjutan P9] - REFACTOR: pakai RPC add_stock_lot & adjust_stock_opname
+//   (konsisten dengan app.js, ikut arsitektur Lot/Batch Tracking + FEFO dari P9)
+//   + tambah field Nomor Batch & Stok Minimum (manual input, tidak dari AI)
+//
 // API key Gemini sudah dipindah ke Supabase Edge Function (server-side).
 // Browser TIDAK lagi menyimpan/mengirim API key apapun.
 //
@@ -87,6 +91,9 @@ async function handleAnalyzeClick() {
       return;
     }
 
+    // CATATAN: batch_number & minimum_stock SENGAJA tidak diminta dari AI
+    // (keputusan desain: AI tidak reliable membaca teks kecil/barcode batch,
+    // jadi kedua field ini selalu manual input oleh user).
     extractedItems = items.map((item, index) => ({
       tempId: 'item_' + index,
       nama: item.nama || '',
@@ -95,6 +102,8 @@ async function handleAnalyzeClick() {
       kategori: item.kategori || '',
       expiry_date: item.expiry_date || '',
       lokasi_penyimpanan: item.lokasi_penyimpanan || '',
+      batch_number: '', // manual, tidak dari AI
+      minimum_stock: 0, // manual, tidak dari AI
       jenis_transaksi: 'in', // default: Barang Masuk. Bisa diubah ke 'opname' oleh user.
       included: true
     }));
@@ -152,6 +161,8 @@ async function callGeminiExtraction(base64Image, mimeType) {
 
 // ============================================
 // RENDER: Tampilkan hasil ekstraksi (editable)
+// Field sekarang SAMA dengan form input manual di index.html:
+// nama, jumlah, satuan, kategori, expiry, lokasi, batch_number, minimum_stock
 // ============================================
 function renderExtractedItems() {
   resultSummary.textContent = `Ditemukan ${extractedItems.length} barang. Periksa dan koreksi sebelum simpan.`;
@@ -224,6 +235,17 @@ function renderExtractedItems() {
             <input type="text" class="item-lokasi" value="${escapeHtml(item.lokasi_penyimpanan)}" placeholder="Misal: Lemari A">
           </div>
         </div>
+
+        <div class="field-row">
+          <div class="field-group">
+            <label>Nomor Batch (manual)</label>
+            <input type="text" class="item-batch" value="${escapeHtml(item.batch_number)}" placeholder="Contoh: BTC-2026-001">
+          </div>
+          <div class="field-group">
+            <label>Stok Minimum (barang baru)</label>
+            <input type="number" class="item-minstock" value="${item.minimum_stock}" min="0" step="0.01">
+          </div>
+        </div>
       </div>
     `;
 
@@ -251,6 +273,8 @@ function renderExtractedItems() {
     row.querySelector('.item-kategori').addEventListener('input', (e) => updateItemField(item.tempId, 'kategori', e.target.value));
     row.querySelector('.item-expiry').addEventListener('input', (e) => updateItemField(item.tempId, 'expiry_date', e.target.value));
     row.querySelector('.item-lokasi').addEventListener('input', (e) => updateItemField(item.tempId, 'lokasi_penyimpanan', e.target.value));
+    row.querySelector('.item-batch').addEventListener('input', (e) => updateItemField(item.tempId, 'batch_number', e.target.value));
+    row.querySelector('.item-minstock').addEventListener('input', (e) => updateItemField(item.tempId, 'minimum_stock', parseFloat(e.target.value) || 0));
 
     // Set value date terpisah setelah elemen ter-attach, untuk hindari bug WebView Android
     const expiryInput = row.querySelector('.item-expiry');
@@ -283,6 +307,8 @@ function handleAddManualRow() {
     kategori: '',
     expiry_date: '',
     lokasi_penyimpanan: '',
+    batch_number: '',
+    minimum_stock: 0,
     jenis_transaksi: 'in',
     included: true
   };
@@ -338,31 +364,36 @@ async function handleSaveAllClick() {
 }
 
 // ============================================
-// Simpan 1 item ke products + stock_movements
-// (mirror dari handleStockIn di app.js, source_type dibedakan)
+// Simpan 1 item — SEKARANG LEWAT RPC (add_stock_lot / adjust_stock_opname)
+// Konsisten dengan handleStockIn() & handleOpname() di app.js.
+// Tidak lagi insert manual ke stock_movements / hitung stockAfter di JS —
+// semua itu sekarang jadi tanggung jawab RPC & trigger di database.
 // ============================================
 async function saveExtractedItemToSupabase(item) {
   const productName = item.nama.trim();
-  const quantity = parseFloat(item.jumlah);
+  const quantity = parseInt(item.jumlah, 10);
   const unit = item.satuan || 'pcs';
   const category = item.kategori.trim() || null;
   const expiryDate = item.expiry_date || null;
   const storageLocation = item.lokasi_penyimpanan.trim() || null;
+  const batchNumber = item.batch_number.trim() || null;
+  const minimumStock = parseFloat(item.minimum_stock) || 0;
 
+  // Cari produk existing, atau buat baru kalau belum ada
   let { data: existingProduct, error: findError } = await supabaseClient
     .from('products')
-    .select('id, current_stock')
+    .select('id')
     .eq('clinic_id', CURRENT_CLINIC_ID)
     .eq('name', productName)
     .maybeSingle();
 
   if (findError) throw findError;
 
-  let productId, stockBefore;
+  let productId;
+  const isNewProduct = !existingProduct;
 
   if (existingProduct) {
     productId = existingProduct.id;
-    stockBefore = existingProduct.current_stock;
   } else {
     const { data: newProduct, error: insertProductError } = await supabaseClient
       .from('products')
@@ -372,56 +403,43 @@ async function saveExtractedItemToSupabase(item) {
         category: category,
         unit: unit,
         storage_location: storageLocation,
-        minimum_stock: 0,
+        minimum_stock: minimumStock, // hanya dipakai untuk produk baru
         current_stock: 0
       })
-      .select('id, current_stock')
+      .select('id')
       .single();
 
     if (insertProductError) throw insertProductError;
     productId = newProduct.id;
-    stockBefore = 0;
   }
 
-  // ============================================
-  // Percabangan: "Barang Masuk" vs "Stok Fisik Saat Ini"
-  // Produk baru (stockBefore selalu 0, baru dibuat barusan) selalu
-  // diperlakukan sebagai "in", karena opname tidak bermakna tanpa
-  // baseline stok sebelumnya (lihat diskusi desain).
-  // ============================================
-  const isNewProduct = !existingProduct;
+  // Produk baru (belum ada histori stok) selalu diperlakukan sebagai "in",
+  // karena opname tidak bermakna tanpa baseline stok sebelumnya
+  // (aturan yang sama seperti versi lama, tetap dipertahankan).
   const jenisTransaksi = isNewProduct ? 'in' : item.jenis_transaksi;
 
-  let movementType, movementQuantity, stockAfter;
-
   if (jenisTransaksi === 'opname') {
-    // Stok Fisik Saat Ini: quantity dari user = jumlah fisik akhir.
-    // Ikut pola handleOpname() di app.js: quantity disimpan sebagai selisih absolut.
-    stockAfter = quantity;
-    movementQuantity = Math.abs(stockAfter - stockBefore);
-    movementType = 'opname_adjustment';
-  } else {
-    // Barang Masuk: quantity ditambahkan ke stok yang ada.
-    stockAfter = stockBefore + quantity;
-    movementQuantity = quantity;
-    movementType = 'in';
-  }
-
-  const { error: insertMovementError } = await supabaseClient
-    .from('stock_movements')
-    .insert({
-      clinic_id: CURRENT_CLINIC_ID,
-      product_id: productId,
-      movement_type: movementType,
-      quantity: movementQuantity,
-      stock_before: stockBefore,
-      stock_after: stockAfter,
-      expiry_date: expiryDate,
-      source_type: 'photo_ai',
-      performed_by: CURRENT_USER_ID
+    const { error: rpcError } = await supabaseClient.rpc('adjust_stock_opname', {
+      p_clinic_id: CURRENT_CLINIC_ID,
+      p_product_id: productId,
+      p_jumlah_fisik: quantity,
+      p_user_id: CURRENT_USER_ID,
+      p_opname_note: 'Input via foto AI'
     });
 
-  if (insertMovementError) throw insertMovementError;
+    if (rpcError) throw rpcError;
+  } else {
+    const { error: rpcError } = await supabaseClient.rpc('add_stock_lot', {
+      p_clinic_id: CURRENT_CLINIC_ID,
+      p_product_id: productId,
+      p_quantity: quantity,
+      p_batch_number: batchNumber,
+      p_expiry_date: expiryDate,
+      p_user_id: CURRENT_USER_ID
+    });
+
+    if (rpcError) throw rpcError;
+  }
 }
 
 // ============================================
