@@ -133,7 +133,7 @@ async function handlePhotoSelected(e) {
   } catch (error) {
     console.error('Compress error:', error);
     showUploadStatus(error.message || 'Gagal memproses foto. Coba foto lain.', 'error');
-    uploadLabel.textContent = 'Tap untuk ambil foto atau pilih dari galeri';
+    uploadLabel.textContent = 'Tap untuk ambil gambar dari galeri';
   }
 }
 
@@ -522,7 +522,7 @@ function resetFotoPage() {
   photoInput.value = '';
   photoPreview.style.display = 'none';
   photoPreview.src = '';
-  uploadLabel.textContent = 'Tap untuk ambil foto atau pilih dari galeri';
+  uploadLabel.textContent = 'Tap untuk ambil gambar dari galeri';
   analyzeBtn.style.display = 'none';
   uploadStatus.style.display = 'none';
 
