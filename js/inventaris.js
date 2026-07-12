@@ -2,6 +2,11 @@
 // INVENTARIS - Daftar stok barang
 // Percakapan P10 - TAMBAH: dropdown sortir, tap-to-expand (detail + riwayat
 //   transaksi singkat), pagination client-side (20 item/halaman)
+// Percakapan [Edit Data Barang] - TAMBAH: form edit inline di dalam expand card.
+//   Field yang bisa diedit: nama, kategori, satuan (label saja, bukan konversi
+//   kuantitas), lokasi penyimpanan, stok minimum. Jumlah stok TIDAK bisa diedit
+//   di sini (diarahkan ke Stok Opname) karena current_stock adalah hasil agregat
+//   dari product_lots (via trigger sync_product_current_stock), bukan kolom bebas.
 // Default urutan (saat sortir = "Status"): Kritis (stok=0) > Menipis (stok<=minimum) > Normal
 // ============================================
 
@@ -11,6 +16,7 @@ let ALL_INVENTARIS_ITEMS = [];
 let CURRENT_SORT = 'status'; // 'status' | 'nama' | 'stok' | 'kategori'
 let CURRENT_PAGE = 1;
 let EXPANDED_ITEM_ID = null; // tempId (product id) dari card yang sedang terbuka, atau null
+let EDITING_ITEM_ID = null; // product id dari card yang sedang dalam mode edit, atau null
 
 const inventarisSearchInput = document.getElementById('inventarisSearchInput');
 const inventarisSummary = document.getElementById('inventarisSummary');
@@ -170,6 +176,24 @@ function buildItemCard(p) {
     handleCardToggle(p.id);
   });
 
+  // Tombol-tombol di dalam area edit (Edit / Simpan / Batal) — event delegation
+  const actionBtn = item.querySelector('[data-action]');
+  if (actionBtn) {
+    item.querySelectorAll('[data-action]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation(); // jangan sampai toggle expand ikut kepicu
+        const action = btn.dataset.action;
+        if (action === 'edit') {
+          handleStartEdit(p.id);
+        } else if (action === 'cancel-edit') {
+          handleCancelEdit(p.id);
+        } else if (action === 'save-edit') {
+          handleSaveEdit(p.id, item);
+        }
+      });
+    });
+  }
+
   return item;
 }
 
@@ -207,9 +231,18 @@ function buildExpandContent(p) {
     `).join('') + '</ul>';
   }
 
+  const isEditing = EDITING_ITEM_ID === p.id;
+
   return `
-    <div class="expand-fields">
+    <div class="expand-fields-view" style="display:${isEditing ? 'none' : 'block'}">
+      <div><strong>Kategori:</strong> ${escapeHtml(p.category || '-')}</div>
+      <div><strong>Satuan:</strong> ${escapeHtml(p.unit || '-')}</div>
       <div><strong>Lokasi penyimpanan:</strong> ${escapeHtml(p.storage_location || '-')}</div>
+      <div><strong>Stok minimum:</strong> ${p.minimum_stock}</div>
+      <button type="button" class="btn-edit-item" data-action="edit">✏️ Edit Data Barang</button>
+    </div>
+    <div class="expand-fields-edit" style="display:${isEditing ? 'block' : 'none'}">
+      ${buildEditForm(p)}
     </div>
     <div class="expand-lots">
       <strong>Lot aktif (batch & kadaluarsa)</strong>
@@ -218,6 +251,44 @@ function buildExpandContent(p) {
     <div class="expand-history">
       <strong>Riwayat terakhir</strong>
       ${historyHtml}
+    </div>
+  `;
+}
+
+// ============================================
+// EDIT DATA BARANG: form inline di dalam expand card
+// Field yang bisa diedit: nama, kategori, satuan (label saja), lokasi, stok minimum.
+// Jumlah stok TIDAK bisa diedit di sini — diarahkan ke Stok Opname.
+// ============================================
+function buildEditForm(p) {
+  return `
+    <div class="edit-form">
+      <div class="edit-form-group">
+        <label>Nama Barang</label>
+        <input type="text" class="edit-input" data-field="name" value="${escapeAttr(p.name)}">
+      </div>
+      <div class="edit-form-group">
+        <label>Kategori</label>
+        <input type="text" class="edit-input" data-field="category" value="${escapeAttr(p.category || '')}">
+      </div>
+      <div class="edit-form-group">
+        <label>Satuan</label>
+        <input type="text" class="edit-input" data-field="unit" value="${escapeAttr(p.unit || '')}">
+      </div>
+      <div class="edit-form-group">
+        <label>Lokasi Penyimpanan</label>
+        <input type="text" class="edit-input" data-field="storage_location" value="${escapeAttr(p.storage_location || '')}">
+      </div>
+      <div class="edit-form-group">
+        <label>Stok Minimum</label>
+        <input type="number" class="edit-input" data-field="minimum_stock" value="${p.minimum_stock}" min="0">
+      </div>
+      <p class="edit-stock-note">Untuk ubah jumlah stok, gunakan menu <strong>Stok Opname</strong> di halaman Input.</p>
+      <div class="edit-form-actions">
+        <button type="button" class="btn-secondary" data-action="cancel-edit">Batal</button>
+        <button type="button" class="btn-primary" data-action="save-edit">Simpan</button>
+      </div>
+      <div class="edit-status-message" data-role="edit-status"></div>
     </div>
   `;
 }
@@ -306,6 +377,87 @@ async function handleCardToggle(productId) {
 }
 
 // ============================================
+// EDIT DATA BARANG: mulai edit, batal, simpan
+// ============================================
+function handleStartEdit(productId) {
+  EDITING_ITEM_ID = productId;
+  renderInventaris(inventarisSearchInput.value);
+}
+
+function handleCancelEdit(productId) {
+  EDITING_ITEM_ID = null;
+  renderInventaris(inventarisSearchInput.value);
+}
+
+async function handleSaveEdit(productId, cardEl) {
+  const saveBtn = cardEl.querySelector('[data-action="save-edit"]');
+  const statusEl = cardEl.querySelector('[data-role="edit-status"]');
+
+  const getField = (field) => cardEl.querySelector(`.edit-input[data-field="${field}"]`).value.trim();
+
+  const name = getField('name');
+  const category = getField('category');
+  const unit = getField('unit');
+  const storageLocation = getField('storage_location');
+  const minimumStockRaw = getField('minimum_stock');
+  const minimumStock = minimumStockRaw === '' ? 0 : parseFloat(minimumStockRaw);
+
+  if (!name) {
+    showEditStatus(statusEl, 'Nama barang tidak boleh kosong.', 'error');
+    return;
+  }
+
+  if (isNaN(minimumStock) || minimumStock < 0) {
+    showEditStatus(statusEl, 'Stok minimum harus angka 0 atau lebih.', 'error');
+    return;
+  }
+
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'Menyimpan...';
+
+  const { error } = await supabaseClient
+    .from('products')
+    .update({
+      name: name,
+      category: category,
+      unit: unit,
+      storage_location: storageLocation,
+      minimum_stock: minimumStock
+    })
+    .eq('id', productId)
+    .eq('clinic_id', CURRENT_CLINIC_ID);
+
+  saveBtn.disabled = false;
+  saveBtn.textContent = 'Simpan';
+
+  if (error) {
+    console.error('Gagal simpan perubahan produk:', error);
+    showEditStatus(statusEl, 'Gagal menyimpan: ' + error.message, 'error');
+    return;
+  }
+
+  // Update data lokal langsung (tidak perlu fetch ulang semua produk)
+  const product = ALL_INVENTARIS_ITEMS.find(p => p.id === productId);
+  if (product) {
+    product.name = name;
+    product.category = category;
+    product.unit = unit;
+    product.storage_location = storageLocation;
+    product.minimum_stock = minimumStock;
+    product.status = getStockStatus(product.current_stock, product.minimum_stock);
+  }
+
+  EDITING_ITEM_ID = null;
+  renderInventaris(inventarisSearchInput.value);
+}
+
+function showEditStatus(el, message, type) {
+  if (!el) return;
+  el.textContent = message;
+  el.className = 'edit-status-message edit-status-' + type;
+}
+
+// ============================================
 // PAGINATION: render angka halaman "1 2 3 ... 24"
 // ============================================
 function renderPagination(totalPages) {
@@ -381,6 +533,15 @@ function escapeHtml(text) {
   const div = document.createElement('div');
   div.textContent = text;
   return div.innerHTML;
+}
+
+// Escape untuk dipakai di dalam atribut HTML (value="...")
+function escapeAttr(text) {
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 }
 
 // ============================================
