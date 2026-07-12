@@ -24,6 +24,18 @@
       font-size: 14px;
     }
 
+    #exportPdfBtn {
+      margin-left: auto;
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 14px;
+      white-space: nowrap;
+    }
+
+    #exportPdfBtn:disabled {
+      opacity: 0.6;
+    }
+
     .inventaris-item {
       cursor: pointer;
     }
@@ -174,7 +186,7 @@
       <input type="text" id="inventarisSearchInput" placeholder="Cari nama barang..." autocomplete="off">
     </div>
 
-    <!-- TOOLBAR: dropdown sortir -->
+    <!-- TOOLBAR: dropdown sortir + export PDF -->
     <div class="inventaris-toolbar">
       <select id="inventarisSortSelect">
         <option value="status">Urutkan: Status</option>
@@ -182,7 +194,9 @@
         <option value="stok">Urutkan: Stok</option>
         <option value="kategori">Urutkan: Kategori</option>
       </select>
+      <button id="exportPdfBtn" class="btn-secondary">Export PDF</button>
     </div>
+    <div id="exportStatus" class="status-message" style="display:none;"></div>
 
     <!-- RINGKASAN STATUS -->
     <div id="inventarisSummary" class="inventaris-summary"></div>
@@ -219,6 +233,8 @@
 
   <!-- Supabase library dari CDN -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- pdf-lib untuk generate PDF laporan stok langsung di browser (P11) -->
+<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
 <script src="js/supabase-client.js"></script>
 <script src="js/inventaris.js"></script>
 <script src="js/auth-check.js"></script>
