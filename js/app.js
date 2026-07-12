@@ -138,7 +138,6 @@ function uniqueMerge(starterList, historyList) {
 }
 
 function updateMetadataPlaceholders() {
-function updateMetadataPlaceholders() {
   const typedName = productNameInput.value.trim().toLowerCase();
 
   if (!typedName) {
