@@ -1,45 +1,18 @@
-window.onerror = function(message, source, lineno, colno, error) {
-  alert('ERROR: ' + message + '\nBaris: ' + lineno + '\nFile: ' + source);
-};
-
 // ============================================
 // APP LOGIC - Form Input Stok (3 jenis transaksi)
 // stock_movements: in, out, opname_adjustment
 // Versi: P9 - Lot/Batch Tracking + FEFO otomatis
-// Semua write lot+movement sekarang lewat RPC (atomik di database):
-//   - add_stock_lot()        -> stock in (bikin lot baru)
-//   - deduct_stock_fefo()    -> stock out (potong lot FEFO otomatis)
-//   - adjust_stock_opname()  -> stok opname (selisih via FEFO / lot baru)
-// products.current_stock disinkron otomatis oleh trigger trg_sync_current_stock
-//
-// Percakapan [lanjutan P10] - AUTOCOMPLETE/CREATABLE DROPDOWN
-// Field Nama Barang, Kategori, Lokasi, Satuan, Nomor Batch searchable:
-// histori diambil sekali saat load, di-cache, difilter lokal saat user
-// mengetik. User tetap bisa ketik nilai baru yang belum ada.
-//
-// Percakapan [lanjutan P10, part 3] - INFO PLACEHOLDER UNTUK SEMUA
-// FIELD METADATA (Kategori, Lokasi, Satuan, Stok Minimum)
-// Saat nama barang yang diketik/dipilih cocok persis dengan produk
-// existing, placeholder ke-4 field ini berubah jadi info nilai yang
-// sudah tersimpan. Field-field ini TETAP kosong (kecuali Satuan yang
-// punya default 'pcs'), tidak auto-fill ke value asli — supaya tidak
-// ada risiko data lama tertimpa tanpa sadar. Saat submit, field yang
-// dibiarkan kosong TIDAK mengubah data existing (lihat handleStockIn).
-// Perubahan data existing (edit sungguhan) adalah domain fitur
-// "Edit Data Barang" tersendiri, bukan bagian form ini.
 // ============================================
 
 let CURRENT_CLINIC_ID = null;
 let CURRENT_USER_ID = null;
-let ALL_PRODUCTS = []; // cache semua produk untuk difilter di searchable dropdown
+let ALL_PRODUCTS = [];
 
-// Cache untuk autocomplete field-field baru
 let ALL_CATEGORIES = [];
 let ALL_LOCATIONS = [];
 let ALL_UNITS = [];
 let ALL_BATCH_NUMBERS = [];
 
-// Starter list (selalu muncul di awal, digabung dengan histori nyata)
 const STARTER_CATEGORIES = ['APD', 'BMHP', 'Obat', 'Alat Kesehatan', 'Bahan Tambal/Restorasi', 'Lainnya'];
 const STARTER_UNITS = ['pcs', 'box', 'botol', 'tube', 'dus', 'pack', 'set', 'lembar'];
 
@@ -54,26 +27,22 @@ const statusDiv = document.getElementById('statusMessage');
 const submitBtn = document.getElementById('submitBtn');
 const productSelectGroup = document.getElementById('productSelectGroup');
 
-// Elemen searchable dropdown "Pilih Barang" (Out & Opname)
 const productSearchInput = document.getElementById('productSearchInput');
 const productSelectedId = document.getElementById('productSelectedId');
 const productSearchResults = document.getElementById('productSearchResults');
 
-// Field groups (tampil/sembunyi tergantung movementType)
 const fieldsIn = document.getElementById('fieldsIn');
 const fieldsOut = document.getElementById('fieldsOut');
 const fieldsOpname = document.getElementById('fieldsOpname');
 const opnamePreview = document.getElementById('opnamePreview');
 const newProductFields = document.getElementById('newProductFields');
 
-// Field-field yang butuh info placeholder saat produk existing dikenali
 const productNameInput = document.getElementById('productName');
 const categoryInput = document.getElementById('category');
 const storageLocationInput = document.getElementById('storageLocation');
 const unitInput = document.getElementById('unit');
 const minimumStockInput = document.getElementById('minimumStock');
 
-// Dipanggil dari auth.js setelah user berhasil login
 async function onUserLoggedIn() {
   const { data: { user }, error: userAuthError } = await supabaseClient.auth.getUser();
 
@@ -105,9 +74,6 @@ async function onUserLoggedIn() {
   await loadAutocompleteOptions();
 }
 
-// Load daftar produk existing ke cache ALL_PRODUCTS.
-// Ambil semua kolom metadata (category, storage_location, unit,
-// minimum_stock) supaya bisa dipakai untuk info placeholder.
 async function loadProductOptions() {
   const { data: products, error } = await supabaseClient
     .from('products')
@@ -124,9 +90,6 @@ async function loadProductOptions() {
   ALL_PRODUCTS = products || [];
 }
 
-// ============================================
-// Load histori untuk autocomplete: kategori, lokasi, satuan, batch
-// ============================================
 async function loadAutocompleteOptions() {
   const { data: products, error: productsError } = await supabaseClient
     .from('products')
@@ -136,9 +99,9 @@ async function loadAutocompleteOptions() {
   if (productsError) {
     console.error('Gagal load histori kategori/lokasi/satuan:', productsError);
   } else if (products) {
-    const categoriesFromHistory = products.map(p => p.category).filter(Boolean);
-    const locationsFromHistory = products.map(p => p.storage_location).filter(Boolean);
-    const unitsFromHistory = products.map(p => p.unit).filter(Boolean);
+    const categoriesFromHistory = products.map(function(p) { return p.category; }).filter(Boolean);
+    const locationsFromHistory = products.map(function(p) { return p.storage_location; }).filter(Boolean);
+    const unitsFromHistory = products.map(function(p) { return p.unit; }).filter(Boolean);
 
     ALL_CATEGORIES = uniqueMerge(STARTER_CATEGORIES, categoriesFromHistory);
     ALL_LOCATIONS = uniqueMerge([], locationsFromHistory);
@@ -153,18 +116,17 @@ async function loadAutocompleteOptions() {
   if (lotsError) {
     console.error('Gagal load histori batch number:', lotsError);
   } else if (lots) {
-    const batchesFromHistory = lots.map(l => l.batch_number).filter(Boolean);
+    const batchesFromHistory = lots.map(function(l) { return l.batch_number; }).filter(Boolean);
     ALL_BATCH_NUMBERS = uniqueMerge([], batchesFromHistory);
   }
 }
 
-// Gabung starter list + histori, hilangkan duplikat (case-insensitive)
 function uniqueMerge(starterList, historyList) {
-  const combined = [...starterList, ...historyList];
+  const combined = starterList.concat(historyList);
   const seen = new Set();
   const result = [];
 
-  combined.forEach(value => {
+  combined.forEach(function(value) {
     const key = value.toLowerCase();
     if (!seen.has(key)) {
       seen.add(key);
@@ -175,13 +137,6 @@ function uniqueMerge(starterList, historyList) {
   return result;
 }
 
-// ============================================
-// INFO PLACEHOLDER UNTUK 4 FIELD METADATA
-// Dipanggil tiap kali field Nama Barang berubah. Kalau nama cocok
-// PERSIS (case-insensitive) dengan produk yang sudah ada, placeholder
-// ke-4 field metadata berubah jadi info nilai yang sudah tersimpan.
-// Field TETAP kosong (tidak auto-fill value), murni info visual.
-// ============================================
 function updateMetadataPlaceholders() {
   const typedName = productNameInput.value.trim().toLowerCase();
 
@@ -190,17 +145,19 @@ function updateMetadataPlaceholders() {
     return;
   }
 
-  const matchedProduct = ALL_PRODUCTS.find(p => p.name.toLowerCase() === typedName);
+  const matchedProduct = ALL_PRODUCTS.find(function(p) {
+    return p.name.toLowerCase() === typedName;
+  });
 
   if (!matchedProduct) {
     resetMetadataPlaceholders();
     return;
   }
 
-  categoryInput.placeholder = `Kategori saat ini: ${matchedProduct.category || '(belum diisi)'}`;
-  storageLocationInput.placeholder = `Lokasi saat ini: ${matchedProduct.storage_location || '(belum diisi)'}`;
-  unitInput.placeholder = `Satuan saat ini: ${matchedProduct.unit}`;
-  minimumStockInput.placeholder = `Stok minimum saat ini: ${matchedProduct.minimum_stock}`;
+  categoryInput.placeholder = 'Kategori saat ini: ' + (matchedProduct.category || '(belum diisi)');
+  storageLocationInput.placeholder = 'Lokasi saat ini: ' + (matchedProduct.storage_location || '(belum diisi)');
+  unitInput.placeholder = 'Satuan saat ini: ' + matchedProduct.unit;
+  minimumStockInput.placeholder = 'Stok minimum saat ini: ' + matchedProduct.minimum_stock;
 }
 
 function resetMetadataPlaceholders() {
@@ -212,16 +169,12 @@ function resetMetadataPlaceholders() {
 
 productNameInput.addEventListener('input', updateMetadataPlaceholders);
 
-// ============================================
-// SEARCHABLE DROPDOWN LOGIC — "Pilih Barang" (Out & Opname)
-// ============================================
-
 function renderProductResults(filterText) {
   const keyword = filterText.trim().toLowerCase();
 
   const filtered = keyword === ''
     ? ALL_PRODUCTS.slice(0, 50)
-    : ALL_PRODUCTS.filter(p => p.name.toLowerCase().includes(keyword)).slice(0, 50);
+    : ALL_PRODUCTS.filter(function(p) { return p.name.toLowerCase().includes(keyword); }).slice(0, 50);
 
   productSearchResults.innerHTML = '';
 
@@ -234,16 +187,16 @@ function renderProductResults(filterText) {
     return;
   }
 
-  filtered.forEach(p => {
+  filtered.forEach(function(p) {
     const item = document.createElement('div');
     item.className = 'product-search-item';
-    item.textContent = `${p.name} (stok: ${p.current_stock} ${p.unit})`;
+    item.textContent = p.name + ' (stok: ' + p.current_stock + ' ' + p.unit + ')';
     item.dataset.id = p.id;
     item.dataset.currentStock = p.current_stock;
     item.dataset.unit = p.unit;
     item.dataset.name = p.name;
 
-    item.addEventListener('click', () => {
+    item.addEventListener('click', function() {
       selectProduct(p);
     });
 
@@ -255,7 +208,7 @@ function renderProductResults(filterText) {
 
 function selectProduct(product) {
   productSelectedId.value = product.id;
-  productSearchInput.value = `${product.name} (stok: ${product.current_stock} ${product.unit})`;
+  productSearchInput.value = product.name + ' (stok: ' + product.current_stock + ' ' + product.unit + ')';
   productSearchInput.dataset.currentStock = product.current_stock;
   productSearchResults.style.display = 'none';
   updateOpnamePreview();
@@ -269,18 +222,14 @@ function resetProductSelection() {
   productSearchResults.innerHTML = '';
 }
 
-productSearchInput.addEventListener('focus', () => {
+productSearchInput.addEventListener('focus', function() {
   renderProductResults('');
 });
 
-productSearchInput.addEventListener('input', () => {
+productSearchInput.addEventListener('input', function() {
   productSelectedId.value = '';
   renderProductResults(productSearchInput.value);
 });
-
-// ============================================
-// SEARCHABLE DROPDOWN LOGIC — Generik, dipakai untuk 5 field baru
-// ============================================
 
 function setupSimpleAutocomplete(inputId, resultsId, getOptionsFn) {
   const input = document.getElementById(inputId);
@@ -292,7 +241,7 @@ function setupSimpleAutocomplete(inputId, resultsId, getOptionsFn) {
 
     const filtered = keyword === ''
       ? options.slice(0, 50)
-      : options.filter(v => v.toLowerCase().includes(keyword)).slice(0, 50);
+      : options.filter(function(v) { return v.toLowerCase().includes(keyword); }).slice(0, 50);
 
     resultsDiv.innerHTML = '';
 
@@ -301,15 +250,14 @@ function setupSimpleAutocomplete(inputId, resultsId, getOptionsFn) {
       return;
     }
 
-    filtered.forEach(value => {
+    filtered.forEach(function(value) {
       const item = document.createElement('div');
       item.className = 'product-search-item';
       item.textContent = value;
 
-      item.addEventListener('click', () => {
+      item.addEventListener('click', function() {
         input.value = value;
         resultsDiv.style.display = 'none';
-        // Kalau ini field Nama Barang, trigger juga update semua info placeholder
         if (inputId === 'productName') {
           updateMetadataPlaceholders();
         }
@@ -321,10 +269,15 @@ function setupSimpleAutocomplete(inputId, resultsId, getOptionsFn) {
     resultsDiv.style.display = 'block';
   }
 
-  input.addEventListener('focus', () => render(''));
-  input.addEventListener('input', () => render(input.value));
+  input.addEventListener('focus', function() {
+    render('');
+  });
 
-  document.addEventListener('click', (e) => {
+  input.addEventListener('input', function() {
+    render(input.value);
+  });
+
+  document.addEventListener('click', function(e) {
     const isClickInside = input.contains(e.target) || resultsDiv.contains(e.target);
     if (!isClickInside) {
       resultsDiv.style.display = 'none';
@@ -332,27 +285,34 @@ function setupSimpleAutocomplete(inputId, resultsId, getOptionsFn) {
   });
 }
 
-setupSimpleAutocomplete('productName', 'productNameResults', () => {
-  return uniqueMerge([], ALL_PRODUCTS.map(p => p.name));
+setupSimpleAutocomplete('productName', 'productNameResults', function() {
+  return uniqueMerge([], ALL_PRODUCTS.map(function(p) { return p.name; }));
 });
 
-setupSimpleAutocomplete('category', 'categoryResults', () => ALL_CATEGORIES);
-setupSimpleAutocomplete('storageLocation', 'storageLocationResults', () => ALL_LOCATIONS);
-setupSimpleAutocomplete('unit', 'unitResults', () => ALL_UNITS);
-setupSimpleAutocomplete('batchNumber', 'batchNumberResults', () => ALL_BATCH_NUMBERS);
+setupSimpleAutocomplete('category', 'categoryResults', function() {
+  return ALL_CATEGORIES;
+});
 
-document.addEventListener('click', (e) => {
+setupSimpleAutocomplete('storageLocation', 'storageLocationResults', function() {
+  return ALL_LOCATIONS;
+});
+
+setupSimpleAutocomplete('unit', 'unitResults', function() {
+  return ALL_UNITS;
+});
+
+setupSimpleAutocomplete('batchNumber', 'batchNumberResults', function() {
+  return ALL_BATCH_NUMBERS;
+});
+
+document.addEventListener('click', function(e) {
   const isClickInside = productSearchInput.contains(e.target) || productSearchResults.contains(e.target);
   if (!isClickInside) {
     productSearchResults.style.display = 'none';
   }
 });
 
-// ============================================
-// TOGGLE FIELD GROUPS
-// ============================================
-
-movementTypeSelect.addEventListener('change', () => {
+movementTypeSelect.addEventListener('change', function() {
   const type = movementTypeSelect.value;
 
   fieldsIn.style.display = type === 'in' ? 'block' : 'none';
@@ -378,17 +338,13 @@ function updateOpnamePreview() {
 
   const selisih = physicalCount - currentStock;
   const arah = selisih > 0 ? 'lebih' : selisih < 0 ? 'kurang' : 'sama';
-  opnamePreview.textContent = `Selisih: ${selisih > 0 ? '+' : ''}${selisih} (${arah}). Stok akan disesuaikan dari ${currentStock} -> ${physicalCount}.`;
+  opnamePreview.textContent = 'Selisih: ' + (selisih > 0 ? '+' : '') + selisih + ' (' + arah + '). Stok akan disesuaikan dari ' + currentStock + ' -> ' + physicalCount + '.';
   opnamePreview.className = 'opname-preview ' + (selisih === 0 ? 'preview-neutral' : (selisih > 0 ? 'preview-plus' : 'preview-minus'));
 }
 
 document.getElementById('opnamePhysicalCount').addEventListener('input', updateOpnamePreview);
 
-// ============================================
-// FORM SUBMIT
-// ============================================
-
-form.addEventListener('submit', async (e) => {
+form.addEventListener('submit', async function(e) {
   e.preventDefault();
 
   if (!CURRENT_CLINIC_ID) {
@@ -438,23 +394,15 @@ form.addEventListener('submit', async (e) => {
 });
 
 function parseErrorMessage(error) {
-  const msg = error?.message || String(error);
+  const msg = (error && error.message) || String(error);
   if (msg.includes('STOK_TIDAK_CUKUP')) {
     const match = msg.match(/kurang\s+(-?\d+)\s*unit/i);
     const kurang = match ? match[1] : '?';
-    return `Stok tidak cukup, kurang ${kurang} unit dari yang diminta.`;
+    return 'Stok tidak cukup, kurang ' + kurang + ' unit dari yang diminta.';
   }
   return msg;
 }
 
-// ============================================
-// HANDLER: Tambah Barang (in)
-// CATATAN: kalau produk sudah ada (existingProduct), field category,
-// storage_location, unit, minimum_stock yang diisi user di form ini
-// TIDAK dipakai untuk update produk — cuma dipakai kalau produk BARU.
-// Ini konsisten dengan prinsip "form ini untuk transaksi, bukan edit
-// data produk" yang sudah disepakati.
-// ============================================
 async function handleStockIn() {
   const productName = document.getElementById('productName').value.trim();
   const category = document.getElementById('category').value.trim();
@@ -470,23 +418,22 @@ async function handleStockIn() {
     throw new Error('Nama barang dan jumlah wajib diisi dengan benar.');
   }
 
-  let { data: existingProduct, error: findError } = await supabaseClient
+  let existingProductResult = await supabaseClient
     .from('products')
     .select('id')
     .eq('clinic_id', CURRENT_CLINIC_ID)
     .eq('name', productName)
     .maybeSingle();
 
-  if (findError) throw findError;
+  if (existingProductResult.error) throw existingProductResult.error;
 
+  const existingProduct = existingProductResult.data;
   let productId;
 
   if (existingProduct) {
     productId = existingProduct.id;
-    // Semua field metadata (category, storage_location, unit, minimum_stock)
-    // diabaikan di sini untuk produk existing. Lihat catatan di atas fungsi.
   } else {
-    const { data: newProduct, error: insertProductError } = await supabaseClient
+    const insertResult = await supabaseClient
       .from('products')
       .insert({
         clinic_id: CURRENT_CLINIC_ID,
@@ -500,11 +447,11 @@ async function handleStockIn() {
       .select('id')
       .single();
 
-    if (insertProductError) throw insertProductError;
-    productId = newProduct.id;
+    if (insertResult.error) throw insertResult.error;
+    productId = insertResult.data.id;
   }
 
-  const { error: rpcError } = await supabaseClient.rpc('add_stock_lot', {
+  const rpcResult = await supabaseClient.rpc('add_stock_lot', {
     p_clinic_id: CURRENT_CLINIC_ID,
     p_product_id: productId,
     p_quantity: quantity,
@@ -513,12 +460,9 @@ async function handleStockIn() {
     p_user_id: CURRENT_USER_ID
   });
 
-  if (rpcError) throw rpcError;
+  if (rpcResult.error) throw rpcResult.error;
 }
 
-// ============================================
-// HANDLER: Penggunaan Barang (out)
-// ============================================
 async function handleStockOut() {
   const productId = productSelectedId.value;
   const quantity = parseInt(document.getElementById('outQuantity').value, 10);
@@ -532,7 +476,7 @@ async function handleStockOut() {
     throw new Error('Isi jumlah dengan benar.');
   }
 
-  const { error: rpcError } = await supabaseClient.rpc('deduct_stock_fefo', {
+  const rpcResult = await supabaseClient.rpc('deduct_stock_fefo', {
     p_clinic_id: CURRENT_CLINIC_ID,
     p_product_id: productId,
     p_quantity: quantity,
@@ -541,12 +485,9 @@ async function handleStockOut() {
     p_reason: reason
   });
 
-  if (rpcError) throw rpcError;
+  if (rpcResult.error) throw rpcResult.error;
 }
 
-// ============================================
-// HANDLER: Stok Opname
-// ============================================
 async function handleOpname() {
   const productId = productSelectedId.value;
   const physicalCount = parseInt(document.getElementById('opnamePhysicalCount').value, 10);
@@ -556,4 +497,26 @@ async function handleOpname() {
     throw new Error('Pilih barang dari daftar terlebih dahulu (klik salah satu hasil pencarian).');
   }
 
-  if (isNaN(physicalCount) || ph
+  if (isNaN(physicalCount) || physicalCount < 0) {
+    throw new Error('Isi jumlah fisik dengan benar.');
+  }
+
+  const rpcResult = await supabaseClient.rpc('adjust_stock_opname', {
+    p_clinic_id: CURRENT_CLINIC_ID,
+    p_product_id: productId,
+    p_jumlah_fisik: physicalCount,
+    p_user_id: CURRENT_USER_ID,
+    p_opname_note: opnameNote
+  });
+
+  if (rpcResult.error) throw rpcResult.error;
+}
+
+function showStatus(message, type) {
+  statusDiv.textContent = message;
+  statusDiv.className = type === 'success' ? 'status-success' : 'status-error';
+  setTimeout(function() {
+    statusDiv.className = '';
+    statusDiv.textContent = '';
+  }, 4000);
+    }
