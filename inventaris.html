@@ -54,20 +54,24 @@
       color: #444;
     }
 
-    .expand-history strong {
+    .expand-history strong, .expand-lots strong {
       display: block;
       font-size: 13px;
       color: #666;
       margin-bottom: 6px;
     }
 
-    .history-list {
+    .expand-lots {
+      margin-bottom: 10px;
+    }
+
+    .history-list, .lots-list {
       list-style: none;
       margin: 0;
       padding: 0;
     }
 
-    .history-list li {
+    .history-list li, .lots-list li {
       display: flex;
       gap: 10px;
       font-size: 13px;
@@ -75,7 +79,7 @@
       border-bottom: 1px solid #f0f0f0;
     }
 
-    .history-list li:last-child {
+    .history-list li:last-child, .lots-list li:last-child {
       border-bottom: none;
     }
 
@@ -88,8 +92,17 @@
       flex: 1;
     }
 
-    .history-qty {
+    .history-qty, .lot-qty {
       font-weight: 600;
+    }
+
+    .lot-batch {
+      min-width: 110px;
+    }
+
+    .lot-expiry {
+      flex: 1;
+      color: #888;
     }
 
     .history-loading, .history-empty {
