@@ -17,6 +17,8 @@ const inventarisSummary = document.getElementById('inventarisSummary');
 const inventarisList = document.getElementById('inventarisList');
 const inventarisSortSelect = document.getElementById('inventarisSortSelect');
 const inventarisPagination = document.getElementById('inventarisPagination');
+const exportPdfBtn = document.getElementById('exportPdfBtn');
+const exportStatus = document.getElementById('exportStatus');
 
 // Dipanggil oleh auth-check.js setelah user terverifikasi login
 async function onPageReady() {
@@ -26,6 +28,8 @@ async function onPageReady() {
     CURRENT_PAGE = 1; // reset ke halaman 1 tiap kali pencarian berubah
     renderInventaris(inventarisSearchInput.value);
   });
+
+  exportPdfBtn.addEventListener('click', handleExportPdf);
 
   inventarisSortSelect.addEventListener('change', () => {
     CURRENT_SORT = inventarisSortSelect.value;
@@ -379,3 +383,171 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
+// ============================================
+// Percakapan [P11] - EXPORT PDF (Laporan Snapshot Stok)
+// Pakai pdf-lib (dimuat via CDN di inventaris.html), semua proses di browser,
+// tidak ada data yang dikirim ke server manapun untuk pembuatan PDF ini.
+//
+// Data yang di-export = hasil filter pencarian yang sedang aktif & sortir
+// yang sedang dipilih (bukan cuma 20 item di halaman aktif — SEMUA hasil filter),
+// supaya laporan tetap lengkap walau UI-nya lagi di halaman pagination tertentu.
+// ============================================
+const PAGE_WIDTH = 595.28;  // A4 dalam points
+const PAGE_HEIGHT = 841.89;
+const MARGIN = 40;
+const ROW_HEIGHT = 20;
+const COL_X = { nama: MARGIN, kategori: 220, stok: 340, minimum: 400, status: 460, lokasi: 520 };
+
+async function handleExportPdf() {
+  exportPdfBtn.disabled = true;
+  exportPdfBtn.textContent = 'Membuat PDF...';
+  hideExportStatus();
+
+  try {
+    const searchTerm = inventarisSearchInput.value.trim().toLowerCase();
+    let dataToExport = searchTerm === ''
+      ? ALL_INVENTARIS_ITEMS
+      : ALL_INVENTARIS_ITEMS.filter(p => p.name.toLowerCase().includes(searchTerm));
+    dataToExport = applySorting(dataToExport);
+
+    if (dataToExport.length === 0) {
+      showExportStatus('Tidak ada data untuk di-export.', 'error');
+      return;
+    }
+
+    const pdfBytes = await buildInventarisPdf(dataToExport);
+    downloadPdfBytes(pdfBytes, buildExportFilename());
+
+    showExportStatus(`Laporan berhasil dibuat (${dataToExport.length} barang).`, 'success');
+  } catch (error) {
+    console.error('Gagal membuat PDF:', error);
+    showExportStatus('Gagal membuat PDF: ' + error.message, 'error');
+  } finally {
+    exportPdfBtn.disabled = false;
+    exportPdfBtn.textContent = 'Export PDF';
+  }
+}
+
+async function buildInventarisPdf(items) {
+  const { PDFDocument, rgb, StandardFonts } = PDFLib;
+
+  const pdfDoc = await PDFDocument.create();
+  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+
+  let page = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
+  let y = drawPageHeader(page, fontBold, font, items.length);
+
+  // Header kolom tabel
+  y -= 10;
+  y = drawTableHeader(page, fontBold, y);
+
+  for (const item of items) {
+    // Kalau sudah mepet ke bawah halaman, buat halaman baru dan gambar ulang header tabel
+    if (y < MARGIN + ROW_HEIGHT) {
+      page = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
+      y = PAGE_HEIGHT - MARGIN;
+      y = drawTableHeader(page, fontBold, y);
+    }
+
+    drawItemRow(page, font, y, item);
+    y -= ROW_HEIGHT;
+  }
+
+  return pdfDoc.save();
+}
+
+function drawPageHeader(page, fontBold, font, totalItems) {
+  const { rgb } = PDFLib;
+  let y = PAGE_HEIGHT - MARGIN;
+
+  page.drawText('Laporan Stok Barang - StockDental', {
+    x: MARGIN, y, size: 16, font: fontBold, color: rgb(0.1, 0.1, 0.1)
+  });
+  y -= 20;
+
+  const tanggalCetak = new Date().toLocaleDateString('id-ID', {
+    day: 'numeric', month: 'long', year: 'numeric'
+  });
+  page.drawText(`Dicetak: ${tanggalCetak}  |  Total barang: ${totalItems}`, {
+    x: MARGIN, y, size: 10, font, color: rgb(0.4, 0.4, 0.4)
+  });
+  y -= 20;
+
+  return y;
+}
+
+function drawTableHeader(page, fontBold, y) {
+  const { rgb } = PDFLib;
+
+  page.drawRectangle({
+    x: MARGIN, y: y - 4, width: PAGE_WIDTH - MARGIN * 2, height: ROW_HEIGHT,
+    color: rgb(0.9, 0.9, 0.9)
+  });
+
+  const headerY = y;
+  page.drawText('Nama', { x: COL_X.nama + 4, y: headerY, size: 9, font: fontBold });
+  page.drawText('Kategori', { x: COL_X.kategori, y: headerY, size: 9, font: fontBold });
+  page.drawText('Stok', { x: COL_X.stok, y: headerY, size: 9, font: fontBold });
+  page.drawText('Min', { x: COL_X.minimum, y: headerY, size: 9, font: fontBold });
+  page.drawText('Status', { x: COL_X.status, y: headerY, size: 9, font: fontBold });
+
+  return y - ROW_HEIGHT;
+}
+
+function drawItemRow(page, font, y, item) {
+  const { rgb } = PDFLib;
+
+  // Warna teks status biar cepat kelihatan yang perlu perhatian
+  const statusColor = item.status === 'kritis' ? rgb(0.8, 0.1, 0.1)
+    : item.status === 'menipis' ? rgb(0.8, 0.55, 0) : rgb(0.1, 0.6, 0.2);
+  const statusLabel = item.status === 'kritis' ? 'Kritis' : item.status === 'menipis' ? 'Menipis' : 'Normal';
+
+  // Nama barang dipotong kalau kepanjangan, supaya tidak tabrakan dengan kolom kategori
+  const namaText = truncateText(item.name, 34);
+
+  page.drawText(namaText, { x: COL_X.nama + 4, y, size: 9, font, color: rgb(0, 0, 0) });
+  page.drawText(truncateText(item.category || '-', 18), { x: COL_X.kategori, y, size: 9, font });
+  page.drawText(`${item.current_stock} ${item.unit}`, { x: COL_X.stok, y, size: 9, font });
+  page.drawText(`${item.minimum_stock}`, { x: COL_X.minimum, y, size: 9, font });
+  page.drawText(statusLabel, { x: COL_X.status, y, size: 9, font, color: statusColor });
+}
+
+// Potong teks panjang + tambah "..." biar tidak keluar dari lebar kolom PDF
+function truncateText(text, maxChars) {
+  if (!text) return '-';
+  return text.length > maxChars ? text.slice(0, maxChars - 1) + '…' : text;
+}
+
+function buildExportFilename() {
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  return `laporan-stok-stockdental-${yyyy}-${mm}-${dd}.pdf`;
+}
+
+// Trigger download file PDF ke perangkat user (tanpa upload/server apapun)
+function downloadPdfBytes(pdfBytes, filename) {
+  const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+  const url = URL.createObjectURL(blob);
+
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+
+  URL.revokeObjectURL(url);
+}
+
+function showExportStatus(message, type) {
+  exportStatus.textContent = message;
+  exportStatus.className = 'status-message status-' + type;
+  exportStatus.style.display = 'block';
+}
+
+function hideExportStatus() {
+  exportStatus.style.display = 'none';
+        }
