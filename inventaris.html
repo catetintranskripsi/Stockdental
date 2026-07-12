@@ -5,6 +5,134 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>StockDental - Inventaris</title>
   <link rel="stylesheet" href="css/style.css">
+  <style>
+    /* ============ P10: Sortir, tap-to-expand, pagination ============ */
+
+    .inventaris-toolbar {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    #inventarisSortSelect {
+      flex-shrink: 0;
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      background: #fff;
+      font-size: 14px;
+    }
+
+    .inventaris-item {
+      cursor: pointer;
+    }
+
+    .inventaris-item-main {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .inventaris-chevron {
+      margin-left: auto;
+      color: #888;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+
+    .inventaris-item-expand {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px dashed #ddd;
+      cursor: default;
+    }
+
+    .expand-fields {
+      font-size: 14px;
+      margin-bottom: 10px;
+      color: #444;
+    }
+
+    .expand-history strong {
+      display: block;
+      font-size: 13px;
+      color: #666;
+      margin-bottom: 6px;
+    }
+
+    .history-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    .history-list li {
+      display: flex;
+      gap: 10px;
+      font-size: 13px;
+      padding: 4px 0;
+      border-bottom: 1px solid #f0f0f0;
+    }
+
+    .history-list li:last-child {
+      border-bottom: none;
+    }
+
+    .history-date {
+      color: #888;
+      min-width: 90px;
+    }
+
+    .history-type {
+      flex: 1;
+    }
+
+    .history-qty {
+      font-weight: 600;
+    }
+
+    .history-loading, .history-empty {
+      font-size: 13px;
+      color: #888;
+      margin: 0;
+    }
+
+    /* ---- Pagination ---- */
+    .inventaris-pagination {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 6px;
+      margin-top: 16px;
+      padding-bottom: 8px;
+    }
+
+    .page-number {
+      min-width: 34px;
+      height: 34px;
+      padding: 0 6px;
+      border-radius: 6px;
+      border: 1px solid #ddd;
+      background: #fff;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    .page-number.active {
+      background: #2b7a78;
+      color: #fff;
+      border-color: #2b7a78;
+      font-weight: 600;
+    }
+
+    .page-ellipsis {
+      display: flex;
+      align-items: center;
+      padding: 0 4px;
+      color: #999;
+    }
+  </style>
 </head>
 <body>
 
@@ -33,6 +161,16 @@
       <input type="text" id="inventarisSearchInput" placeholder="Cari nama barang..." autocomplete="off">
     </div>
 
+    <!-- TOOLBAR: dropdown sortir -->
+    <div class="inventaris-toolbar">
+      <select id="inventarisSortSelect">
+        <option value="status">Urutkan: Status</option>
+        <option value="nama">Urutkan: Nama</option>
+        <option value="stok">Urutkan: Stok</option>
+        <option value="kategori">Urutkan: Kategori</option>
+      </select>
+    </div>
+
     <!-- RINGKASAN STATUS -->
     <div id="inventarisSummary" class="inventaris-summary"></div>
 
@@ -40,6 +178,9 @@
     <div id="inventarisList" class="inventaris-list">
       <p class="loading-text">Memuat data...</p>
     </div>
+
+    <!-- PAGINATION -->
+    <div id="inventarisPagination" class="inventaris-pagination"></div>
 
   </div>
 
@@ -69,5 +210,5 @@
 <script src="js/inventaris.js"></script>
 <script src="js/auth-check.js"></script>
 </body>
-                                                                       </html>
-                                                                       
+</html>
+
