@@ -226,6 +226,7 @@ async function callGeminiExtraction(base64Image, mimeType) {
 }
 
 // ============================================
+
 // RENDER: Tampilkan hasil ekstraksi (editable)
 // Field sekarang SAMA dengan form input manual di index.html:
 // nama, jumlah, satuan, kategori, expiry, lokasi, batch_number, minimum_stock
@@ -430,6 +431,8 @@ async function handleSaveAllClick() {
 }
 
 // ============================================
+
+
 // Simpan 1 item — SEKARANG LEWAT RPC (add_stock_lot / adjust_stock_opname)
 // Konsisten dengan handleStockIn() & handleOpname() di app.js.
 // Tidak lagi insert manual ke stock_movements / hitung stockAfter di JS —
@@ -528,4 +531,29 @@ function resetFotoPage() {
   saveStatus.style.display = 'none';
 }
 
-// ==================
+// ============================================
+// HELPER: Status messages
+// ============================================
+function showUploadStatus(message, type) {
+  uploadStatus.textContent = message;
+  uploadStatus.className = 'status-message status-' + type;
+  uploadStatus.style.display = 'block';
+}
+
+function showSaveStatus(message, type) {
+  saveStatus.textContent = message;
+  saveStatus.className = 'status-message status-' + type;
+  saveStatus.style.display = 'block';
+}
+
+// ============================================
+// HELPER: Escape HTML
+// ============================================
+function escapeHtml(text) {
+  if (!text) return '';
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+
