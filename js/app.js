@@ -12,6 +12,13 @@
 // Field Nama Barang, Kategori, Lokasi, Satuan, Nomor Batch sekarang
 // searchable: histori diambil sekali saat load, di-cache, difilter lokal
 // saat user mengetik. User tetap bisa ketik nilai baru yang belum ada.
+//
+// Percakapan [lanjutan P10, part 2] - INFO STOK MINIMUM EXISTING
+// Saat nama barang yang diketik cocok persis dengan produk yang sudah
+// ada, placeholder Stok Minimum berubah jadi info nilai yang sudah
+// tersimpan. Field TETAP kosong (tidak auto-fill), supaya tidak ada
+// risiko nilai lama tertimpa tanpa sadar. Update hanya terjadi kalau
+// field ini benar-benar diisi user.
 // ============================================
 
 let CURRENT_CLINIC_ID = null;
@@ -27,6 +34,8 @@ let ALL_BATCH_NUMBERS = [];
 // Starter list (selalu muncul di awal, digabung dengan histori nyata)
 const STARTER_CATEGORIES = ['APD', 'BMHP', 'Obat', 'Alat Kesehatan', 'Bahan Tambal/Restorasi', 'Lainnya'];
 const STARTER_UNITS = ['pcs', 'box', 'botol', 'tube', 'dus', 'pack', 'set', 'lembar'];
+
+const DEFAULT_MIN_STOCK_PLACEHOLDER = 'Kosongkan jika belum tahu';
 
 const movementTypeSelect = document.getElementById('movementType');
 const form = document.getElementById('formStockMovement');
@@ -45,6 +54,10 @@ const fieldsOut = document.getElementById('fieldsOut');
 const fieldsOpname = document.getElementById('fieldsOpname');
 const opnamePreview = document.getElementById('opnamePreview');
 const newProductFields = document.getElementById('newProductFields');
+
+// Field baru: Nama Barang & Stok Minimum (untuk fitur info stok minimum existing)
+const productNameInput = document.getElementById('productName');
+const minimumStockInput = document.getElementById('minimumStock');
 
 // Dipanggil dari auth.js setelah user berhasil login
 async function onUserLoggedIn() {
@@ -79,10 +92,11 @@ async function onUserLoggedIn() {
 }
 
 // Load daftar produk existing ke cache ALL_PRODUCTS (dipakai untuk filter search)
+// Sekarang ikut ambil minimum_stock, dipakai untuk info placeholder.
 async function loadProductOptions() {
   const { data: products, error } = await supabaseClient
     .from('products')
-    .select('id, name, current_stock, unit')
+    .select('id, name, current_stock, unit, minimum_stock')
     .eq('clinic_id', CURRENT_CLINIC_ID)
     .eq('is_active', true)
     .order('name');
@@ -97,8 +111,6 @@ async function loadProductOptions() {
 
 // ============================================
 // Load histori untuk autocomplete: kategori, lokasi, satuan, batch
-// Satu kali query per kolom, hasilnya di-cache di memori (bukan query ulang
-// tiap ketikan). Nilai kosong/null disaring, duplikat dihapus.
 // ============================================
 async function loadAutocompleteOptions() {
   const { data: products, error: productsError } = await supabaseClient
@@ -147,6 +159,31 @@ function uniqueMerge(starterList, historyList) {
 
   return result;
 }
+
+// ============================================
+// INFO STOK MINIMUM EXISTING
+// Dipanggil tiap kali field Nama Barang berubah. Kalau nama cocok
+// PERSIS (case-insensitive) dengan produk yang sudah ada, placeholder
+// Stok Minimum berubah jadi info nilai yang sudah tersimpan.
+// ============================================
+function updateMinimumStockPlaceholder() {
+  const typedName = productNameInput.value.trim().toLowerCase();
+
+  if (!typedName) {
+    minimumStockInput.placeholder = DEFAULT_MIN_STOCK_PLACEHOLDER;
+    return;
+  }
+
+  const matchedProduct = ALL_PRODUCTS.find(p => p.name.toLowerCase() === typedName);
+
+  if (matchedProduct) {
+    minimumStockInput.placeholder = `Stok minimum saat ini: ${matchedProduct.minimum_stock}`;
+  } else {
+    minimumStockInput.placeholder = DEFAULT_MIN_STOCK_PLACEHOLDER;
+  }
+}
+
+productNameInput.addEventListener('input', updateMinimumStockPlaceholder);
 
 // ============================================
 // SEARCHABLE DROPDOWN LOGIC — "Pilih Barang" (Out & Opname)
@@ -216,9 +253,6 @@ productSearchInput.addEventListener('input', () => {
 
 // ============================================
 // SEARCHABLE DROPDOWN LOGIC — Generik, dipakai untuk 5 field baru
-// (Nama Barang, Kategori, Lokasi, Satuan, Nomor Batch)
-// Beda dengan "Pilih Barang": field ini SELALU boleh diisi nilai baru
-// yang belum ada di cache (creatable), tidak wajib klik dari dropdown.
 // ============================================
 
 function setupSimpleAutocomplete(inputId, resultsId, getOptionsFn) {
@@ -248,6 +282,10 @@ function setupSimpleAutocomplete(inputId, resultsId, getOptionsFn) {
       item.addEventListener('click', () => {
         input.value = value;
         resultsDiv.style.display = 'none';
+        // Kalau ini field Nama Barang, trigger juga update placeholder stok minimum
+        if (inputId === 'productName') {
+          updateMinimumStockPlaceholder();
+        }
       });
 
       resultsDiv.appendChild(item);
@@ -267,7 +305,6 @@ function setupSimpleAutocomplete(inputId, resultsId, getOptionsFn) {
   });
 }
 
-// Nama Barang pakai cache produk (ambil nama uniknya saja)
 setupSimpleAutocomplete('productName', 'productNameResults', () => {
   return uniqueMerge([], ALL_PRODUCTS.map(p => p.name));
 });
@@ -277,7 +314,6 @@ setupSimpleAutocomplete('storageLocation', 'storageLocationResults', () => ALL_L
 setupSimpleAutocomplete('unit', 'unitResults', () => ALL_UNITS);
 setupSimpleAutocomplete('batchNumber', 'batchNumberResults', () => ALL_BATCH_NUMBERS);
 
-// Tutup dropdown "Pilih Barang" kalau klik di luar area search
 document.addEventListener('click', (e) => {
   const isClickInside = productSearchInput.contains(e.target) || productSearchResults.contains(e.target);
   if (!isClickInside) {
@@ -301,6 +337,7 @@ movementTypeSelect.addEventListener('change', () => {
   newProductFields.style.display = (type === 'in') ? 'block' : 'none';
 
   resetProductSelection();
+  minimumStockInput.placeholder = DEFAULT_MIN_STOCK_PLACEHOLDER;
 });
 
 function updateOpnamePreview() {
@@ -360,6 +397,7 @@ form.addEventListener('submit', async (e) => {
     newProductFields.style.display = 'none';
     resetProductSelection();
     document.getElementById('unit').value = 'pcs';
+    minimumStockInput.placeholder = DEFAULT_MIN_STOCK_PLACEHOLDER;
     await loadProductOptions();
     await loadAutocompleteOptions();
 
@@ -413,6 +451,10 @@ async function handleStockIn() {
 
   if (existingProduct) {
     productId = existingProduct.id;
+    // CATATAN: minimum_stock TIDAK diupdate di sini walau field diisi.
+    // Mengubah minimum_stock produk existing adalah domain fitur
+    // "Edit Data Barang" (sesi tersendiri), bukan bagian dari "Tambah Barang".
+    // Placeholder info di UI sudah kasih tahu user nilai yang berlaku sekarang.
   } else {
     const { data: newProduct, error: insertProductError } = await supabaseClient
       .from('products')
@@ -506,4 +548,4 @@ function showStatus(message, type) {
     statusDiv.className = '';
     statusDiv.textContent = '';
   }, 4000);
-    }
+}
