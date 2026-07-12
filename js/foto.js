@@ -49,26 +49,92 @@ function onPageReady() {
 }
 
 // ============================================
-// STEP 1: User pilih foto → preview
+// Percakapan [BARU] - KOMPRESI FOTO SEBELUM UPLOAD
+// Resize ke maksimal 1280px di sisi terpanjang + compress JPEG quality 0.75.
+// Tujuan: hindari gagal upload karena file kamera terlalu besar (beberapa MB),
+// tanpa perlu user turunkan kualitas kamera manual.
+//
+// Cara kerja: gambar dimuat ke <img> di memori, digambar ulang ke <canvas>
+// dengan ukuran baru, lalu diekspor sebagai JPEG base64 lewat canvas.toDataURL().
+// Semua terjadi di browser (client-side), tidak ada upload sementara ke server.
+// ============================================
+const MAX_DIMENSION = 1280;
+const JPEG_QUALITY = 0.75;
+
+function compressImage(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+
+      let { width, height } = img;
+
+      // Hitung ukuran baru, jaga aspect ratio, cuma perkecil (tidak perbesar foto kecil)
+      if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
+        if (width > height) {
+          height = Math.round(height * (MAX_DIMENSION / width));
+          width = MAX_DIMENSION;
+        } else {
+          width = Math.round(width * (MAX_DIMENSION / height));
+          height = MAX_DIMENSION;
+        }
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+
+      // Selalu ekspor sebagai JPEG (lebih kecil dari PNG untuk foto kamera),
+      // meski file asli formatnya lain (misal HEIC yang sudah didecode browser jadi bitmap).
+      const compressedDataUrl = canvas.toDataURL('image/jpeg', JPEG_QUALITY);
+
+      resolve({
+        dataUrl: compressedDataUrl,
+        mimeType: 'image/jpeg'
+      });
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error('Gagal memuat foto untuk kompresi. Coba foto lain.'));
+    };
+
+    img.src = objectUrl;
+  });
+}
+
+// ============================================
+// STEP 1: User pilih foto → kompres → preview
 // ============================================
 async function handlePhotoSelected(e) {
   const file = e.target.files[0];
   if (!file) return;
 
-  selectedPhotoMimeType = file.type;
+  showUploadStatus('Memproses foto...', 'info');
+  uploadLabel.textContent = 'Memproses foto...';
 
-  const reader = new FileReader();
-  reader.onload = (event) => {
-    const fullDataUrl = event.target.result;
-    selectedPhotoBase64 = fullDataUrl.split(',')[1];
+  try {
+    const { dataUrl, mimeType } = await compressImage(file);
 
-    photoPreview.src = fullDataUrl;
+    selectedPhotoMimeType = mimeType;
+    selectedPhotoBase64 = dataUrl.split(',')[1];
+
+    photoPreview.src = dataUrl;
     photoPreview.style.display = 'block';
     uploadLabel.textContent = 'Foto dipilih. Tap area ini untuk ganti foto.';
     analyzeBtn.style.display = 'block';
     analyzeBtn.disabled = false;
-  };
-  reader.readAsDataURL(file);
+    uploadStatus.style.display = 'none';
+  } catch (error) {
+    console.error('Compress error:', error);
+    showUploadStatus(error.message || 'Gagal memproses foto. Coba foto lain.', 'error');
+    uploadLabel.textContent = 'Tap untuk ambil foto atau pilih dari galeri';
+  }
 }
 
 // ============================================
@@ -462,27 +528,4 @@ function resetFotoPage() {
   saveStatus.style.display = 'none';
 }
 
-// ============================================
-// HELPER: Status messages
-// ============================================
-function showUploadStatus(message, type) {
-  uploadStatus.textContent = message;
-  uploadStatus.className = 'status-message status-' + type;
-  uploadStatus.style.display = 'block';
-}
-
-function showSaveStatus(message, type) {
-  saveStatus.textContent = message;
-  saveStatus.className = 'status-message status-' + type;
-  saveStatus.style.display = 'block';
-}
-
-// ============================================
-// HELPER: Escape HTML
-// ============================================
-function escapeHtml(text) {
-  if (!text) return '';
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-      }
+// ==================
