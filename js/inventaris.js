@@ -52,7 +52,8 @@ async function loadInventaris() {
   ALL_INVENTARIS_ITEMS = (products || []).map(p => ({
     ...p,
     status: getStockStatus(p.current_stock, p.minimum_stock),
-    recentHistory: null // diisi on-demand saat card di-expand pertama kali (cache)
+    recentHistory: null, // diisi on-demand saat card di-expand pertama kali (cache)
+    activeLots: null // diisi on-demand saat card di-expand pertama kali (cache) — daftar lot aktif (batch_number + expiry_date)
   }));
 
   renderInventaris('');
@@ -186,9 +187,29 @@ function buildExpandContent(p) {
     `).join('') + '</ul>';
   }
 
+  let lotsHtml;
+
+  if (p.activeLots === null) {
+    lotsHtml = '<p class="history-loading">Memuat data lot...</p>';
+  } else if (p.activeLots.length === 0) {
+    lotsHtml = '<p class="history-empty">Tidak ada lot aktif.</p>';
+  } else {
+    lotsHtml = '<ul class="lots-list">' + p.activeLots.map(lot => `
+      <li>
+        <span class="lot-batch">${escapeHtml(lot.batch_number || '(tanpa no. batch)')}</span>
+        <span class="lot-expiry">Exp: ${formatTanggal(lot.expiry_date)}</span>
+        <span class="lot-qty">${lot.quantity}</span>
+      </li>
+    `).join('') + '</ul>';
+  }
+
   return `
     <div class="expand-fields">
       <div><strong>Lokasi penyimpanan:</strong> ${escapeHtml(p.storage_location || '-')}</div>
+    </div>
+    <div class="expand-lots">
+      <strong>Lot aktif (batch & kadaluarsa)</strong>
+      ${lotsHtml}
     </div>
     <div class="expand-history">
       <strong>Riwayat terakhir</strong>
@@ -227,23 +248,53 @@ async function handleCardToggle(productId) {
   if (wasExpanded) return; // ditutup, tidak perlu fetch apa-apa
 
   const product = ALL_INVENTARIS_ITEMS.find(p => p.id === productId);
-  if (!product || product.recentHistory !== null) return; // sudah ada cache, tidak perlu query ulang
+  if (!product) return;
 
-  const { data, error } = await supabaseClient
-    .from('stock_movements')
-    .select('movement_type, quantity, created_at')
-    .eq('product_id', productId)
-    .order('created_at', { ascending: false })
-    .limit(5);
+  // Fetch riwayat transaksi & lot aktif secara paralel (kalau belum ada cache masing-masing)
+  const fetchHistory = product.recentHistory === null
+    ? supabaseClient
+        .from('stock_movements')
+        .select('movement_type, quantity, created_at')
+        .eq('product_id', productId)
+        .order('created_at', { ascending: false })
+        .limit(5)
+    : null;
 
-  if (error) {
-    console.error('Gagal load riwayat transaksi:', error);
-    product.recentHistory = []; // tampilkan sebagai kosong daripada macet di "Memuat..."
-  } else {
-    product.recentHistory = data || [];
+  const fetchLots = product.activeLots === null
+    ? supabaseClient
+        .from('product_lots')
+        .select('batch_number, expiry_date, quantity')
+        .eq('product_id', productId)
+        .eq('is_active', true)
+        .order('expiry_date', { ascending: true }) // FEFO: paling dekat kadaluarsa duluan
+    : null;
+
+  if (!fetchHistory && !fetchLots) return; // keduanya sudah di-cache, tidak perlu query ulang
+
+  const [historyResult, lotsResult] = await Promise.all([
+    fetchHistory || Promise.resolve(null),
+    fetchLots || Promise.resolve(null)
+  ]);
+
+  if (historyResult) {
+    if (historyResult.error) {
+      console.error('Gagal load riwayat transaksi:', historyResult.error);
+      product.recentHistory = []; // tampilkan sebagai kosong daripada macet di "Memuat..."
+    } else {
+      product.recentHistory = historyResult.data || [];
+    }
   }
 
-  // Re-render lagi supaya riwayat yang baru di-fetch langsung tampil
+  if (lotsResult) {
+    if (lotsResult.error) {
+      console.error('Gagal load data lot:', lotsResult.error);
+      product.activeLots = [];
+    } else {
+      product.activeLots = lotsResult.data || [];
+    }
+  }
+
+  // Re-render lagi supaya data yang baru di-fetch langsung tampil
   // (hanya kalau card ini masih dalam keadaan terbuka saat fetch selesai)
   if (EXPANDED_ITEM_ID === productId) {
     renderInventaris(inventarisSearchInput.value);
