@@ -138,6 +138,7 @@ function uniqueMerge(starterList, historyList) {
 }
 
 function updateMetadataPlaceholders() {
+function updateMetadataPlaceholders() {
   const typedName = productNameInput.value.trim().toLowerCase();
 
   if (!typedName) {
@@ -156,8 +157,14 @@ function updateMetadataPlaceholders() {
 
   categoryInput.placeholder = 'Kategori saat ini: ' + (matchedProduct.category || '(belum diisi)');
   storageLocationInput.placeholder = 'Lokasi saat ini: ' + (matchedProduct.storage_location || '(belum diisi)');
-  unitInput.placeholder = 'Satuan saat ini: ' + matchedProduct.unit;
   minimumStockInput.placeholder = 'Stok minimum saat ini: ' + matchedProduct.minimum_stock;
+
+  // Satuan beda dari field lain: selalu ada default value "pcs",
+  // jadi placeholder tidak akan kelihatan kalau tidak dikosongkan dulu.
+  // Aman dikosongkan karena field ini diabaikan sepenuhnya saat submit
+  // untuk produk existing (lihat handleStockIn).
+  unitInput.value = '';
+  unitInput.placeholder = 'Satuan saat ini: ' + matchedProduct.unit;
 }
 
 function resetMetadataPlaceholders() {
