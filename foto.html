@@ -6,6 +6,7 @@
   <title>StockDental - Foto Barang</title>
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="css/foto.css">
+  <link rel="stylesheet" href="css/foto-override.css">
 </head>
 <body>
 
@@ -34,6 +35,13 @@
         <h2>Foto Barang / Faktur</h2>
       </div>
       <button id="logoutBtn" class="btn-secondary">Logout</button>
+    </div>
+
+    <!-- Sub-tab metode input: sama persis dipasang di index.html & (nanti) suara.html -->
+    <div class="sub-tab-row">
+      <a href="index.html" class="sub-tab-item">Manual</a>
+      <a href="foto.html" class="sub-tab-item sub-tab-active">Foto</a>
+      <a href="suara.html" class="sub-tab-item">Suara</a>
     </div>
 
     <p class="page-subtitle">Ambil foto barang atau faktur, AI akan bantu baca datanya</p>
@@ -80,7 +88,7 @@
       <span class="nav-icon">📊</span>
       <span class="nav-label">Ringkasan</span>
     </a>
-    <a href="index.html" class="nav-item">
+    <a href="index.html" class="nav-item active">
       <span class="nav-icon">📝</span>
       <span class="nav-label">Input</span>
     </a>
@@ -91,10 +99,6 @@
     <a href="history.html" class="nav-item">
       <span class="nav-icon">📈</span>
       <span class="nav-label">Riwayat</span>
-    </a>
-    <a href="foto.html" class="nav-item active">
-      <span class="nav-icon">📷</span>
-      <span class="nav-label">Foto</span>
     </a>
   </nav>
 
