@@ -1,0 +1,250 @@
+/* ============================================
+   STOCKDENTAL — PAGES OVERRIDE
+   Percakapan 13 - DESIGN SYSTEM (lanjutan)
+   Menstyle class ASLI yang sudah dipakai inventaris.js, history.js,
+   dan index.html — TANPA mengubah HTML/JS logic sama sekali.
+
+   Load SESUDAH style.css di setiap halaman:
+   <link rel="stylesheet" href="css/style.css">
+   <link rel="stylesheet" href="css/pages-override.css">
+   ============================================
+   Isi file ini:
+   1. Form group umum (index.html, history.html filter, inventaris search)
+   2. Kartu Inventaris (.inventaris-item dkk)
+   3. Kartu Riwayat (.history-item dkk)
+   4. Sub-tab metode input (markup baru untuk index.html)
+   5. Perbaikan header (judul panjang di foto.html dkk)
+============================================ */
+
+/* ---------- 1. FORM GROUP UMUM ---------- */
+.form-group {
+  margin-bottom: var(--space-md);
+}
+
+.form-group label {
+  margin: 0 0 var(--space-xs) 0;
+}
+
+.filter-row {
+  display: flex;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+.filter-row .form-group {
+  flex: 1;
+}
+
+.switch-text {
+  font-size: 0.88rem;
+  color: var(--color-text-muted);
+  margin-top: var(--space-md);
+  text-align: center;
+}
+
+.status-message {
+  font-size: 0.85rem;
+  margin-top: var(--space-sm);
+}
+
+.loading-text,
+.error-text {
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  padding: var(--space-md) 0;
+  text-align: center;
+}
+
+.error-text {
+  color: var(--color-kritis);
+}
+
+/* ---------- 2. KARTU INVENTARIS (.inventaris-item) ---------- */
+.inventaris-summary {
+  font-size: 0.9rem;
+  color: var(--color-normal);
+  background: var(--color-normal-bg);
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  margin-bottom: var(--space-md);
+}
+
+.inventaris-item {
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+  padding: var(--space-md);
+  margin-bottom: var(--space-sm);
+  border-left: 4px solid var(--color-normal);
+  cursor: pointer;
+  transition: box-shadow 0.15s ease;
+}
+
+.inventaris-item:hover {
+  box-shadow: var(--shadow-card-hover);
+}
+
+.inventaris-item.status-menipis { border-left-color: var(--color-menipis); }
+.inventaris-item.status-kritis { border-left-color: var(--color-kritis); }
+
+.inventaris-item.selection-mode {
+  border: 1px solid var(--color-border);
+  border-left: 4px solid var(--color-normal);
+}
+.inventaris-item.selection-mode.status-menipis { border-left-color: var(--color-menipis); }
+.inventaris-item.selection-mode.status-kritis { border-left-color: var(--color-kritis); }
+
+.inventaris-item.selection-mode.selected {
+  border: 2px solid var(--color-primary);
+  border-left: 4px solid var(--color-primary);
+  background: var(--color-primary-light);
+}
+
+.inventaris-item-main {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.inventaris-item-name {
+  font-weight: 600;
+  color: var(--color-text);
+  flex: 1;
+}
+
+.inventaris-chevron {
+  margin-left: auto;
+  color: var(--color-text-faint);
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+.inventaris-item-detail {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  margin-top: 4px;
+}
+
+.inventaris-item-expand {
+  margin-top: var(--space-sm);
+  padding-top: var(--space-sm);
+  border-top: 1px dashed var(--color-border);
+  cursor: default;
+}
+
+/* Badge status di kartu Inventaris - pill + dot, konsisten dgn Ringkasan */
+.inventaris-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 3px 10px 3px 8px;
+  border-radius: var(--radius-pill);
+  flex-shrink: 0;
+}
+
+.inventaris-badge::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.inventaris-badge.badge-normal {
+  background: var(--color-normal-bg);
+  color: var(--color-normal);
+}
+.inventaris-badge.badge-normal::before { background: var(--color-normal); }
+
+.inventaris-badge.badge-menipis {
+  background: var(--color-menipis-bg);
+  color: var(--color-menipis);
+}
+.inventaris-badge.badge-menipis::before { background: var(--color-menipis); }
+
+.inventaris-badge.badge-kritis {
+  background: var(--color-kritis-bg);
+  color: var(--color-kritis);
+}
+.inventaris-badge.badge-kritis::before { background: var(--color-kritis); }
+
+/* ---------- 3. KARTU RIWAYAT (.history-item) ---------- */
+.summary-stats {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  background: var(--color-surface);
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-card);
+  margin-bottom: var(--space-md);
+}
+
+.history-item {
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+  padding: var(--space-md);
+  margin-bottom: var(--space-sm);
+  border-left: 4px solid var(--color-border);
+}
+
+.history-item.type-in { border-left-color: var(--color-normal); }
+.history-item.type-out { border-left-color: var(--color-menipis); }
+.history-item.type-opname_adjustment { border-left-color: var(--color-primary); }
+.history-item.type-merge_marker { border-left-color: var(--color-accent); }
+
+.history-item-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.history-badge {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+}
+
+.history-badge.badge-in {
+  background: var(--color-normal-bg);
+  color: var(--color-normal);
+}
+.history-badge.badge-out {
+  background: var(--color-menipis-bg);
+  color: var(--color-menipis);
+}
+.history-badge.badge-opname_adjustment {
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+}
+.history-badge.badge-merge_marker {
+  background: var(--color-accent-light);
+  color: var(--color-accent);
+}
+
+.history-date {
+  font-size: 0.78rem;
+  color: var(--color-text-faint);
+}
+
+.history-item-name {
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: 4px;
+}
+
+.history-item-detail {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+/* ---------- 4. SUB-TAB METODE INPUT (index.html) ---------- */
+/* Markup baru yang perlu ditambahkan ke index.html, gaya sama persis
+   dengan yang sudah dipasang di foto.html - lihat .sub-tab-row di style.css */
