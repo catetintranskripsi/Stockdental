@@ -127,11 +127,17 @@ a:focus-visible {
 .app-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
+  gap: var(--space-sm);
   background: var(--color-primary);
   padding: var(--space-md);
   margin: calc(-1 * var(--space-md)) calc(-1 * var(--space-md)) var(--space-lg) calc(-1 * var(--space-md));
   border-radius: 0 0 var(--radius-md) var(--radius-md);
+}
+
+.app-header > div:first-child {
+  min-width: 0; /* penting: izinkan flex child wrap teks dengan baik, bukan overflow/nabrak tombol */
+  flex: 1;
 }
 
 .app-header h1 {
@@ -144,15 +150,19 @@ a:focus-visible {
   font-size: 0.85rem;
   font-weight: 500;
   margin-top: 2px;
+  word-wrap: break-word;
 }
 
 /* Tombol Logout di atas header teal - versi outline putih transparan,
-   supaya tidak tenggelam di atas background berwarna */
+   supaya tidak tenggelam di atas background berwarna. flex-shrink:0
+   supaya tombol tidak ikut menyempit saat judul halaman panjang. */
 .app-header .btn-secondary,
 .app-header #logoutBtn {
   background: rgba(255, 255, 255, 0.12);
   color: #fff;
   border: 1px solid rgba(255, 255, 255, 0.35);
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .app-header .btn-secondary:hover,
