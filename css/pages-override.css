@@ -59,7 +59,52 @@
   color: var(--color-kritis);
 }
 
-/* ---------- 2. KARTU INVENTARIS (.inventaris-item) ---------- */
+/* ---------- 1b. DROPDOWN AUTOCOMPLETE / SEARCH RESULTS ---------- */
+/* Dipakai di index.html: productSearchResults, productNameResults,
+   categoryResults, storageLocationResults, unitResults, batchNumberResults.
+   Sebelumnya tanpa style sama sekali - baris hasil bertumpuk rapat tanpa
+   jarak, sulit di-tap akurat di HP. Area tap dibuat minimal ~44px tinggi
+   (standar touch target mobile). */
+.product-search-results {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  background: var(--color-surface);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-card-hover);
+  max-height: 280px;
+  overflow-y: auto;
+  margin-top: 4px;
+}
+
+.product-search-item {
+  padding: 12px 14px;
+  font-size: 0.9rem;
+  color: var(--color-text);
+  border-bottom: 1px solid var(--color-bg);
+  cursor: pointer;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+
+.product-search-item:last-child {
+  border-bottom: none;
+}
+
+.product-search-item:active {
+  background: var(--color-primary-light);
+}
+
+.product-search-no-result {
+  padding: 12px 14px;
+  font-size: 0.88rem;
+  color: var(--color-text-muted);
+  text-align: center;
+}
 .inventaris-summary {
   font-size: 0.9rem;
   color: var(--color-normal);
