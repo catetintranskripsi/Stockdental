@@ -1,313 +1,510 @@
+/* ============================================
+   STOCKDENTAL — DESIGN SYSTEM FOUNDATION
+   Percakapan 13 - DESIGN SYSTEM
+   Modern SaaS, aksen teal + amber, rounded, card shadow
+   ============================================
+   Struktur file ini:
+   1. Font import
+   2. Design tokens (CSS variables)
+   3. Reset & base
+   4. Layout & container
+   5. Header & navigasi
+   6. Komponen: button, input, select
+   7. Komponen: card (umum + ringkasan + inventaris)
+   8. Komponen: badge status
+   9. Komponen: alert list (dashboard)
+   10. Bottom navigation
+   11. Utility & responsive
+============================================ */
+
+/* ---------- 1. FONT IMPORT ---------- */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+
+/* ---------- 2. DESIGN TOKENS ---------- */
+:root {
+  /* Warna aksen utama */
+  --color-primary: #0F6B5C;        /* teal gelap - aksen utama, header, tombol utama */
+  --color-primary-light: #E6F2EF;  /* teal sangat muda - background pill/hover */
+  --color-primary-dark: #0B4F44;   /* teal lebih gelap - hover/active state */
+
+  --color-accent: #D97706;         /* amber - aksen sekunder, CTA khusus */
+  --color-accent-light: #FEF3E2;
+
+  /* Warna status (fungsional, jangan diubah - staf sudah hafal pola ini) */
+  --color-kritis: #DC2626;
+  --color-kritis-bg: #FEE2E2;
+  --color-menipis: #EA580C;
+  --color-menipis-bg: #FFEDD5;
+  --color-warning: #CA8A04;
+  --color-warning-bg: #FEF9C3;
+  --color-normal: #16A34A;
+  --color-normal-bg: #DCFCE7;
+
+  /* Netral */
+  --color-text: #1F2937;
+  --color-text-muted: #6B7280;
+  --color-text-faint: #9CA3AF;
+  --color-bg: #F8FAFC;
+  --color-surface: #FFFFFF;
+  --color-border: #E5E7EB;
+
+  /* Tipografi */
+  --font-display: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+  /* Radius & shadow */
+  --radius-md: 12px;
+  --radius-sm: 8px;
+  --radius-pill: 999px;
+  --shadow-card: 0 1px 3px rgba(15, 23, 42, 0.06), 0 4px 12px rgba(15, 23, 42, 0.05);
+  --shadow-card-hover: 0 2px 6px rgba(15, 23, 42, 0.08), 0 8px 20px rgba(15, 23, 42, 0.08);
+
+  /* Spacing (skala konsisten) */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+}
+
+/* ---------- 3. RESET & BASE ---------- */
 * {
   box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-body);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  margin: 0;
+  color: var(--color-text);
+}
+
+h1 { font-size: 1.375rem; font-weight: 700; }
+h2 { font-size: 0.95rem; font-weight: 500; color: var(--color-text-muted); }
+h3 { font-size: 1rem; font-weight: 600; margin-bottom: var(--space-sm); }
+
+p { margin: 0; }
+
+a { color: var(--color-primary); text-decoration: none; }
+
+button, input, select, textarea {
+  font-family: var(--font-body);
+}
+
+/* Fokus terlihat jelas untuk aksesibilitas (keyboard/switch access) */
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* ---------- 4. LAYOUT & CONTAINER ---------- */
+.container {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: var(--space-md);
+  min-height: 100vh;
+}
+
+/* ---------- 5. HEADER & NAVIGASI ---------- */
+/* Header solid teal, full-bleed, memisahkan identitas app dari konten halaman.
+   .app-header berada di dalam .container pada markup yang sudah ada;
+   negative margin di sini "membocorkan" lebarnya keluar container
+   tanpa perlu mengubah struktur HTML manapun. */
+.app-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--color-primary);
+  padding: var(--space-md);
+  margin: calc(-1 * var(--space-md)) calc(-1 * var(--space-md)) var(--space-lg) calc(-1 * var(--space-md));
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+}
+
+.app-header h1 {
+  color: #fff;
+  font-size: 1.2rem;
+}
+
+.app-header h2 {
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.85rem;
+  font-weight: 500;
+  margin-top: 2px;
+}
+
+/* Tombol Logout di atas header teal - versi outline putih transparan,
+   supaya tidak tenggelam di atas background berwarna */
+.app-header .btn-secondary,
+.app-header #logoutBtn {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+.app-header .btn-secondary:hover,
+.app-header #logoutBtn:hover {
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff;
+}
+
+/* ---------- 5b. SUB-TAB METODE INPUT (Manual | Foto | Suara) ---------- */
+/* Dipakai di index.html, foto.html, dan nanti suara.html.
+   Navigasi antar file lewat <a href>, bukan SPA - tab aktif ditandai
+   lewat class .sub-tab-active pada masing-masing halaman. */
+.sub-tab-row {
+  display: flex;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-lg);
+  background: var(--color-bg);
+  padding: 4px;
+  border-radius: var(--radius-pill);
+}
+
+.sub-tab-item {
+  flex: 1;
+  text-align: center;
+  padding: 9px 8px;
+  border-radius: var(--radius-pill);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.sub-tab-item.sub-tab-active {
+  background: var(--color-surface);
+  color: var(--color-primary);
+  box-shadow: var(--shadow-card);
+}
+
+/* ---------- 6. BUTTON ---------- */
+.btn-primary,
+.btn-secondary,
+button[type="submit"],
+#logoutBtn,
+#simpanBtn {
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 0.9rem;
+  padding: 10px 20px;
+  border-radius: var(--radius-sm);
+  border: none;
+  cursor: pointer;
+  transition: transform 0.05s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.btn-primary,
+button[type="submit"] {
+  background: var(--color-primary);
+  color: #fff;
+}
+
+.btn-primary:hover,
+button[type="submit"]:hover {
+  background: var(--color-primary-dark);
+}
+
+.btn-primary:active,
+button[type="submit"]:active {
+  transform: scale(0.98);
+}
+
+.btn-secondary,
+#logoutBtn {
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+}
+
+.btn-secondary:hover,
+#logoutBtn:hover {
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.btn-lihat-semua {
+  background: none;
+  border: none;
+  color: var(--color-primary);
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: var(--space-sm) 0 0 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.btn-lihat-semua:active {
+  opacity: 0.7;
+}
+
+/* ---------- 7. INPUT & SELECT ---------- */
+input[type="text"],
+input[type="number"],
+input[type="date"],
+input[type="email"],
+input[type="password"],
+input[type="search"],
+select,
+textarea {
+  width: 100%;
+  padding: 11px 14px;
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 0.95rem;
+  color: var(--color-text);
+  background: var(--color-surface);
+  transition: border-color 0.15s ease;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--color-primary);
+  outline: none;
+}
+
+input::placeholder {
+  color: var(--color-text-faint);
+}
+
+label,
+.form-label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  margin: var(--space-md) 0 var(--space-xs) 0;
+}
+
+/* ---------- 8. CARD (umum) ---------- */
+.ringkasan-card,
+.card {
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+  padding: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+.ringkasan-status-row {
+  display: flex;
+  gap: var(--space-md);
+}
+
+.ringkasan-status-box {
+  flex: 1;
+  border-radius: var(--radius-sm);
+  padding: var(--space-md);
+  text-align: center;
+}
+
+.ringkasan-status-box.status-kritis {
+  background: var(--color-kritis-bg);
+}
+
+.ringkasan-status-box.status-menipis {
+  background: var(--color-menipis-bg);
+}
+
+.ringkasan-status-count {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 1.75rem;
+  font-weight: 700;
+}
+
+.status-kritis .ringkasan-status-count { color: var(--color-kritis); }
+.status-menipis .ringkasan-status-count { color: var(--color-menipis); }
+
+.ringkasan-status-label {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  margin-top: var(--space-xs);
+}
+
+.ringkasan-total-transaksi {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.ringkasan-detail-transaksi {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  margin-top: var(--space-xs);
+}
+
+.ringkasan-top-list {
+  margin: 0;
+  padding-left: 1.2rem;
+  font-size: 0.9rem;
+}
+
+.ringkasan-top-list li {
+  padding: var(--space-xs) 0;
+}
+
+.ringkasan-badge {
+  display: inline-block;
+  background: var(--color-bg);
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 2px 10px;
+  border-radius: var(--radius-pill);
+  margin-left: var(--space-sm);
+  vertical-align: middle;
+}
+
+.ringkasan-alert-subheading {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  margin: 0 0 var(--space-sm) 0;
+}
+
+.ringkasan-alert-list {
+  list-style: none;
   margin: 0;
   padding: 0;
 }
 
-body {
-  font-family: -apple-system, Roboto, sans-serif;
-  ...
-}
-/* ============ AUTH & APP HEADER ADDITIONS ============ */
-
-.switch-text {
-  ...
-}
-.product-search-results {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  max-height: 240px;
-  overflow-y: auto;
-  background: white;
-  border: 1px solid #ccc;
-  border-top: none;
-  z-index: 10;
+.ringkasan-alert-list li {
+  font-size: 0.88rem;
+  padding: var(--space-sm) 0;
+  border-bottom: 1px solid var(--color-bg);
 }
 
-.product-search-item {
-  padding: 10px 12px;
-  cursor: pointer;
-  border-bottom: 1px solid #eee;
-}
-
-.product-search-item:hover,
-.product-search-item.highlighted {
-  background: #f0f0f0;
-}
-
-.product-search-item:last-child {
+.ringkasan-alert-list li:last-child {
   border-bottom: none;
 }
 
-.product-search-no-result {
-  padding: 10px 12px;
-  color: #888;
-  font-style: italic;
+.loading-text {
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  padding: var(--space-md) 0;
 }
-/* ============================================
-   BOTTOM NAVIGATION
-   ============================================ */
+
+/* ---------- 9. BADGE STATUS (signature element) ---------- */
+/* Pill dengan dot indikator - dipakai konsisten di Inventaris, Ringkasan, Riwayat */
+.badge-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 4px 12px 4px 8px;
+  border-radius: var(--radius-pill);
+}
+
+.badge-status::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.badge-status.badge-normal {
+  background: var(--color-normal-bg);
+  color: var(--color-normal);
+}
+.badge-status.badge-normal::before { background: var(--color-normal); }
+
+.badge-status.badge-menipis {
+  background: var(--color-menipis-bg);
+  color: var(--color-menipis);
+}
+.badge-status.badge-menipis::before { background: var(--color-menipis); }
+
+.badge-status.badge-kritis {
+  background: var(--color-kritis-bg);
+  color: var(--color-kritis);
+}
+.badge-status.badge-kritis::before { background: var(--color-kritis); }
+
+/* ---------- 10. INVENTARIS CARD ---------- */
+.inventaris-card {
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+  padding: var(--space-md);
+  margin-bottom: var(--space-sm);
+  border-left: 4px solid var(--color-normal);
+}
+
+.inventaris-card.border-menipis { border-left-color: var(--color-menipis); }
+.inventaris-card.border-kritis { border-left-color: var(--color-kritis); }
+
+/* ---------- 11. BOTTOM NAVIGATION ---------- */
 .bottom-nav {
   position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
   display: flex;
-  background: white;
-  border-top: 1px solid #ddd;
-  z-index: 100;
+  justify-content: space-around;
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
+  padding: 6px 0 max(6px, env(safe-area-inset-bottom)) 0;
+  box-shadow: 0 -2px 12px rgba(15, 23, 42, 0.04);
 }
 
 .nav-item {
-  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 10px 0;
-  text-decoration: none;
-  color: #888;
-  font-size: 12px;
-}
-
-.nav-item.active {
-  color: #2563eb;
-  font-weight: bold;
+  gap: 2px;
+  padding: 6px 14px;
+  color: var(--color-text-faint);
+  font-size: 0.7rem;
+  border-radius: var(--radius-sm);
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
 .nav-icon {
-  font-size: 22px;
-  margin-bottom: 2px;
+  font-size: 1.2rem;
+  line-height: 1;
 }
 
-/* ============================================
-   INVENTARIS PAGE
-   ============================================ */
-.inventaris-summary {
-  margin: 12px 0;
+.nav-item.active {
+  color: var(--color-primary);
+  background: var(--color-primary-light);
 }
 
-.summary-ok {
-  color: #16a34a;
-  font-weight: bold;
+.nav-label {
+  font-weight: 600;
 }
 
-.summary-warning {
-  color: #b45309;
-  font-weight: bold;
-}
+/* ---------- 12. UTILITY & RESPONSIVE ---------- */
+.text-muted { color: var(--color-text-muted); }
+.text-center { text-align: center; }
 
-.inventaris-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.inventaris-item {
-  border: 1px solid #e5e5e5;
-  border-left-width: 4px;
-  border-radius: 6px;
-  padding: 10px 12px;
-}
-
-.inventaris-item.status-kritis {
-  border-left-color: #dc2626;
-  background: #fef2f2;
-}
-
-.inventaris-item.status-menipis {
-  border-left-color: #d97706;
-  background: #fffbeb;
-}
-
-.inventaris-item.status-normal {
-  border-left-color: #16a34a;
-  background: #f0fdf4;
-}
-
-.inventaris-item-main {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 4px;
-}
-
-.inventaris-item-name {
-  font-weight: bold;
-}
-
-.inventaris-badge {
-  font-size: 11px;
-  padding: 2px 8px;
-  border-radius: 12px;
-  color: white;
-}
-
-.badge-kritis { background: #dc2626; }
-.badge-menipis { background: #d97706; }
-.badge-normal { background: #16a34a; }
-
-.inventaris-item-detail {
-  display: flex;
-  justify-content: space-between;
-  font-size: 13px;
-  color: #555;
-}
-
-/* ============================================
-   HISTORY PAGE
-   ============================================ */
-.filter-row {
-  display: flex;
-  gap: 10px;
-}
-
-.filter-row .form-group {
-  flex: 1;
-}
-
-.history-summary {
-  margin: 12px 0;
-  font-size: 14px;
-  color: #555;
-}
-
-.history-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.history-item {
-  border: 1px solid #e5e5e5;
-  border-left-width: 4px;
-  border-radius: 6px;
-  padding: 10px 12px;
-}
-
-.history-item.type-in { border-left-color: #16a34a; }
-.history-item.type-out { border-left-color: #dc2626; }
-.history-item.type-opname_adjustment { border-left-color: #2563eb; }
-
-.history-item-main {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 4px;
-}
-
-.history-badge {
-  font-size: 11px;
-  padding: 2px 8px;
-  border-radius: 12px;
-  color: white;
-}
-
-.badge-in { background: #16a34a; }
-.badge-out { background: #dc2626; }
-.badge-opname_adjustment { background: #2563eb; }
-
-.history-date {
-  font-size: 12px;
-  color: #888;
-}
-
-.history-item-name {
-  font-weight: bold;
-  margin-bottom: 4px;
-}
-
-.history-item-detail {
-  display: flex;
-  justify-content: space-between;
-  font-size: 13px;
-  color: #555;
-}
-
-/* ============================================
-   SHARED
-   ============================================ */
-
-.loading-text, .error-text {
-  text-align: center;
-  color: #888;
-  padding: 20px 0;
-}
-
-.error-text {
-  color: #dc2626;
+@media (min-width: 480px) {
+  .container {
+    padding: var(--space-lg);
   }
-
-/* ============================================
-   Percakapan 6 - RINGKASAN STYLING
-   ============================================ */
-.ringkasan-card {
-  background: #fff;
-  border-radius: 12px;
-  padding: 16px;
-  margin-bottom: 16px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
 
-.ringkasan-card h3 {
-  margin: 0 0 12px 0;
-  font-size: 16px;
-  color: #333;
-}
-
-.ringkasan-status-row {
-  display: flex;
-  gap: 12px;
-}
-
-.ringkasan-status-box {
-  flex: 1;
-  text-align: center;
-  padding: 12px;
-  border-radius: 8px;
-}
-
-.ringkasan-status-box.status-kritis {
-  background: #fee2e2;
-}
-
-.ringkasan-status-box.status-menipis {
-  background: #fef3c7;
-}
-
-.ringkasan-status-count {
-  display: block;
-  font-size: 28px;
-  font-weight: bold;
-}
-
-.status-kritis .ringkasan-status-count { color: #dc2626; }
-.status-menipis .ringkasan-status-count { color: #d97706; }
-
-.ringkasan-status-label {
-  font-size: 13px;
-  color: #666;
-}
-
-.ringkasan-total-transaksi {
-  font-size: 24px;
-  font-weight: bold;
-  margin: 0 0 4px 0;
-}
-
-.ringkasan-detail-transaksi {
-  font-size: 13px;
-  color: #666;
-  margin: 0;
-}
-
-.ringkasan-top-list {
-  padding-left: 20px;
-  margin: 0;
-}
-
-.ringkasan-top-list li {
-  padding: 6px 0;
-  font-size: 14px;
+/* Hormati preferensi reduce motion */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
 }
