@@ -7,6 +7,10 @@
 //   kuantitas), lokasi penyimpanan, stok minimum. Jumlah stok TIDAK bisa diedit
 //   di sini (diarahkan ke Stok Opname) karena current_stock adalah hasil agregat
 //   dari product_lots (via trigger sync_product_current_stock), bukan kolom bebas.
+// Percakapan [Gabungkan Barang] - TAMBAH: mode pilih 2 produk untuk digabung,
+//   modal konfirmasi, panggil RPC merge_products(), tampilan khusus baris
+//   'merge_marker' di riwayat transaksi. Juga perbaiki bug kecil label
+//   'opname_adjustment' yang sebelumnya tidak ke-mapping (tampil mentah).
 // Default urutan (saat sortir = "Status"): Kritis (stok=0) > Menipis (stok<=minimum) > Normal
 // ============================================
 
@@ -18,6 +22,10 @@ let CURRENT_PAGE = 1;
 let EXPANDED_ITEM_ID = null; // tempId (product id) dari card yang sedang terbuka, atau null
 let EDITING_ITEM_ID = null; // product id dari card yang sedang dalam mode edit, atau null
 
+// ---- State untuk fitur Gabungkan Barang ----
+let SELECTION_MODE = false;
+let SELECTED_IDS = new Set(); // maksimal 2 product id
+
 const inventarisSearchInput = document.getElementById('inventarisSearchInput');
 const inventarisSummary = document.getElementById('inventarisSummary');
 const inventarisList = document.getElementById('inventarisList');
@@ -25,6 +33,15 @@ const inventarisSortSelect = document.getElementById('inventarisSortSelect');
 const inventarisPagination = document.getElementById('inventarisPagination');
 const exportPdfBtn = document.getElementById('exportPdfBtn');
 const exportStatus = document.getElementById('exportStatus');
+
+// ---- Elemen fitur Gabungkan Barang ----
+const toggleMergeModeBtn = document.getElementById('toggleMergeModeBtn');
+const confirmMergeBtn = document.getElementById('confirmMergeBtn');
+const mergeStatus = document.getElementById('mergeStatus');
+const mergeConfirmModal = document.getElementById('mergeConfirmModal');
+const mergeConfirmBody = document.getElementById('mergeConfirmBody');
+const mergeExecuteBtn = document.getElementById('mergeExecuteBtn');
+const mergeCancelBtn = document.getElementById('mergeCancelBtn');
 
 // Dipanggil oleh auth-check.js setelah user terverifikasi login
 async function onPageReady() {
@@ -42,6 +59,11 @@ async function onPageReady() {
     CURRENT_PAGE = 1; // reset ke halaman 1 tiap kali sortir berubah
     renderInventaris(inventarisSearchInput.value);
   });
+
+  toggleMergeModeBtn.addEventListener('click', handleToggleMergeMode);
+  confirmMergeBtn.addEventListener('click', handleMergeClick);
+  mergeExecuteBtn.addEventListener('click', executeMerge);
+  mergeCancelBtn.addEventListener('click', closeMergeConfirmModal);
 }
 
 async function loadInventaris() {
@@ -49,7 +71,7 @@ async function loadInventaris() {
 
   const { data: products, error } = await supabaseClient
     .from('products')
-    .select('id, name, category, current_stock, minimum_stock, unit, storage_location')
+    .select('id, name, category, current_stock, minimum_stock, unit, storage_location, created_at')
     .eq('clinic_id', CURRENT_CLINIC_ID)
     .eq('is_active', true);
 
@@ -148,31 +170,44 @@ function renderInventaris(keyword) {
 // ============================================
 function buildItemCard(p) {
   const isExpanded = EXPANDED_ITEM_ID === p.id;
+  const isSelected = SELECTED_IDS.has(p.id);
 
   const item = document.createElement('div');
-  item.className = `inventaris-item status-${p.status}${isExpanded ? ' expanded' : ''}`;
+  item.className = `inventaris-item status-${p.status}${isExpanded ? ' expanded' : ''}${SELECTION_MODE ? ' selection-mode' : ''}${isSelected ? ' selected' : ''}`;
   item.dataset.productId = p.id;
 
   const badgeLabel = p.status === 'kritis' ? 'Kritis' : p.status === 'menipis' ? 'Menipis' : 'Normal';
 
+  const checkboxHtml = SELECTION_MODE
+    ? `<input type="checkbox" class="merge-checkbox" ${isSelected ? 'checked' : ''} tabindex="-1">`
+    : '';
+
   item.innerHTML = `
     <div class="inventaris-item-main">
+      ${checkboxHtml}
       <span class="inventaris-item-name">${escapeHtml(p.name)}</span>
       <span class="inventaris-badge badge-${p.status}">${badgeLabel}</span>
-      <span class="inventaris-chevron">${isExpanded ? '▴' : '▾'}</span>
+      <span class="inventaris-chevron">${SELECTION_MODE ? '' : (isExpanded ? '▴' : '▾')}</span>
     </div>
     <div class="inventaris-item-detail">
       <span>${escapeHtml(p.category || '-')}</span>
       <span>${p.current_stock} ${escapeHtml(p.unit)} (min: ${p.minimum_stock})</span>
     </div>
-    <div class="inventaris-item-expand" style="display:${isExpanded ? 'block' : 'none'}">
+    <div class="inventaris-item-expand" style="display:${(!SELECTION_MODE && isExpanded) ? 'block' : 'none'}">
       ${buildExpandContent(p)}
     </div>
   `;
 
   // Klik di area manapun pada card (kecuali di dalam expand content) = toggle expand
+  // ATAU, kalau sedang dalam mode pilih-untuk-gabung, klik = toggle pilihan checkbox
   item.addEventListener('click', (e) => {
-    if (e.target.closest('.inventaris-item-expand')) return; // biar tidak konflik kalau nanti ada elemen interaktif di dalam expand
+    if (e.target.closest('.inventaris-item-expand')) return; // biar tidak konflik dengan elemen interaktif di dalam expand
+
+    if (SELECTION_MODE) {
+      handleToggleSelect(p.id);
+      return;
+    }
+
     handleCardToggle(p.id);
   });
 
@@ -206,13 +241,24 @@ function buildExpandContent(p) {
   } else if (p.recentHistory.length === 0) {
     historyHtml = '<p class="history-empty">Belum ada riwayat transaksi.</p>';
   } else {
-    historyHtml = '<ul class="history-list">' + p.recentHistory.map(h => `
-      <li>
-        <span class="history-date">${formatTanggal(h.created_at)}</span>
-        <span class="history-type">${movementTypeLabel(h.movement_type)}</span>
-        <span class="history-qty">${h.quantity}</span>
-      </li>
-    `).join('') + '</ul>';
+    historyHtml = '<ul class="history-list">' + p.recentHistory.map(h => {
+      // Baris penanda hasil gabung produk ditampilkan beda (ikon + catatan, tanpa kolom jumlah)
+      if (h.movement_type === 'merge_marker') {
+        return `
+          <li class="history-merge">
+            <span class="history-date">${formatTanggal(h.created_at)}</span>
+            <span class="history-type">🔗 ${escapeHtml(h.notes || 'Digabung dari produk lain')}</span>
+          </li>
+        `;
+      }
+      return `
+        <li>
+          <span class="history-date">${formatTanggal(h.created_at)}</span>
+          <span class="history-type">${movementTypeLabel(h.movement_type)}</span>
+          <span class="history-qty">${h.quantity}</span>
+        </li>
+      `;
+    }).join('') + '</ul>';
   }
 
   let lotsHtml;
@@ -295,11 +341,13 @@ function buildEditForm(p) {
 
 // Label tampilan untuk movement_type. Fallback ke nilai asli kalau tipe belum dikenal,
 // supaya tidak error/tampil kosong kalau ada jenis transaksi baru yang belum kepikiran di sini.
+// Catatan: key 'opname_adjustment' sempat tidak ke-mapping sebelumnya (tertulis 'opname') — sudah diperbaiki.
 function movementTypeLabel(type) {
   const labels = {
     in: 'Masuk',
     out: 'Keluar',
-    opname: 'Opname'
+    opname_adjustment: 'Opname',
+    merge_marker: 'Digabung'
   };
   return labels[type] || escapeHtml(type || '-');
 }
@@ -329,7 +377,7 @@ async function handleCardToggle(productId) {
   const fetchHistory = product.recentHistory === null
     ? supabaseClient
         .from('stock_movements')
-        .select('movement_type, quantity, created_at')
+        .select('movement_type, quantity, created_at, notes')
         .eq('product_id', productId)
         .order('created_at', { ascending: false })
         .limit(5)
@@ -455,6 +503,182 @@ function showEditStatus(el, message, type) {
   if (!el) return;
   el.textContent = message;
   el.className = 'edit-status-message edit-status-' + type;
+}
+
+// ============================================
+// GABUNGKAN BARANG (MERGE)
+// Alur: toggle mode pilih -> pilih tepat 2 card -> validasi satuan & hitung
+// riwayat transaksi tiap produk -> tentukan survivor otomatis -> tampilkan
+// modal konfirmasi -> panggil RPC merge_products() -> reload data.
+// ============================================
+function handleToggleMergeMode() {
+  SELECTION_MODE = !SELECTION_MODE;
+  SELECTED_IDS.clear();
+  EXPANDED_ITEM_ID = null; // tutup expand card yang mungkin lagi kebuka, biar tidak membingungkan
+
+  toggleMergeModeBtn.textContent = SELECTION_MODE ? 'Batal Pilih' : '🔗 Gabungkan Barang';
+  confirmMergeBtn.style.display = 'none';
+  hideMergeStatus();
+
+  renderInventaris(inventarisSearchInput.value);
+}
+
+function exitSelectionMode() {
+  SELECTION_MODE = false;
+  SELECTED_IDS.clear();
+  toggleMergeModeBtn.textContent = '🔗 Gabungkan Barang';
+  confirmMergeBtn.style.display = 'none';
+  renderInventaris(inventarisSearchInput.value);
+}
+
+function handleToggleSelect(productId) {
+  if (SELECTED_IDS.has(productId)) {
+    SELECTED_IDS.delete(productId);
+  } else {
+    if (SELECTED_IDS.size >= 2) {
+      showMergeStatus('Pilih maksimal 2 barang untuk digabungkan.', 'error');
+      return;
+    }
+    SELECTED_IDS.add(productId);
+  }
+
+  confirmMergeBtn.style.display = SELECTED_IDS.size === 2 ? 'inline-block' : 'none';
+  hideMergeStatus();
+  renderInventaris(inventarisSearchInput.value);
+}
+
+async function handleMergeClick() {
+  if (SELECTED_IDS.size !== 2) return;
+
+  const [idA, idB] = Array.from(SELECTED_IDS);
+  const productA = ALL_INVENTARIS_ITEMS.find(p => p.id === idA);
+  const productB = ALL_INVENTARIS_ITEMS.find(p => p.id === idB);
+  if (!productA || !productB) return;
+
+  // Validasi satuan di sisi client dulu (function di database juga akan cek ulang sebagai jaring pengaman terakhir)
+  if ((productA.unit || '') !== (productB.unit || '')) {
+    showMergeStatus(
+      `Kedua barang punya satuan berbeda (${productA.unit || '-'} vs ${productB.unit || '-'}). Ubah dulu satuan salah satu barang lewat Edit Data Barang, baru coba gabungkan lagi.`,
+      'error'
+    );
+    return;
+  }
+
+  confirmMergeBtn.disabled = true;
+  confirmMergeBtn.textContent = 'Memeriksa...';
+
+  // Hitung jumlah riwayat transaksi masing-masing produk, untuk tentukan survivor otomatis
+  const { data: movementsData, error: countError } = await supabaseClient
+    .from('stock_movements')
+    .select('product_id')
+    .in('product_id', [idA, idB]);
+
+  confirmMergeBtn.disabled = false;
+  confirmMergeBtn.textContent = 'Gabungkan (2)';
+
+  if (countError) {
+    console.error('Gagal menghitung riwayat transaksi:', countError);
+    showMergeStatus('Gagal memeriksa data. Coba lagi.', 'error');
+    return;
+  }
+
+  const countA = (movementsData || []).filter(m => m.product_id === idA).length;
+  const countB = (movementsData || []).filter(m => m.product_id === idB).length;
+
+  let survivor, merged, survivorCount, mergedCount;
+
+  if (countA > countB) {
+    survivor = productA; merged = productB; survivorCount = countA; mergedCount = countB;
+  } else if (countB > countA) {
+    survivor = productB; merged = productA; survivorCount = countB; mergedCount = countA;
+  } else {
+    // Jumlah riwayat sama -> yang dibuat lebih dulu (created_at lebih awal) jadi survivor
+    const aOlder = (productA.created_at || '') <= (productB.created_at || '');
+    survivor = aOlder ? productA : productB;
+    merged = aOlder ? productB : productA;
+    survivorCount = aOlder ? countA : countB;
+    mergedCount = aOlder ? countB : countA;
+  }
+
+  openMergeConfirmModal(survivor, merged, survivorCount, mergedCount);
+}
+
+function openMergeConfirmModal(survivor, merged, survivorCount, mergedCount) {
+  const totalStock = Number(survivor.current_stock) + Number(merged.current_stock);
+
+  mergeConfirmBody.innerHTML = `
+    <p>Produk <strong>${escapeHtml(merged.name)}</strong> (${mergedCount} riwayat transaksi) akan digabung ke <strong>${escapeHtml(survivor.name)}</strong> (${survivorCount} riwayat transaksi).</p>
+    <p>Kategori hasil gabungan: <strong>${escapeHtml(survivor.category || '-')}</strong></p>
+    <p>Lokasi hasil gabungan: <strong>${escapeHtml(survivor.storage_location || '-')}</strong></p>
+    <p>Total stok setelah gabung: <strong>${totalStock} ${escapeHtml(survivor.unit || '')}</strong></p>
+    <p class="merge-warning">Aksi ini tidak bisa dibatalkan.</p>
+  `;
+
+  mergeConfirmModal.dataset.survivorId = survivor.id;
+  mergeConfirmModal.dataset.mergedId = merged.id;
+  mergeConfirmModal.style.display = 'flex';
+}
+
+function closeMergeConfirmModal() {
+  mergeConfirmModal.style.display = 'none';
+  mergeConfirmModal.dataset.survivorId = '';
+  mergeConfirmModal.dataset.mergedId = '';
+}
+
+async function executeMerge() {
+  const survivorId = mergeConfirmModal.dataset.survivorId;
+  const mergedId = mergeConfirmModal.dataset.mergedId;
+  if (!survivorId || !mergedId) return;
+
+  mergeExecuteBtn.disabled = true;
+  mergeExecuteBtn.textContent = 'Menggabungkan...';
+
+  const { data: userData, error: userError } = await supabaseClient.auth.getUser();
+
+  if (userError || !userData?.user) {
+    console.error('Gagal ambil data user:', userError);
+    mergeExecuteBtn.disabled = false;
+    mergeExecuteBtn.textContent = 'Ya, Gabungkan';
+    showMergeStatus('Gagal mengambil data akun. Coba login ulang.', 'error');
+    return;
+  }
+
+  const { data, error } = await supabaseClient.rpc('merge_products', {
+    p_clinic_id: CURRENT_CLINIC_ID,
+    p_survivor_id: survivorId,
+    p_merged_id: mergedId,
+    p_user_id: userData.user.id
+  });
+
+  mergeExecuteBtn.disabled = false;
+  mergeExecuteBtn.textContent = 'Ya, Gabungkan';
+
+  if (error) {
+    console.error('Gagal menggabungkan produk:', error);
+    showMergeStatus('Gagal menggabungkan: ' + error.message, 'error');
+    return;
+  }
+
+  closeMergeConfirmModal();
+  exitSelectionMode();
+
+  const resultRow = Array.isArray(data) ? data[0] : null;
+  const survivorName = resultRow?.survivor_name || 'produk';
+  const finalStock = resultRow?.final_stock ?? '-';
+
+  showMergeStatus(`Berhasil digabungkan ke "${survivorName}". Stok akhir: ${finalStock}.`, 'success');
+
+  await loadInventaris(); // reload supaya produk yang sudah dihapus tidak tampil lagi
+}
+
+function showMergeStatus(message, type) {
+  mergeStatus.textContent = message;
+  mergeStatus.className = 'status-message status-' + type;
+  mergeStatus.style.display = 'block';
+}
+
+function hideMergeStatus() {
+  mergeStatus.style.display = 'none';
 }
 
 // ============================================
@@ -711,4 +935,4 @@ function showExportStatus(message, type) {
 
 function hideExportStatus() {
   exportStatus.style.display = 'none';
-        }
+}
