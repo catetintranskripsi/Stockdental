@@ -15,6 +15,33 @@
   margin-bottom: var(--space-lg);
 }
 
+/* Tombol dasar - selaraskan warna teal lama (#2d6a4f) ke token design system.
+   Ukuran (width:100% dst) dari foto.css TETAP dipakai apa adanya, ini
+   hanya menyamakan warna. */
+.btn-primary {
+  background: var(--color-primary);
+}
+
+.btn-primary:disabled {
+  background: var(--color-text-faint);
+}
+
+.btn-secondary {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+/* Perbaikan header foto.html: foto.css lama mendefinisikan
+   .btn-secondary { width: 100% } (dimaksudkan untuk tombol besar di form,
+   misal "+ Tambah baris manual"). Tombol Logout di header memakai class
+   yang sama, jadi ikut melebar 100% dan menutupi judul halaman.
+   Override ini mengembalikan tombol Logout ke ukuran wajar (sesuai isi
+   teksnya saja), tanpa mengubah .btn-secondary di tempat lain. */
+#appContainer .app-header #logoutBtn {
+  width: auto;
+  flex-shrink: 0;
+}
+
 /* Kotak upload foto - jadi dashed border teal, bukan abu-abu polos */
 .upload-box {
   display: flex;
