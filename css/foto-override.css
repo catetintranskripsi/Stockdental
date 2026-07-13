@@ -1,0 +1,169 @@
+/* ============================================
+   STOCKDENTAL — FOTO.CSS OVERRIDE
+   Percakapan 13 - DESIGN SYSTEM
+   Tambahan/penyesuaian untuk halaman foto.html agar konsisten
+   dengan design system baru (style.css). File ini TIDAK menimpa
+   foto.css yang sudah ada — di-load SESUDAHNYA di foto.html:
+
+   <link rel="stylesheet" href="css/foto.css">
+   <link rel="stylesheet" href="css/foto-override.css">   <-- tambahkan baris ini
+============================================ */
+
+.page-subtitle {
+  color: var(--color-text-muted);
+  font-size: 0.88rem;
+  margin-bottom: var(--space-lg);
+}
+
+/* Kotak upload foto - jadi dashed border teal, bukan abu-abu polos */
+.upload-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  padding: var(--space-xl) var(--space-md);
+  border: 2px dashed var(--color-primary);
+  border-radius: var(--radius-md);
+  background: var(--color-primary-light);
+  cursor: pointer;
+  text-align: center;
+  color: var(--color-primary-dark);
+  font-weight: 600;
+  font-size: 0.9rem;
+  transition: background 0.15s ease;
+}
+
+.upload-box:active {
+  background: #DCEEE9;
+}
+
+.upload-icon {
+  font-size: 2rem;
+}
+
+.photo-preview {
+  width: 100%;
+  border-radius: var(--radius-md);
+  margin-top: var(--space-md);
+  box-shadow: var(--shadow-card);
+}
+
+.result-summary {
+  color: var(--color-text-muted);
+  font-size: 0.88rem;
+  margin-bottom: var(--space-md);
+}
+
+/* Status message (sukses/error/loading) */
+.status-message {
+  margin-top: var(--space-md);
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.status-message.status-success {
+  background: var(--color-normal-bg);
+  color: var(--color-normal);
+}
+
+.status-message.status-error {
+  background: var(--color-kritis-bg);
+  color: var(--color-kritis);
+}
+
+.status-message.status-loading {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+
+/* Kartu tiap barang hasil ekstraksi AI */
+.extracted-item-row {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  margin-bottom: var(--space-md);
+  background: var(--color-surface);
+}
+
+.item-row-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-sm);
+  padding-bottom: var(--space-sm);
+  border-bottom: 1px solid var(--color-bg);
+}
+
+.checkbox-label,
+.radio-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.btn-delete-row {
+  background: none;
+  border: none;
+  color: var(--color-kritis);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 8px;
+}
+
+.jenis-transaksi-group {
+  margin-bottom: var(--space-sm);
+}
+
+.radio-row {
+  display: flex;
+  gap: var(--space-md);
+  margin-top: 4px;
+}
+
+.field-group {
+  margin-bottom: var(--space-sm);
+}
+
+.field-group label {
+  margin: 0 0 4px 0;
+}
+
+.field-row {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.field-row .field-group {
+  flex: 1;
+}
+
+.button-row {
+  display: flex;
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+}
+
+.button-row button {
+  flex: 1;
+}
+
+.btn-cancel {
+  background: var(--color-surface);
+  color: var(--color-kritis);
+  border: 1px solid var(--color-kritis);
+  font-weight: 600;
+  padding: 10px 20px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.btn-cancel:hover {
+  background: var(--color-kritis-bg);
+}
