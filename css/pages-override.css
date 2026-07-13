@@ -245,6 +245,11 @@
   color: var(--color-text-muted);
 }
 
+.history-item-detail-merge {
+  font-style: italic;
+  color: var(--color-accent);
+}
+
 /* ---------- 4. SUB-TAB METODE INPUT (index.html) ---------- */
 /* Markup baru yang perlu ditambahkan ke index.html, gaya sama persis
    dengan yang sudah dipasang di foto.html - lihat .sub-tab-row di style.css */
