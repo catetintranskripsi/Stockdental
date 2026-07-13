@@ -55,6 +55,7 @@ async function loadHistory() {
       created_at,
       reason,
       opname_note,
+      notes,
       products (name, unit)
     `)
     .eq('clinic_id', CURRENT_CLINIC_ID)
@@ -90,16 +91,24 @@ function renderHistory(movements) {
     const unit = m.products ? m.products.unit : '';
     const dateStr = formatDateTime(m.created_at);
 
+    // merge_marker adalah jejak audit "produk lama digabung ke produk ini",
+    // bukan transaksi stok biasa - jadi tidak relevan menampilkan jumlah/stok before-after
+    const detailHtml = (m.movement_type === 'merge_marker')
+      ? `<div class="history-item-detail history-item-detail-merge">${escapeHtml(m.notes || 'Digabung dari produk lain')}</div>`
+      : `
+        <div class="history-item-detail">
+          <span>Jumlah: ${m.quantity} ${escapeHtml(unit)}</span>
+          <span>Stok: ${m.stock_before} → ${m.stock_after}</span>
+        </div>
+      `;
+
     item.innerHTML = `
       <div class="history-item-main">
         <span class="history-badge badge-${m.movement_type}">${typeLabel}</span>
         <span class="history-date">${dateStr}</span>
       </div>
       <div class="history-item-name">${escapeHtml(productName)}</div>
-      <div class="history-item-detail">
-        <span>Jumlah: ${m.quantity} ${escapeHtml(unit)}</span>
-        <span>Stok: ${m.stock_before} → ${m.stock_after}</span>
-      </div>
+      ${detailHtml}
     `;
 
     historyList.appendChild(item);
@@ -110,6 +119,7 @@ function getTypeLabel(type) {
   if (type === 'in') return 'Masuk';
   if (type === 'out') return 'Keluar';
   if (type === 'opname_adjustment') return 'Opname';
+  if (type === 'merge_marker') return '🔗 Digabung';
   return type;
 }
 
