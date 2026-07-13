@@ -43,6 +43,44 @@
             <span class="ringkasan-status-label">Menipis</span>
           </div>
         </div>
+
+        <div class="ringkasan-alert-section" style="margin-top: 12px;">
+          <p class="ringkasan-alert-subheading">🔴 Barang Kritis</p>
+          <div id="listKritis"></div>
+        </div>
+
+        <div class="ringkasan-alert-section" style="margin-top: 12px;">
+          <p class="ringkasan-alert-subheading">🟠 Barang Menipis</p>
+          <div id="listMenipis"></div>
+        </div>
+      </div>
+
+      <!-- Alert Kedaluwarsa -->
+      <div class="ringkasan-card">
+        <h3>⏰ Akan Kedaluwarsa <span id="countKedaluwarsa" class="ringkasan-badge">0</span></h3>
+
+        <p id="kedaluwarsaEmpty" class="loading-text" style="display:none;">
+          Tidak ada barang yang akan kedaluwarsa dalam 30 hari ke depan 👍
+        </p>
+
+        <div id="kedaluwarsaListsWrap" style="display:none;">
+
+          <div class="ringkasan-alert-section" id="sectionExpired" style="display:none; margin-top: 12px;">
+            <p class="ringkasan-alert-subheading">🔴 Sudah Kedaluwarsa</p>
+            <div id="listExpired"></div>
+          </div>
+
+          <div class="ringkasan-alert-section" id="sectionH7" style="display:none; margin-top: 12px;">
+            <p class="ringkasan-alert-subheading">🟠 H-7 (7 hari ke depan)</p>
+            <div id="listH7"></div>
+          </div>
+
+          <div class="ringkasan-alert-section" id="sectionH30" style="display:none; margin-top: 12px;">
+            <p class="ringkasan-alert-subheading">🟡 H-30 (8-30 hari ke depan)</p>
+            <div id="listH30"></div>
+          </div>
+
+        </div>
       </div>
 
       <!-- Transaksi Hari Ini -->
