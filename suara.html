@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StockDental - Input Suara</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/foto.css">
+  <link rel="stylesheet" href="css/foto-override.css">
+  <link rel="stylesheet" href="css/suara-override.css">
+</head>
+<body>
+
+  <!-- ============================================ -->
+  <!-- Percakapan [BARU] - HALAMAN INPUT SUARA -->
+  <!-- Reuse penuh pola foto.html: card review per-item, RPC add_stock_lot /
+       adjust_stock_opname, style css/foto.css + foto-override.css.
+       Beda utamanya: sumber data adalah rekaman audio (banyak segmen),
+       bukan 1 foto. -->
+  <!-- ============================================ -->
+
+  <!-- ============ AUTH CHECK SECTION ============ -->
+  <div class="container" id="authContainer">
+    <div id="loginRequiredView">
+      <h1>StockDental</h1>
+      <h2>Silakan login terlebih dahulu</h2>
+      <p><a href="index.html">Kembali ke halaman login</a></p>
+    </div>
+  </div>
+
+  <!-- ============ APP SECTION (tampil setelah login) ============ -->
+  <div class="container" id="appContainer" style="display:none; padding-bottom: 80px;">
+
+    <div class="app-header">
+      <div>
+        <h1>StockDental</h1>
+        <h2>Input Suara</h2>
+      </div>
+      <button id="logoutBtn" class="btn-secondary">Logout</button>
+    </div>
+
+    <!-- Sub-tab metode input: sama persis dengan index.html & foto.html -->
+    <div class="sub-tab-row">
+      <a href="index.html" class="sub-tab-item">Manual</a>
+      <a href="foto.html" class="sub-tab-item">Foto</a>
+      <a href="suara.html" class="sub-tab-item sub-tab-active">Suara</a>
+    </div>
+
+    <p class="page-subtitle">Rekam 1 barang, tap Selesai, ulangi untuk barang berikutnya. AI akan bantu baca semuanya sekaligus.</p>
+
+    <!-- STEP 1: Rekam segmen-segmen suara -->
+    <div id="recordSection" class="card">
+
+      <div id="micPermissionNotice" class="status-message status-loading" style="display:none;">
+        Butuh izin mikrofon. Tap "Izinkan" saat browser bertanya.
+      </div>
+
+      <div class="record-control">
+        <button id="recordToggleBtn" class="record-btn-idle" type="button">
+          <span id="recordIcon">🎤</span>
+          <span id="recordLabel">Tap untuk rekam barang</span>
+        </button>
+        <div id="recordTimer" class="record-timer" style="display:none;">00:00</div>
+      </div>
+
+      <div id="segmentsList" class="segments-list"></div>
+
+      <p id="segmentsEmptyHint" class="page-subtitle" style="text-align:center; margin-top: var(--space-md);">
+        Belum ada rekaman. Mulai dengan tap tombol di atas.
+      </p>
+
+      <button id="processAllBtn" class="btn-primary" style="display:none;" disabled>
+        Proses Semua dengan AI
+      </button>
+
+      <div id="recordStatus" class="status-message" style="display:none;"></div>
+    </div>
+
+    <!-- STEP 2: Hasil Ekstraksi (editable) — struktur identik foto.html -->
+    <div id="resultSection" class="card" style="display:none;">
+      <h2>Hasil Deteksi</h2>
+      <p id="resultSummary" class="result-summary"></p>
+
+      <div id="extractedItemsList"></div>
+
+      <button id="addManualRowBtn" class="btn-secondary">+ Tambah baris manual</button>
+
+      <div class="button-row">
+        <button id="cancelResultBtn" class="btn-cancel">Batal</button>
+        <button id="saveAllBtn" class="btn-primary">Simpan Semua</button>
+      </div>
+
+      <div id="saveStatus" class="status-message" style="display:none;"></div>
+    </div>
+
+  </div>
+
+  <!-- ============ BOTTOM NAVIGATION ============ -->
+  <nav class="bottom-nav" id="bottomNav" style="display:none;">
+    <a href="ringkasan.html" class="nav-item">
+      <span class="nav-icon">📊</span>
+      <span class="nav-label">Ringkasan</span>
+    </a>
+    <a href="index.html" class="nav-item active">
+      <span class="nav-icon">📝</span>
+      <span class="nav-label">Input</span>
+    </a>
+    <a href="inventaris.html" class="nav-item">
+      <span class="nav-icon">📦</span>
+      <span class="nav-label">Inventaris</span>
+    </a>
+    <a href="history.html" class="nav-item">
+      <span class="nav-icon">📈</span>
+      <span class="nav-label">Riwayat</span>
+    </a>
+  </nav>
+
+  <!-- Scripts -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/suara.js"></script>
+<script src="js/auth-check.js"></script>
+
+</body>
+</html>
