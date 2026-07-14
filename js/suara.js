@@ -25,7 +25,9 @@
 // File ini TIDAK boleh redeclare variabel itu.
 // ============================================
 
-const EDGE_FUNCTION_URL = 'https://redocvsmqvjocbenlicw.supabase.co/functions/v1/smooth-responder';
+// Percakapan [BARU] - SUBSCRIPTION & QUOTA: EDGE_FUNCTION_URL dihapus dari sini,
+// karena pemanggilan Edge Function sekarang dilakukan lewat
+// submitAndWaitForAIResult() di ai-queue-helper.js
 
 // Batas aman per segmen & total, supaya kuota AI terkendali
 // (durasi audio dihitung per detik oleh Gemini, beda dari foto yang harganya tetap per gambar)
@@ -256,7 +258,11 @@ async function handleProcessAllClick() {
 
   } catch (error) {
     console.error('Edge Function error:', error);
-    showRecordStatus('Gagal menganalisis suara: ' + error.message, 'error');
+    // Kalau kartu kuota habis/sedang ramai sudah ditampilkan oleh
+    // callGeminiExtractionAudio(), jangan tampilkan pesan error generik lagi
+    if (error.message !== '__QUOTA_UI_SHOWN__') {
+      showRecordStatus('Gagal menganalisis suara: ' + error.message, 'error');
+    }
   } finally {
     processAllBtn.disabled = false;
     processAllBtn.textContent = 'Proses Semua dengan AI';
@@ -264,18 +270,14 @@ async function handleProcessAllClick() {
 }
 
 // ============================================
-// FUNGSI: Panggil Edge Function dengan SEMUA segmen audio sekaligus
-// Tiap blob dikonversi ke base64, dikirim sebagai array audio_parts.
-// Edge Function menggabungkan semua part jadi 1 request ke Gemini
-// (Gemini bisa terima multiple inline_data dalam 1 contents).
+// FUNGSI: Panggil AI lewat antrian + kuota (semua segmen sekaligus)
+// Percakapan [BARU] - SUBSCRIPTION & QUOTA
+// Dulu: fetch() langsung ke Edge Function dengan audio_parts.
+// Sekarang: submit ke antrian dulu (dicek kuota + jatah/menit),
+// lalu polling sampai selesai. Konversi blob->base64 (blobToBase64)
+// TIDAK berubah — tetap dilakukan di sini sebelum submit.
 // ============================================
 async function callGeminiExtractionAudio(segments) {
-  const { data: { session } } = await supabaseClient.auth.getSession();
-
-  if (!session) {
-    throw new Error('Sesi login tidak ditemukan. Silakan login ulang.');
-  }
-
   const audioParts = await Promise.all(
     segments.map(async (segment) => ({
       audio_base64: await blobToBase64(segment.blob),
@@ -283,29 +285,31 @@ async function callGeminiExtractionAudio(segments) {
     }))
   );
 
-  const response = await fetch(EDGE_FUNCTION_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${session.access_token}`
-    },
-    body: JSON.stringify({
-      input_type: 'audio',
+  const outcome = await submitAndWaitForAIResult({
+    clinicId: CURRENT_CLINIC_ID,
+    inputType: 'audio',
+    mediaFields: {
       audio_parts: audioParts
-    })
+    }
   });
 
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(data.error || `Server error (${response.status})`);
+  if (outcome.status === 'done') {
+    const items = outcome.result.items;
+    if (!Array.isArray(items)) {
+      throw new Error('Format hasil dari server tidak sesuai.');
+    }
+    return items;
   }
 
-  if (!Array.isArray(data.items)) {
-    throw new Error('Format hasil dari server tidak sesuai.');
+  if (outcome.status === 'quota_exceeded' || outcome.status === 'busy') {
+    renderQuotaBlockedCard(outcome);
+    // Sinyal khusus supaya handleProcessAllClick() tidak menampilkan
+    // pesan error generik dobel di atas kartu yang sudah ditampilkan
+    throw new Error('__QUOTA_UI_SHOWN__');
   }
 
-  return data.items;
+  // outcome.status === 'error'
+  throw new Error(outcome.message || 'Gagal menganalisis suara.');
 }
 
 function blobToBase64(blob) {
