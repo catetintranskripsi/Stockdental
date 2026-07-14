@@ -1,0 +1,110 @@
+/* ============================================
+   STOCKDENTAL — SUARA-OVERRIDE.CSS
+   Percakapan [BARU] - INPUT SUARA
+   Dimuat SESUDAH foto.css + foto-override.css di suara.html.
+   Reuse token design system yang sama (var(--color-primary), dst)
+   supaya konsisten dengan foto.html & halaman lain.
+============================================ */
+
+.record-control {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
+}
+
+.record-btn-idle,
+.record-btn-active {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  width: 100%;
+  padding: var(--space-xl) var(--space-md);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.95rem;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.record-btn-idle {
+  border: 2px dashed var(--color-primary);
+  background: var(--color-primary-light);
+  color: var(--color-primary-dark);
+}
+
+.record-btn-idle:active {
+  background: #DCEEE9;
+}
+
+.record-btn-active {
+  border: 2px solid var(--color-kritis);
+  background: var(--color-kritis-bg);
+  color: var(--color-kritis);
+  animation: pulse-record 1.4s ease-in-out infinite;
+}
+
+@keyframes pulse-record {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.record-btn-idle span:first-child,
+.record-btn-active span:first-child {
+  font-size: 2rem;
+}
+
+.record-timer {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--color-kritis);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Daftar segmen rekaman yang sudah dibuat, sebelum diproses AI */
+.segments-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+}
+
+.segment-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+}
+
+.segment-item-info {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: 0.88rem;
+  color: var(--color-text);
+}
+
+.segment-item-icon {
+  font-size: 1.1rem;
+}
+
+.segment-item-duration {
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
+}
+
+.segment-item-delete {
+  background: none;
+  border: none;
+  color: var(--color-kritis);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 8px;
+}
