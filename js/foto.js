@@ -13,7 +13,10 @@
 // File ini TIDAK boleh redeclare variabel itu.
 // ============================================
 
-const EDGE_FUNCTION_URL = 'https://redocvsmqvjocbenlicw.supabase.co/functions/v1/smooth-responder';
+// Percakapan [BARU] - SUBSCRIPTION & QUOTA: EDGE_FUNCTION_URL dihapus dari sini,
+// karena pemanggilan Edge Function sekarang dilakukan lewat
+// submitAndWaitForAIResult() di ai-queue-helper.js (yang membangun
+// URL-nya sendiri dari SUPABASE_URL di supabase-client.js)
 
 let selectedPhotoBase64 = null;
 let selectedPhotoMimeType = null;
@@ -181,7 +184,11 @@ async function handleAnalyzeClick() {
 
   } catch (error) {
     console.error('Edge Function error:', error);
-    showUploadStatus('Gagal menganalisis foto: ' + error.message, 'error');
+    // Kalau kartu kuota habis/sedang ramai sudah ditampilkan oleh
+    // callGeminiExtraction(), jangan tampilkan pesan error generik lagi
+    if (error.message !== '__QUOTA_UI_SHOWN__') {
+      showUploadStatus('Gagal menganalisis foto: ' + error.message, 'error');
+    }
   } finally {
     analyzeBtn.disabled = false;
     analyzeBtn.textContent = 'Analisis dengan AI';
@@ -189,38 +196,42 @@ async function handleAnalyzeClick() {
 }
 
 // ============================================
-// FUNGSI: Panggil Edge Function (proxy Gemini di server)
-// Key Gemini TIDAK ada di sini sama sekali — aman.
+// FUNGSI: Panggil AI lewat antrian + kuota
+// Percakapan [BARU] - SUBSCRIPTION & QUOTA
+// Dulu: fetch() langsung ke Edge Function, tunggu, dapat hasil.
+// Sekarang: submit ke antrian dulu (dicek kuota + jatah/menit),
+// lalu polling sampai selesai. Key Gemini tetap TIDAK ada di sini.
 // ============================================
 async function callGeminiExtraction(base64Image, mimeType) {
-  // Ambil token login user saat ini, dikirim ke Edge Function untuk auth check
-  const { data: { session } } = await supabaseClient.auth.getSession();
-
-  if (!session) {
-    throw new Error('Sesi login tidak ditemukan. Silakan login ulang.');
-  }
-
-  const response = await fetch(EDGE_FUNCTION_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${session.access_token}`
-    },
-    body: JSON.stringify({
+  const outcome = await submitAndWaitForAIResult({
+    clinicId: CURRENT_CLINIC_ID,
+    inputType: 'image',
+    mediaFields: {
       image_base64: base64Image,
       mime_type: mimeType
-    })
+    }
   });
 
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(data.error || `Server error (${response.status})`);
+  if (outcome.status === 'done') {
+    const items = outcome.result.items;
+    if (!Array.isArray(items)) {
+      throw new Error('Format hasil dari server tidak sesuai.');
+    }
+    return items;
   }
 
-  if (!Array.isArray(data.items)) {
-    throw new Error('Format hasil dari server tidak sesuai.');
+  if (outcome.status === 'quota_exceeded' || outcome.status === 'busy') {
+    // Tampilkan kartu kuota habis / sedang ramai, bukan error biasa
+    renderQuotaBlockedCard(outcome);
+    // Lempar error khusus supaya handleAnalyzeClick() tahu untuk
+    // TIDAK menampilkan pesan error generik di uploadStatus lagi
+    // (kartunya sudah cukup, tidak perlu dobel pesan)
+    throw new Error('__QUOTA_UI_SHOWN__');
   }
+
+  // outcome.status === 'error'
+  throw new Error(outcome.message || 'Gagal menganalisis foto.');
+}
 
   return data.items;
 }
