@@ -21,6 +21,7 @@ let LAST_KNOWN_CLINIC_ACCESS = null; // { locked, product_count, max_products, t
 async function checkClinicAccessAndRenderBanner() {
   if (!CURRENT_CLINIC_ID) {
     console.warn('checkClinicAccessAndRenderBanner dipanggil sebelum CURRENT_CLINIC_ID terisi.');
+    alert('DEBUG: CURRENT_CLINIC_ID kosong saat checkClinicAccessAndRenderBanner dipanggil.'); // TEMPORARY DEBUG
     return;
   }
 
@@ -30,9 +31,12 @@ async function checkClinicAccessAndRenderBanner() {
 
   if (error) {
     console.error('Gagal cek status akses klinik:', error);
+    alert('DEBUG: RPC check_clinic_access error: ' + JSON.stringify(error)); // TEMPORARY DEBUG
     CLINIC_LOCKED = false; // jangan sampai error jaringan mengunci app secara tidak sengaja
     return;
   }
+
+  alert('DEBUG: RPC berhasil. Hasilnya: ' + JSON.stringify(data)); // TEMPORARY DEBUG
 
   CLINIC_LOCKED = data.locked === true;
   LAST_KNOWN_CLINIC_ACCESS = data;
