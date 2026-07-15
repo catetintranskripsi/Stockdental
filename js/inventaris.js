@@ -472,17 +472,19 @@ async function handleDeleteProduct(productId, productName, cardEl) {
     return;
   }
 
-  // Hapus dari state lokal & tutup mode edit/expand, lalu render ulang
+  // Hapus dari state lokal & tutup mode edit/expand
   ALL_INVENTARIS_ITEMS = ALL_INVENTARIS_ITEMS.filter(p => p.id !== productId);
   EDITING_ITEM_ID = null;
   EXPANDED_ITEM_ID = null;
-  renderInventaris(inventarisSearchInput.value);
 
-  // Barang berkurang bisa saja membuat klinik lolos dari status locked -->
-  // cek ulang & update banner global (function ini ada di auth-check.js)
+  // Cek ulang status akses DULU (update LAST_KNOWN_CLINIC_ACCESS & banner
+  // global di auth-check.js), baru render -- supaya badge total jenis
+  // barang di summary langsung pakai data terbaru, tidak telat 1 render.
   if (typeof checkClinicAccessAndRenderBanner === 'function') {
     await checkClinicAccessAndRenderBanner();
   }
+
+  renderInventaris(inventarisSearchInput.value);
 }
 
 async function handleSaveEdit(productId, cardEl) {
@@ -785,11 +787,14 @@ function buildPageNumberList(currentPage, totalPages) {
 }
 
 function renderSummary(items) {
+  const totalCount = ALL_INVENTARIS_ITEMS.length; // total keseluruhan, TIDAK ikut berubah saat search/filter
+  const totalLine = buildTotalCountLine(totalCount);
+
   const kritisCount = items.filter(p => p.status === 'kritis').length;
   const menipisCount = items.filter(p => p.status === 'menipis').length;
 
   if (kritisCount === 0 && menipisCount === 0) {
-    inventarisSummary.innerHTML = '<p class="summary-ok">✅ Semua stok dalam kondisi baik.</p>';
+    inventarisSummary.innerHTML = `${totalLine}<p class="summary-ok">✅ Semua stok dalam kondisi baik.</p>`;
     return;
   }
 
@@ -797,7 +802,27 @@ function renderSummary(items) {
   if (kritisCount > 0) parts.push(`🔴 ${kritisCount} kritis`);
   if (menipisCount > 0) parts.push(`🟡 ${menipisCount} menipis`);
 
-  inventarisSummary.innerHTML = `<p class="summary-warning">${parts.join(' · ')}</p>`;
+  inventarisSummary.innerHTML = `${totalLine}<p class="summary-warning">${parts.join(' · ')}</p>`;
+}
+
+// ============================================
+// Percakapan [Batas Jumlah Barang & Kunci Akun Expired] - BADGE TOTAL
+// Pakai LAST_KNOWN_CLINIC_ACCESS (diisi checkClinicAccessAndRenderBanner
+// di auth-check.js) untuk tahu max_products klinik ini. Kalau belum
+// sempat terisi (auth-check belum jalan / RPC gagal), tampilkan total
+// polos tanpa batas -- tidak memblokir apa pun, cuma teks saja.
+// ============================================
+function buildTotalCountLine(totalCount) {
+  const access = (typeof LAST_KNOWN_CLINIC_ACCESS !== 'undefined') ? LAST_KNOWN_CLINIC_ACCESS : null;
+  const isFreeLimit = access && access.max_products && access.max_products < 999999;
+
+  if (isFreeLimit) {
+    const nearLimit = totalCount >= access.max_products * 0.85; // beri warna beda kalau sudah dekat batas (>=85%)
+    const cssClass = nearLimit ? 'summary-total near-limit' : 'summary-total';
+    return `<p class="${cssClass}">📦 ${totalCount} dari ${access.max_products} jenis barang</p>`;
+  }
+
+  return `<p class="summary-total">📦 ${totalCount} jenis barang</p>`;
 }
 
 // Basic escape untuk mencegah HTML injection dari nama barang

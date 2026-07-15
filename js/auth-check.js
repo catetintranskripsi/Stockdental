@@ -13,6 +13,7 @@
 let CURRENT_CLINIC_ID = null;
 let CURRENT_USER_ID = null;
 let CLINIC_LOCKED = false; // dicek oleh index.js/foto.js/suara.js sebelum submit
+let LAST_KNOWN_CLINIC_ACCESS = null; // { locked, product_count, max_products, tier, status } - dipakai inventaris.js untuk badge total
 
 const authContainer = document.getElementById('authContainer');
 const appContainer = document.getElementById('appContainer');
@@ -79,6 +80,7 @@ async function checkClinicAccessAndRenderBanner() {
   }
 
   CLINIC_LOCKED = data.locked === true;
+  LAST_KNOWN_CLINIC_ACCESS = data;
   renderClinicLockedBanner(data);
 }
 
