@@ -21,7 +21,6 @@ let LAST_KNOWN_CLINIC_ACCESS = null; // { locked, product_count, max_products, t
 async function checkClinicAccessAndRenderBanner() {
   if (!CURRENT_CLINIC_ID) {
     console.warn('checkClinicAccessAndRenderBanner dipanggil sebelum CURRENT_CLINIC_ID terisi.');
-    alert('DEBUG: CURRENT_CLINIC_ID kosong saat checkClinicAccessAndRenderBanner dipanggil.'); // TEMPORARY DEBUG
     return;
   }
 
@@ -31,12 +30,9 @@ async function checkClinicAccessAndRenderBanner() {
 
   if (error) {
     console.error('Gagal cek status akses klinik:', error);
-    alert('DEBUG: RPC check_clinic_access error: ' + JSON.stringify(error)); // TEMPORARY DEBUG
     CLINIC_LOCKED = false; // jangan sampai error jaringan mengunci app secara tidak sengaja
     return;
   }
-
-  alert('DEBUG: RPC berhasil. Hasilnya: ' + JSON.stringify(data)); // TEMPORARY DEBUG
 
   CLINIC_LOCKED = data.locked === true;
   LAST_KNOWN_CLINIC_ACCESS = data;
@@ -57,16 +53,20 @@ function renderClinicLockedBanner(accessData) {
   if (!banner) {
     banner = document.createElement('div');
     banner.id = 'clinicLockedBanner';
-    // Percakapan [Perbaikan Banner] - ganti dari "position:sticky" ke alur
-    // dokumen normal (tanpa position khusus). "sticky" tadinya menumpuk DI
-    // ATAS konten yang sudah ada di body (termasuk tombol Simpan Transaksi
-    // di halaman Input), bukan mendorongnya turun -- jadi tombol jadi
-    // tertutup/tidak kelihatan tanpa scroll. Sekarang banner jadi elemen
-    // biasa paling atas <body>, otomatis mendorong SEMUA konten di
-    // bawahnya turun, tidak mungkin menutupi apa pun lagi.
-    banner.style.cssText = 'z-index:999;background:#c62828;color:#fff;padding:12px 16px;font-size:14px;line-height:1.4;';
-    document.body.prepend(banner);
+    // Percakapan [Perbaikan Banner v2] - taruh banner DI DALAM .container
+    // yang sedang aktif (bukan langsung ke <body>). Alasan: struktur CSS
+    // app ini pakai .container (max-width 480px, margin auto) untuk semua
+    // konten, dan .app-header punya margin negatif untuk jadi full-bleed
+    // DI DALAM container itu. Banner yang di-prepend ke <body> langsung
+    // jadi elemen terpisah di luar tata letak ini -- lebarnya beda dan
+    // bisa tertimpa/tertumpuk sama .app-header yang full-bleed. Taruh di
+    // dalam container aktif (appContainer kalau sudah login) supaya ikut
+    // alur layout yang sama seperti elemen lain.
+    const activeContainer = document.getElementById('appContainer') || document.body;
+    activeContainer.prepend(banner);
   }
+
+  banner.style.cssText = 'display:block;z-index:999;background:#c62828;color:#fff;padding:12px 16px;font-size:14px;line-height:1.4;border-radius:8px;margin-bottom:16px;';
 
   banner.innerHTML = `
     <strong>Langganan Premium sudah berakhir.</strong>
