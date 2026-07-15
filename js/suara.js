@@ -639,12 +639,20 @@ function showRecordStatus(message, type) {
   recordStatus.textContent = message;
   recordStatus.className = 'status-message status-' + type;
   recordStatus.style.display = 'block';
+  // Percakapan [Perbaikan Pesan Status] - auto-scroll ke pesan error saja
+  if (type === 'error') {
+    recordStatus.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
 }
 
 function showSaveStatus(message, type) {
   saveStatus.textContent = message;
   saveStatus.className = 'status-message status-' + type;
   saveStatus.style.display = 'block';
+  // Percakapan [Perbaikan Pesan Status] - auto-scroll ke pesan error saja
+  if (type === 'error') {
+    saveStatus.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
 }
 
 function escapeHtml(text) {

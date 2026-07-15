@@ -549,9 +549,21 @@ async function handleOpname() {
 
 function showStatus(message, type) {
   statusDiv.textContent = message;
-  statusDiv.className = type === 'success' ? 'status-success' : 'status-error';
+  statusDiv.className = 'status-message status-' + (type === 'success' ? 'success' : 'error');
+  statusDiv.style.display = 'block';
+
+  // Percakapan [Perbaikan Pesan Status] - auto-scroll ke pesan error, biar
+  // user pasti lihat (tombol Simpan Transaksi ada di atasnya, jadi pesan
+  // yang muncul di bawah bisa tidak kelihatan tanpa scroll manual).
+  // Pesan sukses TIDAK di-scroll -- kalau submit berhasil, user sudah
+  // melihat form-nya, tidak perlu dipaksa scroll ke bawah.
+  if (type !== 'success') {
+    statusDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
   setTimeout(function() {
     statusDiv.className = '';
+    statusDiv.style.display = 'none';
     statusDiv.textContent = '';
   }, 4000);
     }

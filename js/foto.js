@@ -576,12 +576,20 @@ function showUploadStatus(message, type) {
   uploadStatus.textContent = message;
   uploadStatus.className = 'status-message status-' + type;
   uploadStatus.style.display = 'block';
+  // Percakapan [Perbaikan Pesan Status] - auto-scroll ke pesan error saja
+  if (type === 'error') {
+    uploadStatus.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
 }
 
 function showSaveStatus(message, type) {
   saveStatus.textContent = message;
   saveStatus.className = 'status-message status-' + type;
   saveStatus.style.display = 'block';
+  // Percakapan [Perbaikan Pesan Status] - auto-scroll ke pesan error saja
+  if (type === 'error') {
+    saveStatus.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
 }
 
 // ============================================
