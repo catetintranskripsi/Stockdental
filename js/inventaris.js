@@ -224,6 +224,8 @@ function buildItemCard(p) {
           handleCancelEdit(p.id);
         } else if (action === 'save-edit') {
           handleSaveEdit(p.id, item);
+        } else if (action === 'delete-product') {
+          handleDeleteProduct(p.id, p.name, item);
         }
       });
     });
@@ -334,6 +336,7 @@ function buildEditForm(p) {
         <button type="button" class="btn-secondary" data-action="cancel-edit">Batal</button>
         <button type="button" class="btn-primary" data-action="save-edit">Simpan</button>
       </div>
+      <button type="button" class="btn-delete-item" data-action="delete-product">🗑️ Hapus Barang Ini</button>
       <div class="edit-status-message" data-role="edit-status"></div>
     </div>
   `;
@@ -435,6 +438,51 @@ function handleStartEdit(productId) {
 function handleCancelEdit(productId) {
   EDITING_ITEM_ID = null;
   renderInventaris(inventarisSearchInput.value);
+}
+
+// ============================================
+// Percakapan [Batas Jumlah Barang & Kunci Akun Expired] - HAPUS BARANG
+// Soft-delete (is_active=false) lewat RPC soft_delete_product(), supaya
+// riwayat stock_movements & product_lots yang mengacu ke produk ini tetap
+// utuh. Tombol ini SELALU aktif (tidak ikut terkunci saat CLINIC_LOCKED),
+// karena ini satu-satunya jalan keluar dari status locked.
+// ============================================
+async function handleDeleteProduct(productId, productName, cardEl) {
+  const confirmed = confirm(`Hapus "${productName}" dari inventaris?\n\nRiwayat transaksi barang ini tetap tersimpan, tapi barang ini tidak akan muncul lagi di daftar.`);
+  if (!confirmed) return;
+
+  const deleteBtn = cardEl.querySelector('[data-action="delete-product"]');
+  const statusEl = cardEl.querySelector('[data-role="edit-status"]');
+  if (deleteBtn) {
+    deleteBtn.disabled = true;
+    deleteBtn.textContent = 'Menghapus...';
+  }
+
+  const { data, error } = await supabaseClient.rpc('soft_delete_product', {
+    p_product_id: productId
+  });
+
+  if (error || !data || data.success !== true) {
+    console.error('Gagal hapus produk:', error || data);
+    showEditStatus(statusEl, 'Gagal menghapus barang. Coba lagi.', 'error');
+    if (deleteBtn) {
+      deleteBtn.disabled = false;
+      deleteBtn.textContent = '🗑️ Hapus Barang Ini';
+    }
+    return;
+  }
+
+  // Hapus dari state lokal & tutup mode edit/expand, lalu render ulang
+  ALL_INVENTARIS_ITEMS = ALL_INVENTARIS_ITEMS.filter(p => p.id !== productId);
+  EDITING_ITEM_ID = null;
+  EXPANDED_ITEM_ID = null;
+  renderInventaris(inventarisSearchInput.value);
+
+  // Barang berkurang bisa saja membuat klinik lolos dari status locked -->
+  // cek ulang & update banner global (function ini ada di auth-check.js)
+  if (typeof checkClinicAccessAndRenderBanner === 'function') {
+    await checkClinicAccessAndRenderBanner();
+  }
 }
 
 async function handleSaveEdit(productId, cardEl) {
