@@ -70,6 +70,11 @@ async function onUserLoggedIn() {
   const bottomNav = document.getElementById('bottomNav');
   if (bottomNav) bottomNav.style.display = 'flex';
 
+  // Percakapan [Batas Jumlah Barang & Kunci Akun Expired] - cek status
+  // akses klinik (locked kalau expired + jumlah barang > batas free).
+  // Fungsi ini didefinisikan di js/clinic-access.js
+  await checkClinicAccessAndRenderBanner();
+
   await loadProductOptions();
   await loadAutocompleteOptions();
 }
@@ -358,6 +363,14 @@ form.addEventListener('submit', async function(e) {
     return;
   }
 
+  // Percakapan [Batas Jumlah Barang & Kunci Akun Expired] - tolak semua
+  // jenis transaksi (in/out/opname) kalau klinik locked. CLINIC_LOCKED
+  // diisi oleh checkClinicAccessAndRenderBanner() di js/clinic-access.js.
+  if (CLINIC_LOCKED) {
+    showStatus('Langganan sudah berakhir dan jumlah barang melebihi batas gratis. Kurangi jumlah jenis barang di Inventaris atau perpanjang Premium untuk lanjut.', 'error');
+    return;
+  }
+
   const movementType = movementTypeSelect.value;
   if (!movementType) {
     showStatus('Pilih jenis transaksi dulu.', 'error');
@@ -439,6 +452,22 @@ async function handleStockIn() {
   if (existingProduct) {
     productId = existingProduct.id;
   } else {
+    // Percakapan [Batas Jumlah Barang & Kunci Akun Expired] - cek limit
+    // HANYA untuk produk baru (bukan restock produk lama), karena limit
+    // ini soal jumlah JENIS barang, bukan jumlah transaksi.
+    const limitCheck = await supabaseClient.rpc('check_product_limit', {
+      p_clinic_id: CURRENT_CLINIC_ID
+    });
+
+    if (limitCheck.error) throw limitCheck.error;
+
+    if (limitCheck.data.allowed === false) {
+      throw new Error(
+        `Batas jenis barang tercapai (${limitCheck.data.product_count}/${limitCheck.data.max_products}). ` +
+        `Upgrade ke Premium untuk tambah jenis barang baru, atau hapus barang lama di Inventaris.`
+      );
+    }
+
     const insertResult = await supabaseClient
       .from('products')
       .insert({
