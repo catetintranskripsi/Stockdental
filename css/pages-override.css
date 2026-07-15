@@ -47,6 +47,25 @@
   margin-top: var(--space-sm);
 }
 
+/* Percakapan [Perbaikan Pesan Status] - kotak eksplisit untuk pesan
+   error/sukses (dipakai app.js/foto.js/suara.js lewat showStatus,
+   showSaveStatus, dst). Ditambahkan eksplisit di sini supaya konsisten
+   di SEMUA halaman -- sebelumnya index.html menampilkan teks polos
+   tanpa kotak karena tidak ada aturan CSS pasti untuk class ini. */
+.status-message.status-error {
+  background: var(--color-kritis-bg);
+  color: var(--color-kritis);
+  padding: var(--space-md);
+  border-radius: var(--radius-md, 8px);
+}
+
+.status-message.status-success {
+  background: #E6F4EA;
+  color: #1E7E34;
+  padding: var(--space-md);
+  border-radius: var(--radius-md, 8px);
+}
+
 .loading-text,
 .error-text {
   color: var(--color-text-muted);
