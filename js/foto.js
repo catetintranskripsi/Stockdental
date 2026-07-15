@@ -146,6 +146,14 @@ async function handlePhotoSelected(e) {
 async function handleAnalyzeClick() {
   if (!selectedPhotoBase64) return;
 
+  // Percakapan [Batas Jumlah Barang & Kunci Akun Expired] - tolak sebelum
+  // buang kuota AI kalau klinik locked (expired + jenis barang > batas free).
+  // CLINIC_LOCKED diisi checkClinicAccessAndRenderBanner() di clinic-access.js.
+  if (CLINIC_LOCKED) {
+    showUploadStatus('Langganan sudah berakhir dan jumlah barang melebihi batas gratis. Kurangi jumlah jenis barang di Inventaris atau perpanjang Premium untuk pakai fitur AI lagi.', 'error');
+    return;
+  }
+
   analyzeBtn.disabled = true;
   analyzeBtn.textContent = 'Menganalisis foto...';
   showUploadStatus('AI sedang membaca foto, tunggu sebentar...', 'info');
@@ -231,9 +239,6 @@ async function callGeminiExtraction(base64Image, mimeType) {
 
   // outcome.status === 'error'
   throw new Error(outcome.message || 'Gagal menganalisis foto.');
-}
-
-  return data.items;
 }
 
 // ============================================
@@ -405,6 +410,13 @@ async function handleSaveAllClick() {
     return;
   }
 
+  // Percakapan [Batas Jumlah Barang & Kunci Akun Expired] - jaga-jaga kalau
+  // klinik jadi locked di antara waktu analisis foto & klik simpan.
+  if (CLINIC_LOCKED) {
+    showSaveStatus('Langganan sudah berakhir dan jumlah barang melebihi batas gratis. Kurangi jumlah jenis barang di Inventaris atau perpanjang Premium untuk lanjut.', 'error');
+    return;
+  }
+
   for (const item of itemsToSave) {
     if (!item.nama.trim() || !item.jumlah || item.jumlah <= 0) {
       showSaveStatus(`Barang "${item.nama || '(tanpa nama)'}" harus punya nama dan jumlah > 0.`, 'error');
@@ -475,6 +487,21 @@ async function saveExtractedItemToSupabase(item) {
   if (existingProduct) {
     productId = existingProduct.id;
   } else {
+    // Percakapan [Batas Jumlah Barang & Kunci Akun Expired] - cek limit
+    // HANYA untuk produk baru (bukan restock produk lama).
+    const limitCheck = await supabaseClient.rpc('check_product_limit', {
+      p_clinic_id: CURRENT_CLINIC_ID
+    });
+
+    if (limitCheck.error) throw limitCheck.error;
+
+    if (limitCheck.data.allowed === false) {
+      throw new Error(
+        `Batas jenis barang tercapai (${limitCheck.data.product_count}/${limitCheck.data.max_products}). ` +
+        `Upgrade ke Premium atau hapus barang lama di Inventaris.`
+      );
+    }
+
     const { data: newProduct, error: insertProductError } = await supabaseClient
       .from('products')
       .insert({
