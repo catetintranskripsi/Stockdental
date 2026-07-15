@@ -41,6 +41,7 @@ async function checkClinicAccessAndRenderBanner() {
 
 function renderClinicLockedBanner(accessData) {
   let banner = document.getElementById('clinicLockedBanner');
+  const isNewBanner = !banner;
 
   if (!accessData.locked) {
     if (banner) banner.remove();
@@ -52,7 +53,14 @@ function renderClinicLockedBanner(accessData) {
   if (!banner) {
     banner = document.createElement('div');
     banner.id = 'clinicLockedBanner';
-    banner.style.cssText = 'position:sticky;top:0;z-index:999;background:#c62828;color:#fff;padding:12px 16px;font-size:14px;line-height:1.4;';
+    // Percakapan [Perbaikan Banner] - ganti dari "position:sticky" ke alur
+    // dokumen normal (tanpa position khusus). "sticky" tadinya menumpuk DI
+    // ATAS konten yang sudah ada di body (termasuk tombol Simpan Transaksi
+    // di halaman Input), bukan mendorongnya turun -- jadi tombol jadi
+    // tertutup/tidak kelihatan tanpa scroll. Sekarang banner jadi elemen
+    // biasa paling atas <body>, otomatis mendorong SEMUA konten di
+    // bawahnya turun, tidak mungkin menutupi apa pun lagi.
+    banner.style.cssText = 'z-index:999;background:#c62828;color:#fff;padding:12px 16px;font-size:14px;line-height:1.4;';
     document.body.prepend(banner);
   }
 
@@ -66,4 +74,10 @@ function renderClinicLockedBanner(accessData) {
       <button onclick="window.location.href='inventaris.html'" style="padding:6px 12px;border-radius:6px;border:1px solid #fff;background:transparent;color:#fff;">Kurangi Barang</button>
     </div>
   `;
+
+  // Baru muncul pertama kali di halaman ini -> scroll ke atas biar
+  // user pasti lihat, tidak perlu menebak harus scroll ke mana.
+  if (isNewBanner) {
+    banner.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
 }
