@@ -427,7 +427,16 @@ async function handleStockIn() {
   const category = document.getElementById('category').value.trim();
   const quantity = parseInt(document.getElementById('quantity').value, 10);
   const unit = document.getElementById('unit').value.trim() || 'pcs';
-  const expiryDate = document.getElementById('expiryDate').value || null;
+
+  // Percakapan [Format Tanggal DDMMYYYY] - parse & validasi input manual
+  const expiryRaw = document.getElementById('expiryDate').value;
+  const expiryParsed = parseDDMMYYYY(expiryRaw);
+  if (!expiryParsed.valid) {
+    showStatus(expiryParsed.error, 'error');
+    return;
+  }
+  const expiryDate = expiryParsed.isoDate;
+
   const batchNumber = document.getElementById('batchNumber').value.trim() || null;
   const storageLocation = document.getElementById('storageLocation').value.trim();
   const minimumStockRaw = document.getElementById('minimumStock').value;

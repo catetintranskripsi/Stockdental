@@ -311,7 +311,7 @@ function renderExtractedItems() {
         <div class="field-row">
           <div class="field-group">
             <label>Tanggal Kedaluwarsa</label>
-            <input type="date" class="item-expiry">
+            <input type="text" class="item-expiry" inputmode="numeric" placeholder="DDMMYYYY" maxlength="8">
           </div>
           <div class="field-group">
             <label>Lokasi Simpan</label>
@@ -354,15 +354,26 @@ function renderExtractedItems() {
     row.querySelector('.item-jumlah').addEventListener('input', (e) => updateItemField(item.tempId, 'jumlah', parseFloat(e.target.value) || 0));
     row.querySelector('.item-satuan').addEventListener('change', (e) => updateItemField(item.tempId, 'satuan', e.target.value));
     row.querySelector('.item-kategori').addEventListener('input', (e) => updateItemField(item.tempId, 'kategori', e.target.value));
-    row.querySelector('.item-expiry').addEventListener('input', (e) => updateItemField(item.tempId, 'expiry_date', e.target.value));
+    // Percakapan [Format Tanggal DDMMYYYY] - user mengetik DDMMYYYY.
+    // State internal (item.expiry_date) HANYA diisi kalau formatnya
+    // sudah valid (ISO YYYY-MM-DD) atau dikosongkan -- supaya tidak ada
+    // celah state berisi string mentah yang belum tentu ISO. Kalau user
+    // masih mengetik (format belum lengkap), expiry_date sementara jadi
+    // null dulu (dianggap "belum diisi") sampai formatnya valid.
+    row.querySelector('.item-expiry').addEventListener('input', (e) => {
+      const parsed = parseDDMMYYYY(e.target.value);
+      updateItemField(item.tempId, 'expiry_date', parsed.valid ? parsed.isoDate : null);
+      updateItemField(item.tempId, 'expiry_date_invalid_input', (!parsed.valid && e.target.value.trim() !== ''));
+    });
     row.querySelector('.item-lokasi').addEventListener('input', (e) => updateItemField(item.tempId, 'lokasi_penyimpanan', e.target.value));
     row.querySelector('.item-batch').addEventListener('input', (e) => updateItemField(item.tempId, 'batch_number', e.target.value));
     row.querySelector('.item-minstock').addEventListener('input', (e) => updateItemField(item.tempId, 'minimum_stock', parseFloat(e.target.value) || 0));
 
     // Set value date terpisah setelah elemen ter-attach, untuk hindari bug WebView Android
+    // Ditampilkan sebagai DDMMYYYY (dikonversi dari ISO yang tersimpan di state)
     const expiryInput = row.querySelector('.item-expiry');
     if (item.expiry_date) {
-      expiryInput.value = item.expiry_date;
+      expiryInput.value = formatToDDMMYYYY(item.expiry_date);
     }
 
     extractedItemsList.appendChild(row);
@@ -466,7 +477,15 @@ async function saveExtractedItemToSupabase(item) {
   const quantity = parseInt(item.jumlah, 10);
   const unit = item.satuan || 'pcs';
   const category = item.kategori.trim() || null;
+
+  // Percakapan [Format Tanggal DDMMYYYY] - state item.expiry_date sudah
+  // pasti ISO valid atau null (dijaga sejak listener input). Tolak kalau
+  // user meninggalkan field dalam kondisi "sedang ketik tapi belum valid".
+  if (item.expiry_date_invalid_input) {
+    throw new Error(`${productName}: Tanggal kedaluwarsa belum lengkap/salah. Format: DDMMYYYY.`);
+  }
   const expiryDate = item.expiry_date || null;
+
   const storageLocation = item.lokasi_penyimpanan.trim() || null;
   const batchNumber = item.batch_number.trim() || null;
   const minimumStock = parseFloat(item.minimum_stock) || 0;
