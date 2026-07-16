@@ -155,7 +155,7 @@
 
         <div class="form-group">
           <label for="expiryDate">Tanggal Kedaluwarsa (opsional)</label>
-          <input type="date" id="expiryDate">
+          <input type="text" id="expiryDate" inputmode="numeric" placeholder="DDMMYYYY, contoh: 15082028" maxlength="8">
         </div>
 
         <!-- NOMOR BATCH - searchable, full histori -->
@@ -229,7 +229,8 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/supabase-client.js"></script>
   <script src="js/clinic-access.js"></script>
-  <script src="js/app.js?v=3"></script>
+  <script src="js/date-helper.js"></script>
+  <script src="js/app.js?v=4"></script>
   <script src="js/auth.js"></script>
 </body>
 </html>
