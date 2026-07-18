@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Test create-payment</title>
+<style>
+  body { font-family: sans-serif; padding: 16px; background: #f5f5f5; }
+  h2 { color: #0F6B5C; }
+  label { display: block; margin-top: 12px; font-weight: bold; }
+  input, select { width: 100%; padding: 8px; margin-top: 4px; box-sizing: border-box; }
+  button { margin-top: 16px; width: 100%; padding: 12px; background: #0F6B5C; color: white; border: none; border-radius: 6px; font-size: 16px; }
+  button:disabled { background: #999; }
+  pre { background: #222; color: #0f0; padding: 12px; border-radius: 6px; overflow-x: auto; white-space: pre-wrap; word-break: break-all; margin-top: 16px; }
+  img { max-width: 250px; display: block; margin-top: 12px; border: 1px solid #ccc; }
+  .status { margin-top: 8px; font-weight: bold; }
+</style>
+</head>
+<body>
+
+<h2>Test create-payment</h2>
+
+<label>Supabase URL (project)</label>
+<input type="text" id="supabaseUrl" placeholder="https://xxxxx.supabase.co">
+
+<label>Email login (akun Supabase Auth kamu)</label>
+<input type="text" id="email" placeholder="email@kamu.com">
+
+<label>Password</label>
+<input type="password" id="password">
+
+<label>Supabase Anon Key</label>
+<input type="text" id="anonKey" placeholder="anon key dari Supabase Dashboard > Settings > API">
+
+<label>Billing Period</label>
+<select id="billingPeriod">
+  <option value="monthly">monthly (30 hari)</option>
+  <option value="yearly">yearly (360 hari)</option>
+</select>
+
+<button id="btnTest">Login + Test create-payment</button>
+
+<div class="status" id="statusText"></div>
+<img id="qrImg" style="display:none;">
+<pre id="output"></pre>
+
+<script>
+document.getElementById('btnTest').addEventListener('click', async () => {
+  const btn = document.getElementById('btnTest');
+  const output = document.getElementById('output');
+  const statusText = document.getElementById('statusText');
+  const qrImg = document.getElementById('qrImg');
+
+  const supabaseUrl = document.getElementById('supabaseUrl').value.trim();
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+  const anonKey = document.getElementById('anonKey').value.trim();
+  const billingPeriod = document.getElementById('billingPeriod').value;
+
+  if (!supabaseUrl || !email || !password || !anonKey) {
+    statusText.textContent = 'Isi semua field dulu.';
+    return;
+  }
+
+  btn.disabled = true;
+  output.textContent = '';
+  qrImg.style.display = 'none';
+
+  try {
+    // LANGKAH 1: Login dulu buat dapat access token
+    statusText.textContent = 'Sedang login...';
+    const loginRes = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': anonKey
+      },
+      body: JSON.stringify({ email, password })
+    });
+    const loginData = await loginRes.json();
+
+    if (!loginRes.ok) {
+      statusText.textContent = 'Login gagal.';
+      output.textContent = JSON.stringify(loginData, null, 2);
+      btn.disabled = false;
+      return;
+    }
+
+    const accessToken = loginData.access_token;
+    statusText.textContent = 'Login sukses. Memanggil create-payment...';
+
+    // LANGKAH 2: Panggil Edge Function create-payment
+    const funcRes = await fetch(`${supabaseUrl}/functions/v1/create-payment`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`,
+        'apikey': anonKey
+      },
+      body: JSON.stringify({ billing_period: billingPeriod })
+    });
+    const funcData = await funcRes.json();
+
+    output.textContent = JSON.stringify(funcData, null, 2);
+
+    if (funcRes.ok && funcData.qr_image_url) {
+      statusText.textContent = '✅ Berhasil! QR muncul di bawah.';
+      qrImg.src = funcData.qr_image_url;
+      qrImg.style.display = 'block';
+    } else {
+      statusText.textContent = '❌ Gagal. Lihat detail di bawah.';
+    }
+
+  } catch (err) {
+    statusText.textContent = '❌ Error jaringan/script.';
+    output.textContent = String(err);
+  }
+
+  btn.disabled = false;
+});
+</script>
+
+</body>
+</html>
