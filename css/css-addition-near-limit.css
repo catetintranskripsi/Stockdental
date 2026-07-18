@@ -1,0 +1,11 @@
+/* Percakapan [Fix Badge Jumlah Barang Premium]
+   Catatan kecil di bawah badge "X jenis barang" saat user free
+   mendekati batas 70 jenis barang. Kalau class .near-limit sudah
+   ada sebelumnya (warna badge utama), style ini HANYA untuk baris
+   catatan tambahan di bawahnya -- tidak menimpa apa pun yang sudah ada. */
+.summary-near-limit-note {
+  color: #D97706; /* amber, konsisten dengan warna aksen design system */
+  font-size: 13px;
+  margin-top: 2px;
+  font-weight: 500;
+}
