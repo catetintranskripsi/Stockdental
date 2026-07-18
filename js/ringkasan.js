@@ -13,6 +13,7 @@ const RINGKASAN_MAX_ITEMS = 5;
 // Dipanggil oleh auth-check.js setelah user terverifikasi login
 async function onPageReady() {
   await loadRingkasan();
+  initUpgradeBanner();
 }
 
 async function loadRingkasan() {
@@ -339,4 +340,51 @@ function escapeHtml(str) {
   const div = document.createElement('div');
   div.textContent = String(str);
   return div.innerHTML;
+}
+
+// ============================================
+// BANNER UPGRADE PREMIUM (Percakapan [Banner Upgrade Premium])
+// Hanya tampil untuk tier=free. TIDAK memanggil RPC baru -- baca
+// LAST_KNOWN_CLINIC_ACCESS yang sudah diisi checkClinicAccessAndRenderBanner()
+// di clinic-access.js (dipanggil dari auth-check.js SEBELUM onPageReady ini
+// jalan, sesuai urutan <script> di ringkasan.html).
+// ============================================
+const UPGRADE_BANNER_MESSAGES = [
+  'Upgrade Premium — kuota AI 3000/bulan & bebas limit jenis barang',
+  'Sudah dekat 70 jenis barang di Free? Upgrade Premium biar tidak terkunci',
+  'Premium cuma Rp29.000/30 hari — lebih murah dari sekali beli bahan tambal'
+];
+
+function initUpgradeBanner() {
+  const banner = document.getElementById('premiumUpgradeBanner');
+  if (!banner) return;
+
+  // LAST_KNOWN_CLINIC_ACCESS diisi oleh clinic-access.js. Kalau karena
+  // sesuatu hal belum terisi (misal RPC-nya gagal), aman-nya banner
+  // TIDAK ditampilkan -- jangan menebak tier.
+  if (!LAST_KNOWN_CLINIC_ACCESS || LAST_KNOWN_CLINIC_ACCESS.tier !== 'free') {
+    return;
+  }
+
+  // Sudah ditutup di sesi browser ini? jangan muncul lagi sampai reload.
+  if (sessionStorage.getItem('upgrade_banner_dismissed') === 'true') {
+    return;
+  }
+
+  const textEl = document.getElementById('upgradeBannerText');
+  const closeBtn = document.getElementById('upgradeBannerClose');
+  const lihatBtn = document.getElementById('upgradeBannerBtn');
+
+  const randomMsg = UPGRADE_BANNER_MESSAGES[Math.floor(Math.random() * UPGRADE_BANNER_MESSAGES.length)];
+  textEl.textContent = randomMsg;
+  banner.style.display = 'block';
+
+  lihatBtn.addEventListener('click', () => {
+    window.location.href = 'upgrade.html';
+  });
+
+  closeBtn.addEventListener('click', () => {
+    banner.style.display = 'none';
+    sessionStorage.setItem('upgrade_banner_dismissed', 'true');
+  });
 }
