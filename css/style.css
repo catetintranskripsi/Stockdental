@@ -294,6 +294,13 @@ input::placeholder {
 label,
 .form-label {
   display: block;
+  width: fit-content; /* Percakapan [Fix Area Klik Label & Field Satuan] -
+    tanpa ini, label melebar 100% container, jadi area klik "kosong" di
+    kanan teks label ikut memicu fokus ke input (via atribut for="..."),
+    yang bikin dropdown autocomplete kebuka tanpa sengaja saat tap area
+    yang secara visual terlihat kosong. Tata letak tetap sama karena
+    masih display:block (turun baris baru seperti biasa), cuma lebar
+    area klik-nya jadi seketat teksnya sendiri. */
   font-size: 0.85rem;
   font-weight: 600;
   color: var(--color-text-muted);
