@@ -317,3 +317,73 @@
 /* ---------- 4. SUB-TAB METODE INPUT (index.html) ---------- */
 /* Markup baru yang perlu ditambahkan ke index.html, gaya sama persis
    dengan yang sudah dipasang di foto.html - lihat .sub-tab-row di style.css */
+
+/* ---------- 5. BANNER UPGRADE PREMIUM (ringkasan.html) ---------- */
+/* Percakapan [Banner Upgrade Premium] - hanya tampil untuk tier=free.
+   Ditampilkan/disembunyikan via JS di ringkasan.js, baca dari
+   LAST_KNOWN_CLINIC_ACCESS.tier (sudah diisi clinic-access.js) */
+#premiumUpgradeBanner {
+  background: linear-gradient(135deg, var(--color-primary), #14876f);
+  color: #ffffff;
+  padding: 12px 16px;
+  border-radius: 12px;
+  margin-bottom: 16px;
+  font-family: 'Inter', sans-serif;
+}
+
+.upgrade-banner-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+#upgradeBannerText {
+  font-size: 14px;
+  font-weight: 500;
+  flex: 1;
+  line-height: 1.4;
+}
+
+.upgrade-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+#upgradeBannerBtn {
+  background: var(--color-accent);
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: 'Inter', sans-serif;
+  cursor: pointer;
+  min-height: 44px;
+  min-width: 44px;
+  white-space: nowrap;
+}
+
+#upgradeBannerClose {
+  background: transparent;
+  border: none;
+  color: #ffffff;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0;
+}
+
+@media (max-width: 420px) {
+  .upgrade-banner-content {
+    flex-wrap: wrap;
+  }
+  #upgradeBannerText {
+    width: 100%;
+  }
+}
