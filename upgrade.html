@@ -7,119 +7,208 @@
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="css/pages-override.css">
   <style>
-    /* Percakapan [Batas Jumlah Barang & Kunci Akun Expired] - kerangka
-       sederhana. Isi pembayaran aktual (QRIS, webhook) dibuat di sesi
-       Payment Gateway Integration terpisah -- tombol di sini masih placeholder. */
-    .plan-card {
-      background: #fff;
-      border: 1px solid #ddd;
+    /* ============================================
+       Percakapan [Halaman Upgrade Premium]
+       Style khusus halaman ini saja (bukan komponen yang dipakai ulang
+       di halaman lain), jadi ditaruh inline di sini, bukan di
+       pages-override.css. Hanya pakai custom property yang SUDAH
+       terkonfirmasi ada: --color-primary, --color-accent, --color-text,
+       --color-text-muted. Kalau nama variabel di style.css kamu beda,
+       sesuaikan di bagian :root override kecil di bawah.
+       ============================================ */
+    .upgrade-hero {
+      background: linear-gradient(135deg, var(--color-primary), #14876f);
+      color: #ffffff;
+      padding: 28px 20px;
+      border-radius: 16px;
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .upgrade-hero h1 {
+      font-family: 'Poppins', sans-serif;
+      font-size: 22px;
+      margin: 0 0 8px;
+    }
+    .upgrade-hero p {
+      font-size: 14px;
+      opacity: 0.9;
+      margin: 0;
+    }
+
+    .price-cards {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    .price-card {
+      border: 2px solid #e5e7eb;
       border-radius: 12px;
       padding: 16px;
-      margin-bottom: 12px;
+      background: #fff;
     }
-    .plan-card.premium {
-      border: 2px solid var(--color-primary);
+    .price-card.highlight {
+      border-color: var(--color-accent);
+      position: relative;
     }
-    .plan-title {
-      font-size: 16px;
-      font-weight: 700;
+    .price-card.highlight::before {
+      content: "Paling Hemat";
+      position: absolute;
+      top: -11px;
+      right: 16px;
+      background: var(--color-accent);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 20px;
+    }
+    .price-card-label {
+      font-size: 13px;
+      color: var(--color-text-muted);
       margin-bottom: 4px;
     }
-    .plan-price {
-      font-size: 22px;
+    .price-card-amount {
+      font-family: 'Poppins', sans-serif;
+      font-size: 26px;
       font-weight: 700;
-      color: var(--color-primary);
-      margin-bottom: 10px;
+      color: var(--color-text);
     }
-    .plan-price small {
-      font-size: 13px;
+    .price-card-amount small {
+      font-size: 14px;
       font-weight: 400;
-      color: #666;
+      color: var(--color-text-muted);
     }
-    .plan-features {
-      list-style: none;
-      padding: 0;
-      margin: 0 0 14px 0;
-      font-size: 14px;
-      color: #444;
-    }
-    .plan-features li {
-      padding: 4px 0;
-    }
-    .plan-buy-btn {
+
+    .compare-table {
       width: 100%;
-      padding: 12px;
-      border-radius: 8px;
-      font-size: 15px;
-      border: none;
-      background: var(--color-primary);
-      color: #fff;
-      cursor: pointer;
+      border-collapse: collapse;
+      background: #fff;
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 24px;
+      font-size: 13px;
     }
-    .plan-note {
-      font-size: 12px;
-      color: #888;
+    .compare-table th, .compare-table td {
+      padding: 12px 10px;
       text-align: center;
-      margin-top: 6px;
+      border-bottom: 1px solid #eee;
     }
-    .current-status {
-      background: #f0f7f4;
+    .compare-table th:first-child, .compare-table td:first-child {
+      text-align: left;
+      color: var(--color-text);
+      font-weight: 500;
+    }
+    .compare-table thead th {
+      background: #f8f9fa;
+      font-family: 'Poppins', sans-serif;
+      font-weight: 600;
+    }
+    .compare-table thead th.col-premium {
+      color: var(--color-primary);
+    }
+    .compare-table td.yes {
+      color: var(--color-primary);
+      font-weight: 700;
+    }
+
+    .upgrade-note {
+      font-size: 12px;
+      color: var(--color-text-muted);
+      text-align: center;
+      margin-bottom: 20px;
+      line-height: 1.5;
+    }
+
+    .btn-upgrade-cta {
+      display: block;
+      width: 100%;
+      background: var(--color-accent);
+      color: #fff;
+      border: none;
       border-radius: 10px;
-      padding: 12px;
-      font-size: 14px;
+      padding: 14px;
+      font-size: 15px;
+      font-weight: 600;
+      font-family: 'Inter', sans-serif;
+      cursor: pointer;
+      min-height: 48px;
+    }
+
+    .back-link {
+      display: inline-block;
       margin-bottom: 16px;
+      color: var(--color-text-muted);
+      text-decoration: none;
+      font-size: 14px;
     }
   </style>
 </head>
 <body>
 
-  <div class="container" id="authContainer">
-    <div id="loginRequiredView">
-      <h1>StockDental</h1>
-      <h2>Silakan login terlebih dahulu</h2>
-      <p><a href="index.html">Kembali ke halaman login</a></p>
-    </div>
-  </div>
+  <div class="container" style="padding-bottom: 40px;">
 
-  <div class="container" id="appContainer" style="display:none; padding-bottom: 80px;">
-    <div class="app-header">
-      <div>
-        <h1>StockDental</h1>
-        <h2>Upgrade Premium</h2>
+    <a href="ringkasan.html" class="back-link">&larr; Kembali ke Ringkasan</a>
+
+    <div class="upgrade-hero">
+      <h1>Upgrade ke Premium</h1>
+      <p>Kuota AI lebih besar, bebas batas jenis barang, tanpa antre saat ramai.</p>
+    </div>
+
+    <div class="price-cards">
+      <div class="price-card">
+        <div class="price-card-label">Paket 30 Hari</div>
+        <div class="price-card-amount">Rp29.000 <small>/ 30 hari</small></div>
       </div>
-      <button id="logoutBtn" class="btn-secondary">Logout</button>
+      <div class="price-card highlight">
+        <div class="price-card-label">Paket 360 Hari</div>
+        <div class="price-card-amount">Rp290.000 <small>/ 360 hari</small></div>
+      </div>
     </div>
 
-    <div id="currentStatusBox" class="current-status">Memuat status langganan...</div>
+    <table class="compare-table">
+      <thead>
+        <tr>
+          <th>Fitur</th>
+          <th>Free</th>
+          <th class="col-premium">Premium</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Input manual (masuk/keluar/opname)</td>
+          <td>Unlimited*</td>
+          <td class="yes">Unlimited</td>
+        </tr>
+        <tr>
+          <td>Jenis barang di Inventaris</td>
+          <td>Maks. 70</td>
+          <td class="yes">Bebas batas</td>
+        </tr>
+        <tr>
+          <td>Kuota AI (Foto &amp; Suara) / bulan</td>
+          <td>100</td>
+          <td class="yes">3.000</td>
+        </tr>
+        <tr>
+          <td>Prioritas antrian saat ramai</td>
+          <td>Normal</td>
+          <td class="yes">Didahulukan</td>
+        </tr>
+      </tbody>
+    </table>
 
-    <div id="plansContainer">
-      <p class="loading-text">Memuat paket...</p>
-    </div>
+    <p class="upgrade-note">
+      *Input manual di akun Free otomatis terkunci sementara kalau jenis barang
+      sudah melebihi 70 — kurangi/gabungkan barang atau upgrade Premium untuk
+      membuka kembali.
+    </p>
+
+    <button class="btn-upgrade-cta" onclick="window.location.href='mailto:GANTI_EMAIL_KAMU@example.com?subject=Upgrade Premium StockDental'">
+      Upgrade Sekarang
+    </button>
+
   </div>
 
-  <nav class="bottom-nav" id="bottomNav" style="display:none;">
-    <a href="ringkasan.html" class="nav-item">
-      <span class="nav-icon">📊</span>
-      <span class="nav-label">Ringkasan</span>
-    </a>
-    <a href="index.html" class="nav-item">
-      <span class="nav-icon">📝</span>
-      <span class="nav-label">Input</span>
-    </a>
-    <a href="inventaris.html" class="nav-item">
-      <span class="nav-icon">📦</span>
-      <span class="nav-label">Inventaris</span>
-    </a>
-    <a href="history.html" class="nav-item">
-      <span class="nav-icon">📈</span>
-      <span class="nav-label">Riwayat</span>
-    </a>
-  </nav>
-
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="js/supabase-client.js"></script>
-  <script src="js/clinic-access.js"></script>
-  <script src="js/upgrade.js"></script>
-  <script src="js/auth-check.js"></script>
 </body>
 </html>

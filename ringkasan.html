@@ -18,6 +18,18 @@
   <!-- ============ RINGKASAN (tampil setelah login) ============ -->
   <div class="container" id="appContainer" style="display:none; padding-bottom: 80px;">
 
+    <!-- ============ BANNER UPGRADE PREMIUM (Percakapan [Banner Upgrade Premium]) ============ -->
+    <!-- Hanya tampil untuk tier=free. Disisipkan/dihapus via JS di ringkasan.js -->
+    <div id="premiumUpgradeBanner" style="display:none;">
+      <div class="upgrade-banner-content">
+        <span id="upgradeBannerText"></span>
+        <div class="upgrade-banner-actions">
+          <button id="upgradeBannerBtn" type="button">Lihat Premium</button>
+          <button id="upgradeBannerClose" type="button" aria-label="Tutup">&times;</button>
+        </div>
+      </div>
+    </div>
+
     <div class="app-header">
       <div>
         <h1>StockDental</h1>
