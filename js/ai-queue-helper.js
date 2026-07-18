@@ -143,8 +143,8 @@ function renderQuotaBlockedCard(outcome) {
   let title, message, showUpgradeButton;
 
   if (outcome.status === 'quota_exceeded' && outcome.reason === 'clinic_quota_exceeded') {
-    title = 'Kuota AI Hari Ini Sudah Habis';
-    message = `Klinik ini sudah pakai ${outcome.used}/${outcome.limit} kuota AI hari ini. Kuota baru lagi besok jam 00:00. Sementara itu, kamu tetap bisa catat lewat Input Manual — tidak pakai kuota sama sekali.`;
+    title = 'Kuota AI Sudah Habis';
+    message = `Klinik ini sudah pakai ${outcome.used}/${outcome.limit} kuota AI untuk periode langganan saat ini. Kuota akan tersedia lagi setelah perpanjang langganan. Sementara itu, kamu tetap bisa catat lewat Input Manual — tidak pakai kuota sama sekali.`;
     showUpgradeButton = true;
   } else if (outcome.status === 'quota_exceeded' && outcome.reason === 'global_ceiling_reached') {
     title = 'AI Sedang Sangat Sibuk Hari Ini';
