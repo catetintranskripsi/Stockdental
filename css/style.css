@@ -518,3 +518,48 @@ label,
     transition: none !important;
   }
 }
+/* ============================================
+   Percakapan [Perbaikan Tampilan Dropdown Autocomplete]
+   Definisi CSS untuk .product-search-results dan .product-search-item.
+   Dipakai bersama oleh: index.html (Input Manual), foto.html, suara.html,
+   inventaris.html (form Edit) -- semua field autocomplete di halaman
+   tersebut memakai class yang sama ini, jadi ditaruh di style.css
+   (bukan foto-override.css/suara-override.css) supaya otomatis
+   konsisten di semua halaman tanpa perlu ulangi definisi.
+
+   SEBELUM INI: class .product-search-results/.product-search-item
+   TIDAK terdefinisi sama sekali di CSS manapun -- makanya tampilannya
+   polos/tidak konsisten di foto.html dan suara.html.
+   ============================================ */
+
+.product-search-results {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  margin-top: 4px;
+  max-height: 240px;
+  overflow-y: auto;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-card-hover);
+}
+
+.product-search-item {
+  padding: 12px 14px;
+  font-size: 0.95rem;
+  color: var(--color-text);
+  cursor: pointer;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.product-search-item:last-child {
+  border-bottom: none;
+}
+
+.product-search-item:hover,
+.product-search-item:active {
+  background: var(--color-primary-light);
+}
