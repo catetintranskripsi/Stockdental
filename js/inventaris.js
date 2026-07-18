@@ -937,6 +937,18 @@ const ROW_HEIGHT = 20;
 const COL_X = { nama: MARGIN, kategori: 220, stok: 340, minimum: 400, status: 460, lokasi: 520 };
 
 async function handleExportPdf() {
+  // Percakapan [Export PDF - Fitur Premium] - Export PDF adalah fitur
+  // khusus Premium. Baca LAST_KNOWN_CLINIC_ACCESS.tier (sudah diisi
+  // clinic-access.js sebelum onPageReady berjalan, sama seperti pola
+  // yang dipakai banner upgrade di ringkasan.js). TIDAK memanggil RPC
+  // baru -- tier yang dibaca di sini sudah otomatis benar walau klinik
+  // premium-nya sudah expired, karena check_clinic_access sudah pakai
+  // get_clinic_tier() yang mempertimbangkan expires_at.
+  if (!LAST_KNOWN_CLINIC_ACCESS || LAST_KNOWN_CLINIC_ACCESS.tier !== 'premium') {
+    showExportPremiumGate();
+    return;
+  }
+
   exportPdfBtn.disabled = true;
   exportPdfBtn.textContent = 'Membuat PDF...';
   hideExportStatus();
@@ -1083,6 +1095,22 @@ function downloadPdfBytes(pdfBytes, filename) {
 function showExportStatus(message, type) {
   exportStatus.textContent = message;
   exportStatus.className = 'status-message status-' + type;
+  exportStatus.style.display = 'block';
+}
+
+// Percakapan [Export PDF - Fitur Premium] - pakai innerHTML (bukan
+// showExportStatus yang textContent-only) supaya bisa sisipkan tombol
+// langsung ke upgrade.html, sesuai pola clinicLockedBanner di
+// clinic-access.js.
+function showExportPremiumGate() {
+  exportStatus.className = 'status-message status-error';
+  exportStatus.innerHTML = `
+    Export PDF adalah fitur Premium.
+    <button type="button" onclick="window.location.href='upgrade.html'"
+      style="margin-left:8px;padding:4px 10px;border-radius:6px;border:none;background:var(--color-accent);color:#fff;font-weight:600;cursor:pointer;">
+      Lihat Premium
+    </button>
+  `;
   exportStatus.style.display = 'block';
 }
 
