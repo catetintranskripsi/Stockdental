@@ -28,16 +28,18 @@ let extractedItems = []; // array hasil ekstraksi yang sedang diedit user
 let ALL_PRODUCT_NAMES = [];
 let ALL_CATEGORIES = [];
 let ALL_LOCATIONS = [];
+let ALL_UNITS = [];
 const STARTER_CATEGORIES = ['APD', 'BMHP', 'Obat', 'Alat Kesehatan', 'Bahan Tambal/Restorasi', 'Lainnya'];
+const STARTER_UNITS = ['pcs', 'box', 'botol', 'tube', 'dus', 'pack', 'set', 'lembar'];
 
 async function loadAutocompleteOptionsFoto() {
   const { data: products, error } = await supabaseClient
     .from('products')
-    .select('name, category, storage_location')
+    .select('name, category, storage_location, unit')
     .eq('clinic_id', CURRENT_CLINIC_ID);
 
   if (error) {
-    console.error('Gagal load histori nama/kategori/lokasi:', error);
+    console.error('Gagal load histori nama/kategori/lokasi/satuan:', error);
     return;
   }
 
@@ -45,6 +47,7 @@ async function loadAutocompleteOptionsFoto() {
     ALL_PRODUCT_NAMES = uniqueMerge([], products.map(function(p) { return p.name; }).filter(Boolean));
     ALL_CATEGORIES = uniqueMerge(STARTER_CATEGORIES, products.map(function(p) { return p.category; }).filter(Boolean));
     ALL_LOCATIONS = uniqueMerge([], products.map(function(p) { return p.storage_location; }).filter(Boolean));
+    ALL_UNITS = uniqueMerge(STARTER_UNITS, products.map(function(p) { return p.unit; }).filter(Boolean));
   }
 }
 
@@ -320,16 +323,10 @@ function renderExtractedItems() {
             <label>Jumlah</label>
             <input type="number" class="item-jumlah" value="${item.jumlah}" min="0" step="0.01">
           </div>
-          <div class="field-group">
+          <div class="field-group" style="position:relative;">
             <label>Satuan</label>
-            <select class="item-satuan">
-              <option value="pcs" ${item.satuan === 'pcs' ? 'selected' : ''}>pcs</option>
-              <option value="box" ${item.satuan === 'box' ? 'selected' : ''}>box</option>
-              <option value="botol" ${item.satuan === 'botol' ? 'selected' : ''}>botol</option>
-              <option value="tube" ${item.satuan === 'tube' ? 'selected' : ''}>tube</option>
-              <option value="dus" ${item.satuan === 'dus' ? 'selected' : ''}>dus</option>
-              <option value="lainnya" ${item.satuan === 'lainnya' ? 'selected' : ''}>lainnya</option>
-            </select>
+            <input type="text" class="item-satuan" value="${escapeHtml(item.satuan)}" placeholder="pcs / box / botol" autocomplete="off">
+            <div class="item-satuan-results product-search-results" style="display:none;"></div>
           </div>
         </div>
 
@@ -384,7 +381,7 @@ function renderExtractedItems() {
 
     row.querySelector('.item-nama').addEventListener('input', (e) => updateItemField(item.tempId, 'nama', e.target.value));
     row.querySelector('.item-jumlah').addEventListener('input', (e) => updateItemField(item.tempId, 'jumlah', parseFloat(e.target.value) || 0));
-    row.querySelector('.item-satuan').addEventListener('change', (e) => updateItemField(item.tempId, 'satuan', e.target.value));
+    row.querySelector('.item-satuan').addEventListener('input', (e) => updateItemField(item.tempId, 'satuan', e.target.value));
     row.querySelector('.item-kategori').addEventListener('input', (e) => updateItemField(item.tempId, 'kategori', e.target.value));
     // Percakapan [Format Tanggal DDMMYYYY] - user mengetik DDMMYYYY.
     // State internal (item.expiry_date) HANYA diisi kalau formatnya
@@ -428,6 +425,11 @@ function renderExtractedItems() {
       row.querySelector('.item-lokasi'),
       row.querySelector('.item-lokasi-results'),
       function() { return ALL_LOCATIONS; }
+    );
+    setupSimpleAutocompleteOnElement(
+      row.querySelector('.item-satuan'),
+      row.querySelector('.item-satuan-results'),
+      function() { return ALL_UNITS; }
     );
   });
 }
