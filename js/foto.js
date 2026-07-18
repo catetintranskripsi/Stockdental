@@ -22,6 +22,32 @@ let selectedPhotoBase64 = null;
 let selectedPhotoMimeType = null;
 let extractedItems = []; // array hasil ekstraksi yang sedang diedit user
 
+// Percakapan [Perbaikan Dropdown Foto/Suara/Edit Inventaris] - daftar
+// untuk autocomplete field Nama/Kategori/Lokasi, sama sumbernya dengan
+// app.js (histori dari tabel products, plus starter list kategori).
+let ALL_PRODUCT_NAMES = [];
+let ALL_CATEGORIES = [];
+let ALL_LOCATIONS = [];
+const STARTER_CATEGORIES = ['APD', 'BMHP', 'Obat', 'Alat Kesehatan', 'Bahan Tambal/Restorasi', 'Lainnya'];
+
+async function loadAutocompleteOptionsFoto() {
+  const { data: products, error } = await supabaseClient
+    .from('products')
+    .select('name, category, storage_location')
+    .eq('clinic_id', CURRENT_CLINIC_ID);
+
+  if (error) {
+    console.error('Gagal load histori nama/kategori/lokasi:', error);
+    return;
+  }
+
+  if (products) {
+    ALL_PRODUCT_NAMES = uniqueMerge([], products.map(function(p) { return p.name; }).filter(Boolean));
+    ALL_CATEGORIES = uniqueMerge(STARTER_CATEGORIES, products.map(function(p) { return p.category; }).filter(Boolean));
+    ALL_LOCATIONS = uniqueMerge([], products.map(function(p) { return p.storage_location; }).filter(Boolean));
+  }
+}
+
 // Elemen-elemen DOM (di-query sekali di top level, aman karena DOM sudah ada
 // walau appContainer masih display:none saat ini)
 const photoInput = document.getElementById('photoInput');
@@ -49,6 +75,9 @@ function onPageReady() {
   addManualRowBtn.addEventListener('click', handleAddManualRow);
   cancelResultBtn.addEventListener('click', resetFotoPage);
   saveAllBtn.addEventListener('click', handleSaveAllClick);
+
+  // Percakapan [Perbaikan Dropdown Foto/Suara/Edit Inventaris]
+  loadAutocompleteOptionsFoto();
 }
 
 // ============================================
@@ -280,9 +309,10 @@ function renderExtractedItems() {
       </div>
 
       <div class="item-fields">
-        <div class="field-group">
+        <div class="field-group" style="position:relative;">
           <label>Nama Barang</label>
-          <input type="text" class="item-nama" value="${escapeHtml(item.nama)}" placeholder="Nama barang">
+          <input type="text" class="item-nama" value="${escapeHtml(item.nama)}" placeholder="Nama barang" autocomplete="off">
+          <div class="item-nama-results product-search-results" style="display:none;"></div>
         </div>
 
         <div class="field-row">
@@ -303,9 +333,10 @@ function renderExtractedItems() {
           </div>
         </div>
 
-        <div class="field-group">
+        <div class="field-group" style="position:relative;">
           <label>Kategori</label>
-          <input type="text" class="item-kategori" value="${escapeHtml(item.kategori)}" placeholder="Misal: APD, Obat, Alat">
+          <input type="text" class="item-kategori" value="${escapeHtml(item.kategori)}" placeholder="Misal: APD, Obat, Alat" autocomplete="off">
+          <div class="item-kategori-results product-search-results" style="display:none;"></div>
         </div>
 
         <div class="field-row">
@@ -313,9 +344,10 @@ function renderExtractedItems() {
             <label>Tanggal Kedaluwarsa</label>
             <input type="text" class="item-expiry" inputmode="numeric" placeholder="DDMMYYYY" maxlength="8">
           </div>
-          <div class="field-group">
+          <div class="field-group" style="position:relative;">
             <label>Lokasi Simpan</label>
-            <input type="text" class="item-lokasi" value="${escapeHtml(item.lokasi_penyimpanan)}" placeholder="Misal: Lemari A">
+            <input type="text" class="item-lokasi" value="${escapeHtml(item.lokasi_penyimpanan)}" placeholder="Misal: Lemari A" autocomplete="off">
+            <div class="item-lokasi-results product-search-results" style="display:none;"></div>
           </div>
         </div>
 
@@ -377,6 +409,26 @@ function renderExtractedItems() {
     }
 
     extractedItemsList.appendChild(row);
+
+    // Percakapan [Perbaikan Dropdown Foto/Suara/Edit Inventaris] - pasang
+    // autocomplete SETELAH row di-attach ke DOM (elemen ini baru lahir
+    // tiap kali renderExtractedItems() jalan, beda dari app.js yang
+    // elemennya statis dan dipasang sekali saja).
+    setupSimpleAutocompleteOnElement(
+      row.querySelector('.item-nama'),
+      row.querySelector('.item-nama-results'),
+      function() { return ALL_PRODUCT_NAMES; }
+    );
+    setupSimpleAutocompleteOnElement(
+      row.querySelector('.item-kategori'),
+      row.querySelector('.item-kategori-results'),
+      function() { return ALL_CATEGORIES; }
+    );
+    setupSimpleAutocompleteOnElement(
+      row.querySelector('.item-lokasi'),
+      row.querySelector('.item-lokasi-results'),
+      function() { return ALL_LOCATIONS; }
+    );
   });
 }
 

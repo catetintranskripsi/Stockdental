@@ -26,6 +26,35 @@ let EDITING_ITEM_ID = null; // product id dari card yang sedang dalam mode edit,
 let SELECTION_MODE = false;
 let SELECTED_IDS = new Set(); // maksimal 2 product id
 
+// Percakapan [Perbaikan Dropdown Foto/Suara/Edit Inventaris] - daftar
+// untuk autocomplete di form Edit Data Barang (field Nama/Kategori/Satuan/Lokasi).
+// Sumbernya sama dengan app.js: histori dari tabel products + starter list.
+let ALL_PRODUCT_NAMES = [];
+let ALL_CATEGORIES = [];
+let ALL_LOCATIONS = [];
+let ALL_UNITS = [];
+const STARTER_CATEGORIES = ['APD', 'BMHP', 'Obat', 'Alat Kesehatan', 'Bahan Tambal/Restorasi', 'Lainnya'];
+const STARTER_UNITS = ['pcs', 'box', 'botol', 'tube', 'dus', 'pack', 'set', 'lembar'];
+
+async function loadAutocompleteOptionsInventaris() {
+  const { data: products, error } = await supabaseClient
+    .from('products')
+    .select('name, category, storage_location, unit')
+    .eq('clinic_id', CURRENT_CLINIC_ID);
+
+  if (error) {
+    console.error('Gagal load histori nama/kategori/lokasi/satuan:', error);
+    return;
+  }
+
+  if (products) {
+    ALL_PRODUCT_NAMES = uniqueMerge([], products.map(function(p) { return p.name; }).filter(Boolean));
+    ALL_CATEGORIES = uniqueMerge(STARTER_CATEGORIES, products.map(function(p) { return p.category; }).filter(Boolean));
+    ALL_LOCATIONS = uniqueMerge([], products.map(function(p) { return p.storage_location; }).filter(Boolean));
+    ALL_UNITS = uniqueMerge(STARTER_UNITS, products.map(function(p) { return p.unit; }).filter(Boolean));
+  }
+}
+
 const inventarisSearchInput = document.getElementById('inventarisSearchInput');
 const inventarisSummary = document.getElementById('inventarisSummary');
 const inventarisList = document.getElementById('inventarisList');
@@ -46,6 +75,12 @@ const mergeCancelBtn = document.getElementById('mergeCancelBtn');
 // Dipanggil oleh auth-check.js setelah user terverifikasi login
 async function onPageReady() {
   await loadInventaris();
+
+  // Percakapan [Perbaikan Dropdown Foto/Suara/Edit Inventaris] - load
+  // daftar autocomplete untuk form Edit. Tidak perlu di-await sebelum
+  // form edit dibuka, tapi dipanggil di awal supaya sudah siap saat
+  // user pertama kali tap "Edit".
+  loadAutocompleteOptionsInventaris();
 
   inventarisSearchInput.addEventListener('input', () => {
     CURRENT_PAGE = 1; // reset ke halaman 1 tiap kali pencarian berubah
@@ -198,6 +233,33 @@ function buildItemCard(p) {
     </div>
   `;
 
+  // Percakapan [Perbaikan Dropdown Foto/Suara/Edit Inventaris] - pasang
+  // autocomplete di form edit, HANYA kalau card ini sedang dalam mode
+  // edit (form-nya baru lahir lewat innerHTML di atas, elemen di dalam
+  // form belum pernah dipasangi listener sebelum baris ini).
+  if (EDITING_ITEM_ID === p.id) {
+    setupSimpleAutocompleteOnElement(
+      item.querySelector('[data-field="name"]'),
+      item.querySelector('.edit-name-results'),
+      function() { return ALL_PRODUCT_NAMES; }
+    );
+    setupSimpleAutocompleteOnElement(
+      item.querySelector('[data-field="category"]'),
+      item.querySelector('.edit-category-results'),
+      function() { return ALL_CATEGORIES; }
+    );
+    setupSimpleAutocompleteOnElement(
+      item.querySelector('[data-field="unit"]'),
+      item.querySelector('.edit-unit-results'),
+      function() { return ALL_UNITS; }
+    );
+    setupSimpleAutocompleteOnElement(
+      item.querySelector('[data-field="storage_location"]'),
+      item.querySelector('.edit-location-results'),
+      function() { return ALL_LOCATIONS; }
+    );
+  }
+
   // Klik di area manapun pada card (kecuali di dalam expand content) = toggle expand
   // ATAU, kalau sedang dalam mode pilih-untuk-gabung, klik = toggle pilihan checkbox
   item.addEventListener('click', (e) => {
@@ -311,21 +373,25 @@ function buildExpandContent(p) {
 function buildEditForm(p) {
   return `
     <div class="edit-form">
-      <div class="edit-form-group">
+      <div class="edit-form-group" style="position:relative;">
         <label>Nama Barang</label>
-        <input type="text" class="edit-input" data-field="name" value="${escapeAttr(p.name)}">
+        <input type="text" class="edit-input" data-field="name" value="${escapeAttr(p.name)}" autocomplete="off">
+        <div class="edit-name-results product-search-results" style="display:none;"></div>
       </div>
-      <div class="edit-form-group">
+      <div class="edit-form-group" style="position:relative;">
         <label>Kategori</label>
-        <input type="text" class="edit-input" data-field="category" value="${escapeAttr(p.category || '')}">
+        <input type="text" class="edit-input" data-field="category" value="${escapeAttr(p.category || '')}" autocomplete="off">
+        <div class="edit-category-results product-search-results" style="display:none;"></div>
       </div>
-      <div class="edit-form-group">
+      <div class="edit-form-group" style="position:relative;">
         <label>Satuan</label>
-        <input type="text" class="edit-input" data-field="unit" value="${escapeAttr(p.unit || '')}">
+        <input type="text" class="edit-input" data-field="unit" value="${escapeAttr(p.unit || '')}" autocomplete="off">
+        <div class="edit-unit-results product-search-results" style="display:none;"></div>
       </div>
-      <div class="edit-form-group">
+      <div class="edit-form-group" style="position:relative;">
         <label>Lokasi Penyimpanan</label>
-        <input type="text" class="edit-input" data-field="storage_location" value="${escapeAttr(p.storage_location || '')}">
+        <input type="text" class="edit-input" data-field="storage_location" value="${escapeAttr(p.storage_location || '')}" autocomplete="off">
+        <div class="edit-location-results product-search-results" style="display:none;"></div>
       </div>
       <div class="edit-form-group">
         <label>Stok Minimum</label>
@@ -806,20 +872,34 @@ function renderSummary(items) {
 }
 
 // ============================================
-// Percakapan [Batas Jumlah Barang & Kunci Akun Expired] - BADGE TOTAL
+// Percakapan [Fix Badge Jumlah Barang Premium] - BADGE TOTAL (v2)
 // Pakai LAST_KNOWN_CLINIC_ACCESS (diisi checkClinicAccessAndRenderBanner
-// di auth-check.js) untuk tahu max_products klinik ini. Kalau belum
+// di clinic-access.js) untuk tahu max_products klinik ini. Kalau belum
 // sempat terisi (auth-check belum jalan / RPC gagal), tampilkan total
 // polos tanpa batas -- tidak memblokir apa pun, cuma teks saja.
+//
+// PERUBAHAN dari versi sebelumnya: badge TIDAK LAGI menampilkan
+// "X dari 70 jenis barang" untuk siapa pun (premium maupun free).
+// Sekarang selalu "X jenis barang" polos, KECUALI kalau akun free
+// sudah mendekati batas (>=85% dari max_products free) -- baru muncul
+// catatan tambahan di bawahnya. Batas keras (hard block) tetap
+// ditangani terpisah oleh check_product_limit saat submit barang baru
+// (lihat app.js/foto.js/suara.js), tidak berubah sama sekali di sini.
 // ============================================
 function buildTotalCountLine(totalCount) {
   const access = (typeof LAST_KNOWN_CLINIC_ACCESS !== 'undefined') ? LAST_KNOWN_CLINIC_ACCESS : null;
   const isFreeLimit = access && access.max_products && access.max_products < 999999;
 
   if (isFreeLimit) {
-    const nearLimit = totalCount >= access.max_products * 0.85; // beri warna beda kalau sudah dekat batas (>=85%)
-    const cssClass = nearLimit ? 'summary-total near-limit' : 'summary-total';
-    return `<p class="${cssClass}">📦 ${totalCount} dari ${access.max_products} jenis barang</p>`;
+    const nearLimit = totalCount >= access.max_products * 0.85; // ambang 85% dari batas free
+
+    if (nearLimit) {
+      const sisa = Math.max(0, access.max_products - totalCount);
+      return `
+        <p class="summary-total near-limit">📦 ${totalCount} jenis barang</p>
+        <p class="summary-near-limit-note">⚠️ Mendekati batas ${access.max_products} jenis barang untuk akun Free (sisa ${sisa}).</p>
+      `;
+    }
   }
 
   return `<p class="summary-total">📦 ${totalCount} jenis barang</p>`;

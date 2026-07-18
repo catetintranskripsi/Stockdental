@@ -126,21 +126,10 @@ async function loadAutocompleteOptions() {
   }
 }
 
-function uniqueMerge(starterList, historyList) {
-  const combined = starterList.concat(historyList);
-  const seen = new Set();
-  const result = [];
-
-  combined.forEach(function(value) {
-    const key = value.toLowerCase();
-    if (!seen.has(key)) {
-      seen.add(key);
-      result.push(value);
-    }
-  });
-
-  return result;
-}
+// CATATAN: uniqueMerge() dan setupSimpleAutocomplete() TIDAK lagi
+// didefinisikan di sini -- dipindah ke js/autocomplete-helper.js supaya
+// bisa dipakai bersama oleh foto.js, suara.js, dan inventaris.js juga.
+// File autocomplete-helper.js WAJIB di-load sebelum app.js di index.html.
 
 function updateMetadataPlaceholders() {
   const typedName = productNameInput.value.trim().toLowerCase();
@@ -241,60 +230,6 @@ productSearchInput.addEventListener('input', function() {
   productSelectedId.value = '';
   renderProductResults(productSearchInput.value);
 });
-
-function setupSimpleAutocomplete(inputId, resultsId, getOptionsFn) {
-  const input = document.getElementById(inputId);
-  const resultsDiv = document.getElementById(resultsId);
-
-  function render(filterText) {
-    const keyword = filterText.trim().toLowerCase();
-    const options = getOptionsFn();
-
-    const filtered = keyword === ''
-      ? options.slice(0, 50)
-      : options.filter(function(v) { return v.toLowerCase().includes(keyword); }).slice(0, 50);
-
-    resultsDiv.innerHTML = '';
-
-    if (filtered.length === 0) {
-      resultsDiv.style.display = 'none';
-      return;
-    }
-
-    filtered.forEach(function(value) {
-      const item = document.createElement('div');
-      item.className = 'product-search-item';
-      item.textContent = value;
-
-      item.addEventListener('click', function() {
-        input.value = value;
-        resultsDiv.style.display = 'none';
-        if (inputId === 'productName') {
-          updateMetadataPlaceholders();
-        }
-      });
-
-      resultsDiv.appendChild(item);
-    });
-
-    resultsDiv.style.display = 'block';
-  }
-
-  input.addEventListener('focus', function() {
-    render('');
-  });
-
-  input.addEventListener('input', function() {
-    render(input.value);
-  });
-
-  document.addEventListener('click', function(e) {
-    const isClickInside = input.contains(e.target) || resultsDiv.contains(e.target);
-    if (!isClickInside) {
-      resultsDiv.style.display = 'none';
-    }
-  });
-}
 
 setupSimpleAutocomplete('productName', 'productNameResults', function() {
   return uniqueMerge([], ALL_PRODUCTS.map(function(p) { return p.name; }));
