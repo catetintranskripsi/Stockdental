@@ -37,7 +37,14 @@
     #subscriptionStatusCard.status-warning .subscription-status-label {
       color: #b45309;
     }
-    #subscriptionExtendBtn {
+    #subscriptionStatusCard.status-free {
+      border: 2px solid var(--color-accent);
+      background: #fff7ed;
+    }
+    #subscriptionStatusCard.status-free .subscription-status-label {
+      color: var(--color-accent);
+    }
+    #subscriptionActionBtn {
       white-space: nowrap;
       padding: 10px 16px;
       min-height: 40px;
@@ -57,18 +64,6 @@
   <!-- ============ RINGKASAN (tampil setelah login) ============ -->
   <div class="container" id="appContainer" style="display:none; padding-bottom: 80px;">
 
-    <!-- ============ BANNER UPGRADE PREMIUM (Percakapan [Banner Upgrade Premium]) ============ -->
-    <!-- Hanya tampil untuk tier=free. Disisipkan/dihapus via JS di ringkasan.js -->
-    <div id="premiumUpgradeBanner" style="display:none;">
-      <div class="upgrade-banner-content">
-        <span id="upgradeBannerText"></span>
-        <div class="upgrade-banner-actions">
-          <button id="upgradeBannerBtn" type="button">Lihat Premium</button>
-          <button id="upgradeBannerClose" type="button" aria-label="Tutup">&times;</button>
-        </div>
-      </div>
-    </div>
-
     <div class="app-header">
       <div>
         <h1>StockDental</h1>
@@ -82,17 +77,16 @@
     <div id="ringkasanContent" style="display:none;">
 
       <!-- Status Langganan (Percakapan [Status Langganan di Ringkasan]) -->
-      <!-- Muncul untuk tier premium (aktif ATAU permanen). Untuk tier
-           free, cukup banner upgrade yang sudah ada di atas -- supaya
-           tidak dobel pesan yang sama. Diisi/disembunyikan via JS. -->
+      <!-- Satu komponen seragam untuk SEMUA tier (Free, Premium aktif,
+           Premium permanen). Menggantikan banner upgrade lama yang
+           terpisah -- kontennya diisi via JS sesuai tier. -->
       <div class="ringkasan-card" id="subscriptionStatusCard" style="display:none;">
         <div class="subscription-status-row">
           <div>
-            <p class="subscription-status-label" id="subscriptionStatusLabel">Premium</p>
+            <p class="subscription-status-label" id="subscriptionStatusLabel"></p>
             <p class="subscription-status-detail" id="subscriptionStatusDetail"></p>
           </div>
-          <button id="subscriptionExtendBtn" type="button" class="btn-secondary" style="display:none;">
-            Perpanjang
+          <button id="subscriptionActionBtn" type="button" class="btn-secondary" style="display:none;">
           </button>
         </div>
       </div>
