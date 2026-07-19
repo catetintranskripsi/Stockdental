@@ -6,6 +6,18 @@
   <title>StockDental - Upgrade Premium</title>
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="css/pages-override.css">
+  <!--
+    PENTING SEBELUM TEST: pastikan script berikut ada di bagian bawah
+    file ini (sebelum </body>, di ATAS <script> khusus halaman ini) --
+    sama seperti pola yang sudah dipakai di ringkasan.html/inventaris.html:
+    1. <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    2. <script src="js/supabase-client.js"></script>
+    3. <script src="js/clinic-access.js"></script>
+    4. <script src="js/auth-check.js"></script>
+    Kalau urutan/nama file beda dari yang kamu pakai di halaman lain,
+    sesuaikan dulu -- kalau tidak, supabaseClient dan
+    LAST_KNOWN_CLINIC_ACCESS di script bawah tidak akan terdefinisi.
+  -->
   <style>
     /* ============================================
        Percakapan [Halaman Upgrade Premium]
@@ -35,17 +47,24 @@
       margin: 0;
     }
 
-    .price-cards {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      margin-bottom: 24px;
-    }
     .price-card {
       border: 2px solid #e5e7eb;
       border-radius: 12px;
       padding: 16px;
       background: #fff;
+      /* Sekarang jadi <button>, reset default browser + tetap bisa diklik penuh */
+      width: 100%;
+      text-align: left;
+      cursor: pointer;
+      font-family: inherit;
+      transition: border-color 0.15s ease;
+    }
+    .price-card:active {
+      border-color: var(--color-primary);
+    }
+    .price-card:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
     }
     .price-card.highlight {
       border-color: var(--color-accent);
@@ -78,6 +97,102 @@
       font-size: 14px;
       font-weight: 400;
       color: var(--color-text-muted);
+    }
+
+    /* Kotak QR pembayaran */
+    .qr-box {
+      background: #fff;
+      border-radius: 16px;
+      padding: 28px 20px;
+      text-align: center;
+      border: 2px solid #e5e7eb;
+    }
+    .qr-title {
+      font-family: 'Poppins', sans-serif;
+      font-weight: 600;
+      font-size: 16px;
+      color: var(--color-text);
+      margin: 0 0 16px;
+    }
+    .qr-loading {
+      padding: 40px 0;
+      color: var(--color-text-muted);
+      font-size: 14px;
+    }
+    .qr-image {
+      width: 220px;
+      height: 220px;
+      max-width: 100%;
+      border: 1px solid #eee;
+      border-radius: 8px;
+      margin: 0 auto 16px;
+      display: block;
+    }
+    .qr-countdown {
+      font-family: 'Poppins', sans-serif;
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--color-primary);
+      margin: 0 0 8px;
+    }
+    .qr-countdown.expired {
+      color: #dc2626;
+    }
+    .qr-status {
+      font-size: 13px;
+      color: var(--color-text-muted);
+      margin: 0 0 20px;
+    }
+    .btn-secondary {
+      display: block;
+      width: 100%;
+      background: var(--color-primary);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 12px;
+      font-size: 14px;
+      font-weight: 600;
+      font-family: 'Inter', sans-serif;
+      cursor: pointer;
+      min-height: 44px;
+      margin-bottom: 10px;
+    }
+    .btn-text {
+      display: block;
+      width: 100%;
+      background: none;
+      border: none;
+      color: var(--color-text-muted);
+      font-size: 13px;
+      text-decoration: underline;
+      cursor: pointer;
+      padding: 8px;
+    }
+
+    /* Kotak sukses / sudah premium */
+    .success-box {
+      background: #fff;
+      border-radius: 16px;
+      padding: 36px 20px;
+      text-align: center;
+      border: 2px solid #e5e7eb;
+    }
+    .success-icon {
+      font-size: 40px;
+      color: var(--color-primary);
+      margin-bottom: 12px;
+    }
+    .success-box h2 {
+      font-family: 'Poppins', sans-serif;
+      font-size: 19px;
+      color: var(--color-text);
+      margin: 0 0 8px;
+    }
+    .success-box p {
+      font-size: 14px;
+      color: var(--color-text-muted);
+      margin: 0 0 24px;
     }
 
     .compare-table {
@@ -155,65 +270,306 @@
       <p>Kuota AI lebih besar, bebas batas jenis barang, tanpa antre saat ramai.</p>
     </div>
 
-    <div class="price-cards">
-      <div class="price-card">
-        <div class="price-card-label">Paket 30 Hari</div>
-        <div class="price-card-amount">Rp29.000 <small>/ 30 hari</small></div>
+    <!-- Ditampilkan HANYA kalau klinik BELUM premium aktif/permanen.
+         Disembunyikan lewat JS setelah cek LAST_KNOWN_CLINIC_ACCESS. -->
+    <div id="upgradeOfferSection">
+
+      <div class="price-cards">
+        <button type="button" class="price-card" id="btnPilihMonthly" onclick="pilihPaket('monthly')">
+          <div class="price-card-label">Paket 30 Hari</div>
+          <div class="price-card-amount">Rp29.000 <small>/ 30 hari</small></div>
+        </button>
+        <button type="button" class="price-card highlight" id="btnPilihYearly" onclick="pilihPaket('yearly')">
+          <div class="price-card-label">Paket 360 Hari</div>
+          <div class="price-card-amount">Rp290.000 <small>/ 360 hari</small></div>
+        </button>
       </div>
-      <div class="price-card highlight">
-        <div class="price-card-label">Paket 360 Hari</div>
-        <div class="price-card-amount">Rp290.000 <small>/ 360 hari</small></div>
+
+      <table class="compare-table">
+        <thead>
+          <tr>
+            <th>Fitur</th>
+            <th>Free</th>
+            <th class="col-premium">Premium</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Input manual (masuk/keluar/opname)</td>
+            <td>Unlimited*</td>
+            <td class="yes">Unlimited</td>
+          </tr>
+          <tr>
+            <td>Jenis barang di Inventaris</td>
+            <td>Maks. 70</td>
+            <td class="yes">Bebas batas</td>
+          </tr>
+          <tr>
+            <td>Kuota AI (Foto &amp; Suara) / bulan</td>
+            <td>100</td>
+            <td class="yes">3.000</td>
+          </tr>
+          <tr>
+            <td>Prioritas antrian saat ramai</td>
+            <td>Normal</td>
+            <td class="yes">Didahulukan</td>
+          </tr>
+          <tr>
+            <td>Export laporan stok ke PDF</td>
+            <td>&mdash;</td>
+            <td class="yes">Tersedia</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p class="upgrade-note">
+        *Input manual di akun Free otomatis terkunci sementara kalau jenis barang
+        sudah melebihi 70 — kurangi/gabungkan barang atau upgrade Premium untuk
+        membuka kembali.
+      </p>
+
+    </div>
+
+    <!-- Ditampilkan setelah user pilih paket. Berisi QR + countdown + polling. -->
+    <div id="qrSection" style="display: none;">
+      <div class="qr-box">
+        <p class="qr-title" id="qrPaketLabel">Paket 30 Hari — Rp29.000</p>
+        <div id="qrLoading" class="qr-loading">Membuat QR pembayaran...</div>
+        <img id="qrImage" class="qr-image" style="display: none;" alt="QR Code Pembayaran">
+        <p class="qr-countdown" id="qrCountdown"></p>
+        <p class="qr-status" id="qrStatusText">Menunggu pembayaran...</p>
+        <button type="button" class="btn-secondary" id="btnQrExpired" style="display: none;" onclick="generateQrUlang()">
+          Generate QR Baru
+        </button>
+        <button type="button" class="btn-text" onclick="batalkanQr()">Batal, pilih paket lain</button>
       </div>
     </div>
 
-    <table class="compare-table">
-      <thead>
-        <tr>
-          <th>Fitur</th>
-          <th>Free</th>
-          <th class="col-premium">Premium</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>Input manual (masuk/keluar/opname)</td>
-          <td>Unlimited*</td>
-          <td class="yes">Unlimited</td>
-        </tr>
-        <tr>
-          <td>Jenis barang di Inventaris</td>
-          <td>Maks. 70</td>
-          <td class="yes">Bebas batas</td>
-        </tr>
-        <tr>
-          <td>Kuota AI (Foto &amp; Suara) / bulan</td>
-          <td>100</td>
-          <td class="yes">3.000</td>
-        </tr>
-        <tr>
-          <td>Prioritas antrian saat ramai</td>
-          <td>Normal</td>
-          <td class="yes">Didahulukan</td>
-        </tr>
-        <tr>
-          <td>Export laporan stok ke PDF</td>
-          <td>&mdash;</td>
-          <td class="yes">Tersedia</td>
-        </tr>
-      </tbody>
-    </table>
+    <!-- Ditampilkan setelah polling mendeteksi pembayaran sukses. -->
+    <div id="successSection" style="display: none;">
+      <div class="success-box">
+        <div class="success-icon">✓</div>
+        <h2>Pembayaran Berhasil!</h2>
+        <p id="successDetailText">Akun kamu sekarang Premium.</p>
+        <button type="button" class="btn-upgrade-cta" onclick="window.location.href='ringkasan.html'">
+          Kembali ke Dashboard
+        </button>
+      </div>
+    </div>
 
-    <p class="upgrade-note">
-      *Input manual di akun Free otomatis terkunci sementara kalau jenis barang
-      sudah melebihi 70 — kurangi/gabungkan barang atau upgrade Premium untuk
-      membuka kembali.
-    </p>
-
-    <button class="btn-upgrade-cta" onclick="window.location.href='mailto:GANTI_EMAIL_KAMU@example.com?subject=Upgrade Premium StockDental'">
-      Upgrade Sekarang
-    </button>
+    <!-- Ditampilkan kalau klinik SUDAH premium (aktif atau permanen). -->
+    <div id="alreadyPremiumSection" style="display: none;">
+      <div class="success-box">
+        <div class="success-icon">⭐</div>
+        <h2>Kamu Sudah Premium</h2>
+        <p id="alreadyPremiumText">Nikmati semua fitur premium StockDental.</p>
+        <button type="button" class="btn-upgrade-cta" onclick="window.location.href='ringkasan.html'">
+          Kembali ke Dashboard
+        </button>
+      </div>
+    </div>
 
   </div>
+
+  <!-- Script khusus halaman ini. Bergantung pada:
+       - supabaseClient (dari js/supabase-client.js, sudah dimuat sebelum ini)
+       - LAST_KNOWN_CLINIC_ACCESS (diisi js/clinic-access.js via auth-check.js,
+         sudah selesai (awaited) sebelum konten halaman dimuat -- lihat
+         Peta Struktur Aplikasi: auth-check.js jalan di SETIAP halaman)
+  -->
+  <script>
+    const HARGA = { monthly: 29000, yearly: 290000 };
+    const LABEL_PAKET = { monthly: 'Paket 30 Hari — Rp29.000', yearly: 'Paket 360 Hari — Rp290.000' };
+
+    let pollInterval = null;
+    let countdownInterval = null;
+    let qrExpiryTime = null;
+
+    // ============================================
+    // LANGKAH 1: Cek status premium klinik saat halaman dibuka.
+    // Kalau sudah premium (aktif ATAU permanen), sembunyikan
+    // penawaran upgrade, tampilkan pesan "Sudah Premium" saja.
+    // ============================================
+    function cekStatusAwal() {
+      const access = window.LAST_KNOWN_CLINIC_ACCESS;
+
+      if (access && access.tier === 'premium') {
+        document.getElementById('upgradeOfferSection').style.display = 'none';
+        document.getElementById('alreadyPremiumSection').style.display = 'block';
+      }
+      // Kalau access belum ada / tier bukan premium, biarkan
+      // upgradeOfferSection tampil apa adanya (default HTML).
+    }
+    cekStatusAwal();
+
+    // ============================================
+    // LANGKAH 2: User pilih paket -> panggil create-payment
+    // ============================================
+    async function pilihPaket(billingPeriod) {
+      // Disable kedua tombol supaya tidak diklik dobel selagi loading
+      document.getElementById('btnPilihMonthly').disabled = true;
+      document.getElementById('btnPilihYearly').disabled = true;
+
+      document.getElementById('upgradeOfferSection').style.display = 'none';
+      document.getElementById('qrSection').style.display = 'block';
+      document.getElementById('qrLoading').style.display = 'block';
+      document.getElementById('qrImage').style.display = 'none';
+      document.getElementById('qrPaketLabel').textContent = LABEL_PAKET[billingPeriod];
+      document.getElementById('qrStatusText').textContent = 'Menunggu pembayaran...';
+      document.getElementById('btnQrExpired').style.display = 'none';
+
+      // Simpan billingPeriod terakhir dipilih, untuk tombol "Generate QR Baru"
+      window._billingPeriodTerakhir = billingPeriod;
+
+      await buatQr(billingPeriod);
+    }
+
+    async function buatQr(billingPeriod) {
+      document.getElementById('qrLoading').style.display = 'block';
+      document.getElementById('qrImage').style.display = 'none';
+      document.getElementById('qrCountdown').classList.remove('expired');
+      document.getElementById('btnQrExpired').style.display = 'none';
+
+      try {
+        const { data: { session } } = await supabaseClient.auth.getSession();
+
+        if (!session) {
+          alert('Sesi login sudah habis, silakan login ulang.');
+          window.location.href = 'index.html';
+          return;
+        }
+
+        const response = await fetch(
+          `${window.SUPABASE_URL || SUPABASE_URL}/functions/v1/create-payment`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`,
+              'apikey': window.SUPABASE_ANON_KEY || SUPABASE_ANON_KEY
+            },
+            body: JSON.stringify({ billing_period: billingPeriod })
+          }
+        );
+
+        const result = await response.json();
+
+        if (!response.ok || !result.qr_image_url) {
+          console.error('create-payment gagal:', result);
+          document.getElementById('qrLoading').textContent =
+            'Gagal membuat QR pembayaran. Coba lagi dalam beberapa saat.';
+          return;
+        }
+
+        // Tampilkan QR
+        document.getElementById('qrLoading').style.display = 'none';
+        const qrImg = document.getElementById('qrImage');
+        qrImg.src = result.qr_image_url;
+        qrImg.style.display = 'block';
+
+        // Mulai countdown (default 15 menit kalau server tidak kasih nilai)
+        const expiryMinutes = result.expiry_minutes || 15;
+        qrExpiryTime = Date.now() + expiryMinutes * 60 * 1000;
+        mulaiCountdown();
+
+        // Mulai polling status pembayaran
+        mulaiPolling(result.order_id);
+
+      } catch (err) {
+        console.error('Error buat QR:', err);
+        document.getElementById('qrLoading').textContent =
+          'Terjadi kesalahan jaringan. Coba lagi.';
+      }
+    }
+
+    // ============================================
+    // LANGKAH 3: Countdown visual QR (15 menit, TIDAK auto-refresh --
+    // sesuai keputusan awal: begitu habis, munculkan tombol manual
+    // "Generate QR Baru", bukan auto-generate diam-diam)
+    // ============================================
+    function mulaiCountdown() {
+      if (countdownInterval) clearInterval(countdownInterval);
+
+      countdownInterval = setInterval(() => {
+        const sisaMs = qrExpiryTime - Date.now();
+
+        if (sisaMs <= 0) {
+          clearInterval(countdownInterval);
+          document.getElementById('qrCountdown').textContent = 'QR sudah kedaluwarsa';
+          document.getElementById('qrCountdown').classList.add('expired');
+          document.getElementById('qrImage').style.opacity = '0.3';
+          document.getElementById('btnQrExpired').style.display = 'block';
+          document.getElementById('qrStatusText').textContent = '';
+          if (pollInterval) clearInterval(pollInterval);
+          return;
+        }
+
+        const menit = Math.floor(sisaMs / 60000);
+        const detik = Math.floor((sisaMs % 60000) / 1000);
+        document.getElementById('qrCountdown').textContent =
+          `QR berlaku ${menit}:${detik.toString().padStart(2, '0')} lagi`;
+      }, 1000);
+    }
+
+    function generateQrUlang() {
+      document.getElementById('qrImage').style.opacity = '1';
+      buatQr(window._billingPeriodTerakhir);
+    }
+
+    function batalkanQr() {
+      if (pollInterval) clearInterval(pollInterval);
+      if (countdownInterval) clearInterval(countdownInterval);
+      document.getElementById('qrSection').style.display = 'none';
+      document.getElementById('upgradeOfferSection').style.display = 'block';
+      document.getElementById('btnPilihMonthly').disabled = false;
+      document.getElementById('btnPilihYearly').disabled = false;
+    }
+
+    // ============================================
+    // LANGKAH 4: Polling status pembayaran ke Supabase (BUKAN ke
+    // Midtrans langsung -- cukup baca payment_transactions.status
+    // yang sudah diupdate payment-webhook). Tiap 3 detik.
+    // ============================================
+    function mulaiPolling(orderId) {
+      if (pollInterval) clearInterval(pollInterval);
+
+      pollInterval = setInterval(async () => {
+        try {
+          const { data, error } = await supabaseClient
+            .from('payment_transactions')
+            .select('status')
+            .eq('order_id', orderId)
+            .single();
+
+          if (error) {
+            console.error('polling error:', error);
+            return;
+          }
+
+          if (data.status === 'settlement') {
+            clearInterval(pollInterval);
+            clearInterval(countdownInterval);
+            tampilkanSukses();
+          }
+          // status expired/failed dari sisi Midtrans TIDAK kita
+          // handle otomatis di sini -- QR di layar tetap sampai
+          // countdown 15 menit kita sendiri habis, supaya tidak ada
+          // dua sumber "kedaluwarsa" yang bisa beda waktu.
+        } catch (err) {
+          console.error('polling exception:', err);
+        }
+      }, 3000);
+    }
+
+    function tampilkanSukses() {
+      document.getElementById('qrSection').style.display = 'none';
+      document.getElementById('successSection').style.display = 'block';
+      const billingPeriod = window._billingPeriodTerakhir;
+      const durasiText = billingPeriod === 'yearly' ? '360 hari' : '30 hari';
+      document.getElementById('successDetailText').textContent =
+        `Akun kamu sekarang Premium untuk ${durasiText} ke depan. Terima kasih!`;
+    }
+  </script>
 
 </body>
 </html>
