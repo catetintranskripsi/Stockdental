@@ -393,12 +393,31 @@
     function cekStatusAwal() {
       const access = window.LAST_KNOWN_CLINIC_ACCESS;
 
-      if (access && access.tier === 'premium') {
+      // Sembunyikan tombol beli HANYA untuk premium PERMANEN
+      // (expires_at null). Premium AKTIF dengan expires_at biasa
+      // tetap boleh beli lagi -- itu jadi top-up, expires_at
+      // bertambah durasi baru (sudah diproses process_payment_settlement
+      // di sisi server). Jangan sembunyikan tombol untuk kasus ini.
+      if (access && access.tier === 'premium' && !access.expires_at) {
         document.getElementById('upgradeOfferSection').style.display = 'none';
         document.getElementById('alreadyPremiumSection').style.display = 'block';
+        document.getElementById('alreadyPremiumText').textContent =
+          'Akun kamu Premium selamanya. Nikmati semua fitur StockDental tanpa batas waktu.';
+      } else if (access && access.tier === 'premium' && access.expires_at) {
+        // Premium aktif biasa -- tetap tampilkan tombol beli (untuk
+        // top-up), tapi kasih info tanggal expired saat ini di atas
+        // supaya user tahu kondisinya sebelum memutuskan beli lagi.
+        const expiredDate = new Date(access.expires_at).toLocaleDateString('id-ID', {
+          day: 'numeric', month: 'long', year: 'numeric'
+        });
+        const infoEl = document.createElement('p');
+        infoEl.className = 'upgrade-note';
+        infoEl.style.marginTop = '-8px';
+        infoEl.textContent = `Premium kamu aktif sampai ${expiredDate}. Beli paket baru untuk menambah masa aktif.`;
+        document.getElementById('upgradeOfferSection').prepend(infoEl);
       }
-      // Kalau access belum ada / tier bukan premium, biarkan
-      // upgradeOfferSection tampil apa adanya (default HTML).
+      // Kalau access belum ada / tier free, biarkan upgradeOfferSection
+      // tampil apa adanya (default HTML), tanpa info tambahan.
     }
     cekStatusAwal();
 
