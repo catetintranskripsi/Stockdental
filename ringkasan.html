@@ -5,6 +5,45 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>StockDental - Ringkasan</title>
   <link rel="stylesheet" href="css/style.css">
+  <style>
+    /* ============================================
+       Percakapan [Status Langganan di Ringkasan]
+       Inline karena belum pernah lihat isi css/pages-override.css --
+       pindahkan ke sana kalau file itu memang tempat CSS-only
+       override lain di proyek ini, supaya konsisten.
+       ============================================ */
+    .subscription-status-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+    .subscription-status-label {
+      font-family: 'Poppins', sans-serif;
+      font-weight: 600;
+      font-size: 15px;
+      margin: 0 0 2px;
+      color: var(--color-text);
+    }
+    .subscription-status-detail {
+      font-size: 13px;
+      color: var(--color-text-muted);
+      margin: 0;
+    }
+    #subscriptionStatusCard.status-warning {
+      border: 2px solid #f59e0b;
+      background: #fffbeb;
+    }
+    #subscriptionStatusCard.status-warning .subscription-status-label {
+      color: #b45309;
+    }
+    #subscriptionExtendBtn {
+      white-space: nowrap;
+      padding: 10px 16px;
+      min-height: 40px;
+      width: auto;
+    }
+  </style>
 </head>
 <body>
 
@@ -41,6 +80,22 @@
     <div id="ringkasanLoading" class="loading-text">Memuat ringkasan...</div>
 
     <div id="ringkasanContent" style="display:none;">
+
+      <!-- Status Langganan (Percakapan [Status Langganan di Ringkasan]) -->
+      <!-- Muncul untuk tier premium (aktif ATAU permanen). Untuk tier
+           free, cukup banner upgrade yang sudah ada di atas -- supaya
+           tidak dobel pesan yang sama. Diisi/disembunyikan via JS. -->
+      <div class="ringkasan-card" id="subscriptionStatusCard" style="display:none;">
+        <div class="subscription-status-row">
+          <div>
+            <p class="subscription-status-label" id="subscriptionStatusLabel">Premium</p>
+            <p class="subscription-status-detail" id="subscriptionStatusDetail"></p>
+          </div>
+          <button id="subscriptionExtendBtn" type="button" class="btn-secondary" style="display:none;">
+            Perpanjang
+          </button>
+        </div>
+      </div>
 
       <!-- Status Stok -->
       <div class="ringkasan-card">
