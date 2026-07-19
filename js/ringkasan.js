@@ -14,6 +14,7 @@ const RINGKASAN_MAX_ITEMS = 5;
 async function onPageReady() {
   await loadRingkasan();
   initUpgradeBanner();
+  initSubscriptionStatus();
 }
 
 async function loadRingkasan() {
@@ -387,4 +388,75 @@ function initUpgradeBanner() {
     banner.style.display = 'none';
     sessionStorage.setItem('upgrade_banner_dismissed', 'true');
   });
+}
+
+// ============================================
+// STATUS LANGGANAN (Percakapan [Status Langganan di Ringkasan])
+// Muncul untuk tier PREMIUM saja (aktif atau permanen). Untuk tier
+// free, banner upgrade yang sudah ada sudah cukup mewakili ajakan
+// upgrade -- supaya tidak dobel pesan yang sama di halaman ini.
+//
+// Baca LAST_KNOWN_CLINIC_ACCESS.expires_at (field baru, ditambahkan
+// ke check_clinic_access khusus untuk fitur ini). TIDAK memanggil
+// RPC/query baru.
+// ============================================
+const SUBSCRIPTION_WARNING_DAYS = 7; // konsisten dengan alert H-7 produk
+
+function initSubscriptionStatus() {
+  const card = document.getElementById('subscriptionStatusCard');
+  if (!card) return;
+
+  if (!LAST_KNOWN_CLINIC_ACCESS || LAST_KNOWN_CLINIC_ACCESS.tier !== 'premium') {
+    // Free -> card ini tidak tampil, banner upgrade sudah cukup.
+    return;
+  }
+
+  const labelEl = document.getElementById('subscriptionStatusLabel');
+  const detailEl = document.getElementById('subscriptionStatusDetail');
+  const extendBtn = document.getElementById('subscriptionExtendBtn');
+  const expiresAt = LAST_KNOWN_CLINIC_ACCESS.expires_at;
+
+  if (!expiresAt) {
+    // expires_at NULL -> premium permanen, tidak ada tombol perpanjang.
+    labelEl.textContent = '⭐ Premium';
+    detailEl.textContent = 'Berlaku selamanya';
+    extendBtn.style.display = 'none';
+  } else {
+    const expiryDate = new Date(expiresAt);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const expiryDateOnly = new Date(expiryDate);
+    expiryDateOnly.setHours(0, 0, 0, 0);
+
+    const diffDays = Math.round((expiryDateOnly - today) / (1000 * 60 * 60 * 24));
+
+    const tanggalStr = expiryDate.toLocaleDateString('id-ID', {
+      day: 'numeric', month: 'long', year: 'numeric'
+    });
+
+    labelEl.textContent = '⭐ Premium Aktif';
+
+    if (diffDays < 0) {
+      // Sudah lewat expires_at tapi tier masih kebaca 'premium' di sini --
+      // seharusnya tidak terjadi normal (get_clinic_tier sudah handle
+      // expired jadi 'free'), tapi dijaga untuk kasus tepi/cache.
+      detailEl.textContent = `Sudah berakhir ${tanggalStr}`;
+      card.classList.add('status-warning');
+    } else if (diffDays === 0) {
+      detailEl.textContent = 'Berakhir hari ini';
+      card.classList.add('status-warning');
+    } else {
+      detailEl.textContent = `${diffDays} hari lagi (sampai ${tanggalStr})`;
+      if (diffDays <= SUBSCRIPTION_WARNING_DAYS) {
+        card.classList.add('status-warning');
+      }
+    }
+
+    extendBtn.style.display = 'inline-block';
+    extendBtn.addEventListener('click', () => {
+      window.location.href = 'upgrade.html';
+    });
+  }
+
+  card.style.display = 'block';
 }
