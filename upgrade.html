@@ -419,7 +419,12 @@
       // Kalau access belum ada / tier free, biarkan upgradeOfferSection
       // tampil apa adanya (default HTML), tanpa info tambahan.
     }
-    cekStatusAwal();
+    // CATATAN: cekStatusAwal() TIDAK dipanggil langsung di sini --
+    // dipanggil dari onPageReady() di bawah, supaya baru jalan
+    // SETELAH auth-check.js selesai mengisi LAST_KNOWN_CLINIC_ACCESS.
+    // Kalau dipanggil langsung di sini, ada race condition: script
+    // ini jalan duluan sebelum auth-check.js (yang di-load paling
+    // akhir) sempat mengisi datanya.
 
     // ============================================
     // LANGKAH 2: User pilih paket -> panggil create-payment
@@ -588,7 +593,22 @@
       document.getElementById('successDetailText').textContent =
         `Akun kamu sekarang Premium untuk ${durasiText} ke depan. Terima kasih!`;
     }
+
+    // ============================================
+    // Dipanggil oleh auth-check.js setelah user terverifikasi login
+    // (pola sama seperti onPageReady() di ringkasan.js). Baru di
+    // sinilah cekStatusAwal() dipanggil -- setelah
+    // LAST_KNOWN_CLINIC_ACCESS dipastikan sudah terisi.
+    // ============================================
+    function onPageReady() {
+      cekStatusAwal();
+    }
   </script>
 
+  <!-- Supabase library dari CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase-client.js"></script>
+  <script src="js/clinic-access.js"></script>
+  <script src="js/auth-check.js"></script>
 </body>
 </html>
