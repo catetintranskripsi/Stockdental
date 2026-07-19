@@ -570,3 +570,17 @@ label,
 .product-search-item:active {
   background: var(--color-primary-light);
 }
+
+/* ---------- LANDING INFO (halaman login, sebelum auth) ---------- */
+.landing-info { text-align: center; margin-bottom: 20px; }
+.landing-tagline { font-size: 0.85rem; color: var(--color-text-muted); margin: 4px 0 16px; }
+.landing-pricing { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+.landing-price-item {
+  background: var(--color-primary-light);
+  border-radius: 10px;
+  padding: 8px 12px;
+  text-align: center;
+  min-width: 90px;
+}
+.landing-price-label { display: block; font-size: 0.7rem; color: var(--color-text-muted); }
+.landing-price-value { display: block; font-weight: 700; color: var(--color-primary); font-size: 0.9rem; }
