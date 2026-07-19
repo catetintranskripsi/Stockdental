@@ -13,7 +13,6 @@ const RINGKASAN_MAX_ITEMS = 5;
 // Dipanggil oleh auth-check.js setelah user terverifikasi login
 async function onPageReady() {
   await loadRingkasan();
-  initUpgradeBanner();
   initSubscriptionStatus();
 }
 
@@ -344,84 +343,56 @@ function escapeHtml(str) {
 }
 
 // ============================================
-// BANNER UPGRADE PREMIUM (Percakapan [Banner Upgrade Premium])
-// Hanya tampil untuk tier=free. TIDAK memanggil RPC baru -- baca
-// LAST_KNOWN_CLINIC_ACCESS yang sudah diisi checkClinicAccessAndRenderBanner()
-// di clinic-access.js (dipanggil dari auth-check.js SEBELUM onPageReady ini
-// jalan, sesuai urutan <script> di ringkasan.html).
-// ============================================
-const UPGRADE_BANNER_MESSAGES = [
-  'Upgrade Premium — kuota AI 3000/bulan & bebas limit jenis barang',
-  'Sudah dekat 70 jenis barang di Free? Upgrade Premium biar tidak terkunci',
-  'Premium cuma Rp29.000/30 hari — lebih murah dari sekali beli bahan tambal'
-];
-
-function initUpgradeBanner() {
-  const banner = document.getElementById('premiumUpgradeBanner');
-  if (!banner) return;
-
-  // LAST_KNOWN_CLINIC_ACCESS diisi oleh clinic-access.js. Kalau karena
-  // sesuatu hal belum terisi (misal RPC-nya gagal), aman-nya banner
-  // TIDAK ditampilkan -- jangan menebak tier.
-  if (!LAST_KNOWN_CLINIC_ACCESS || LAST_KNOWN_CLINIC_ACCESS.tier !== 'free') {
-    return;
-  }
-
-  // Sudah ditutup di sesi browser ini? jangan muncul lagi sampai reload.
-  if (sessionStorage.getItem('upgrade_banner_dismissed') === 'true') {
-    return;
-  }
-
-  const textEl = document.getElementById('upgradeBannerText');
-  const closeBtn = document.getElementById('upgradeBannerClose');
-  const lihatBtn = document.getElementById('upgradeBannerBtn');
-
-  const randomMsg = UPGRADE_BANNER_MESSAGES[Math.floor(Math.random() * UPGRADE_BANNER_MESSAGES.length)];
-  textEl.textContent = randomMsg;
-  banner.style.display = 'block';
-
-  lihatBtn.addEventListener('click', () => {
-    window.location.href = 'upgrade.html';
-  });
-
-  closeBtn.addEventListener('click', () => {
-    banner.style.display = 'none';
-    sessionStorage.setItem('upgrade_banner_dismissed', 'true');
-  });
-}
-
-// ============================================
 // STATUS LANGGANAN (Percakapan [Status Langganan di Ringkasan])
-// Muncul untuk tier PREMIUM saja (aktif atau permanen). Untuk tier
-// free, banner upgrade yang sudah ada sudah cukup mewakili ajakan
-// upgrade -- supaya tidak dobel pesan yang sama di halaman ini.
+// Satu komponen SERAGAM untuk semua tier -- menggantikan banner
+// upgrade lama yang terpisah (initUpgradeBanner). Isi & aksi tombol
+// menyesuaikan tier: free / premium aktif / premium permanen.
 //
-// Baca LAST_KNOWN_CLINIC_ACCESS.expires_at (field baru, ditambahkan
-// ke check_clinic_access khusus untuk fitur ini). TIDAK memanggil
+// Baca LAST_KNOWN_CLINIC_ACCESS (diisi clinic-access.js via
+// auth-check.js SEBELUM onPageReady ini jalan). TIDAK memanggil
 // RPC/query baru.
 // ============================================
 const SUBSCRIPTION_WARNING_DAYS = 7; // konsisten dengan alert H-7 produk
+
+const FREE_STATUS_MESSAGES = [
+  'Kuota AI 3000/bulan & bebas limit jenis barang menanti di Premium',
+  'Sudah dekat 70 jenis barang di Free? Upgrade Premium biar tidak terkunci',
+  'Premium cuma Rp29.000/30 hari — lebih murah dari sekali beli bahan tambal'
+];
 
 function initSubscriptionStatus() {
   const card = document.getElementById('subscriptionStatusCard');
   if (!card) return;
 
-  if (!LAST_KNOWN_CLINIC_ACCESS || LAST_KNOWN_CLINIC_ACCESS.tier !== 'premium') {
-    // Free -> card ini tidak tampil, banner upgrade sudah cukup.
-    return;
-  }
+  // Aman-nya: kalau LAST_KNOWN_CLINIC_ACCESS belum terisi (misal RPC
+  // gagal), jangan tampilkan apa-apa daripada menebak tier.
+  if (!LAST_KNOWN_CLINIC_ACCESS) return;
 
   const labelEl = document.getElementById('subscriptionStatusLabel');
   const detailEl = document.getElementById('subscriptionStatusDetail');
-  const extendBtn = document.getElementById('subscriptionExtendBtn');
+  const actionBtn = document.getElementById('subscriptionActionBtn');
+  const tier = LAST_KNOWN_CLINIC_ACCESS.tier;
   const expiresAt = LAST_KNOWN_CLINIC_ACCESS.expires_at;
 
-  if (!expiresAt) {
-    // expires_at NULL -> premium permanen, tidak ada tombol perpanjang.
+  card.classList.remove('status-warning', 'status-free');
+
+  if (tier === 'free') {
+    const randomMsg = FREE_STATUS_MESSAGES[Math.floor(Math.random() * FREE_STATUS_MESSAGES.length)];
+    labelEl.textContent = '📦 Free';
+    detailEl.textContent = randomMsg;
+    card.classList.add('status-free');
+
+    actionBtn.textContent = 'Lihat Premium';
+    actionBtn.style.display = 'inline-block';
+    actionBtn.onclick = () => { window.location.href = 'upgrade.html'; };
+
+  } else if (tier === 'premium' && !expiresAt) {
+    // Premium permanen -- tidak ada tombol aksi, tidak relevan.
     labelEl.textContent = '⭐ Premium';
     detailEl.textContent = 'Berlaku selamanya';
-    extendBtn.style.display = 'none';
-  } else {
+    actionBtn.style.display = 'none';
+
+  } else if (tier === 'premium' && expiresAt) {
     const expiryDate = new Date(expiresAt);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -429,7 +400,6 @@ function initSubscriptionStatus() {
     expiryDateOnly.setHours(0, 0, 0, 0);
 
     const diffDays = Math.round((expiryDateOnly - today) / (1000 * 60 * 60 * 24));
-
     const tanggalStr = expiryDate.toLocaleDateString('id-ID', {
       day: 'numeric', month: 'long', year: 'numeric'
     });
@@ -437,9 +407,6 @@ function initSubscriptionStatus() {
     labelEl.textContent = '⭐ Premium Aktif';
 
     if (diffDays < 0) {
-      // Sudah lewat expires_at tapi tier masih kebaca 'premium' di sini --
-      // seharusnya tidak terjadi normal (get_clinic_tier sudah handle
-      // expired jadi 'free'), tapi dijaga untuk kasus tepi/cache.
       detailEl.textContent = `Sudah berakhir ${tanggalStr}`;
       card.classList.add('status-warning');
     } else if (diffDays === 0) {
@@ -452,10 +419,9 @@ function initSubscriptionStatus() {
       }
     }
 
-    extendBtn.style.display = 'inline-block';
-    extendBtn.addEventListener('click', () => {
-      window.location.href = 'upgrade.html';
-    });
+    actionBtn.textContent = 'Perpanjang';
+    actionBtn.style.display = 'inline-block';
+    actionBtn.onclick = () => { window.location.href = 'upgrade.html'; };
   }
 
   card.style.display = 'block';
