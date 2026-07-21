@@ -71,7 +71,8 @@ formSignup.addEventListener('submit', async (e) => {
     password: password,
     options: {
       data: {
-        clinic_name: clinicName
+        clinic_name: clinicName,
+        display_name: clinicName
       }
     }
   });
@@ -116,7 +117,7 @@ formForgotPassword.addEventListener('submit', async (e) => {
     return;
   }
 
-  showAuthStatus(forgotPasswordStatus, 'Link reset password dari Supabase Auth sudah dikirim! Cek email Anda (termasuk folder spam). Pastikan pengirim adalah Supabase Auth.', 'success');
+  showAuthStatus(forgotPasswordStatus, 'Link reset password sudah dikirim! Cek email kamu (termasuk folder spam) - email akan datang dari Supabase, bukan dari StockDental.', 'success');
 });
 
 // ---------- LOGIN ----------
