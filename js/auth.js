@@ -116,7 +116,7 @@ formForgotPassword.addEventListener('submit', async (e) => {
     return;
   }
 
-  showAuthStatus(forgotPasswordStatus, 'Link reset password sudah dikirim! Cek email kamu (termasuk folder spam).', 'success');
+  showAuthStatus(forgotPasswordStatus, 'Link reset password sudah dikirim! Cek email kamu (termasuk folder spam) - email akan datang dari Supabase, bukan dari StockDental.', 'success');
 });
 
 // ---------- LOGIN ----------
