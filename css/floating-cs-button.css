@@ -1,0 +1,103 @@
+/* ============================================
+   FLOATING CS BUTTON — Quick access ke Gem Gemini CS StockDental
+   CSS-only, tidak mengubah HTML/JS yang sudah ada.
+   Konsisten dengan design system: teal #0F6B5C + amber #D97706.
+   ============================================ */
+
+.cs-float-btn {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 998; /* di bawah clinicLockedBanner (999) supaya tidak menutupinya kalau muncul bersamaan */
+
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  background: linear-gradient(135deg, #0F6B5C 0%, #0d5a4d 100%);
+  color: #ffffff;
+  text-decoration: none;
+
+  padding: 12px 16px;
+  border-radius: 999px;
+  box-shadow: 0 4px 14px rgba(15, 107, 92, 0.35);
+
+  font-family: 'Poppins', 'Inter', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+
+  border: none;
+  cursor: pointer;
+
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.cs-float-btn:hover,
+.cs-float-btn:focus-visible {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(15, 107, 92, 0.45);
+}
+
+.cs-float-btn:focus-visible {
+  outline: 2px solid #D97706;
+  outline-offset: 2px;
+}
+
+.cs-float-btn:active {
+  transform: translateY(0);
+}
+
+.cs-float-btn__icon {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+.cs-float-btn__label {
+  white-space: nowrap;
+}
+
+/* Badge kecil "AI" di pojok ikon, opsional tapi bantu kasih tahu ini asisten AI */
+.cs-float-btn__badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  background: #D97706;
+  color: #ffffff;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 5px;
+  border-radius: 999px;
+  line-height: 1;
+  border: 2px solid #ffffff;
+}
+
+.cs-float-btn__icon-wrap {
+  position: relative;
+  display: flex;
+}
+
+/* Mobile: label disembunyikan, tombol jadi bulat kecil supaya tidak makan tempat
+   di layar HP (mayoritas user StockDental akses via HP sesuai project context) */
+@media (max-width: 480px) {
+  .cs-float-btn {
+    padding: 14px;
+    bottom: 16px;
+    right: 16px;
+  }
+
+  .cs-float-btn__label {
+    display: none;
+  }
+}
+
+/* Hormati preferensi user yang mematikan animasi */
+@media (prefers-reduced-motion: reduce) {
+  .cs-float-btn {
+    transition: none;
+  }
+  .cs-float-btn:hover,
+  .cs-float-btn:focus-visible {
+    transform: none;
+  }
+}
