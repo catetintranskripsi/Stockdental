@@ -6,13 +6,16 @@
 
 const loginView = document.getElementById('loginView');
 const signupView = document.getElementById('signupView');
+const forgotPasswordView = document.getElementById('forgotPasswordView');
 const authContainer = document.getElementById('authContainer');
 const appContainer = document.getElementById('appContainer');
 
 const formLogin = document.getElementById('formLogin');
 const formSignup = document.getElementById('formSignup');
+const formForgotPassword = document.getElementById('formForgotPassword');
 const loginStatus = document.getElementById('loginStatus');
 const signupStatus = document.getElementById('signupStatus');
+const forgotPasswordStatus = document.getElementById('forgotPasswordStatus');
 const logoutBtn = document.getElementById('logoutBtn');
 
 // ---------- SWITCH ANTARA LOGIN & SIGNUP ----------
@@ -25,6 +28,18 @@ document.getElementById('showSignup').addEventListener('click', (e) => {
 document.getElementById('showLogin').addEventListener('click', (e) => {
   e.preventDefault();
   signupView.style.display = 'none';
+  loginView.style.display = 'block';
+});
+
+document.getElementById('showForgotPassword').addEventListener('click', (e) => {
+  e.preventDefault();
+  loginView.style.display = 'none';
+  forgotPasswordView.style.display = 'block';
+});
+
+document.getElementById('backToLoginFromForgot').addEventListener('click', (e) => {
+  e.preventDefault();
+  forgotPasswordView.style.display = 'none';
   loginView.style.display = 'block';
 });
 
@@ -77,6 +92,31 @@ formSignup.addEventListener('submit', async (e) => {
       window.location.href = 'ringkasan.html';
     }, 1000);
   }
+});
+
+// ---------- FORGOT PASSWORD ----------
+formForgotPassword.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const forgotPasswordBtn = document.getElementById('forgotPasswordBtn');
+
+  const email = document.getElementById('forgotEmail').value.trim();
+
+  forgotPasswordBtn.disabled = true;
+  forgotPasswordBtn.textContent = 'Mengirim...';
+
+  const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin + '/reset-password.html'
+  });
+
+  forgotPasswordBtn.disabled = false;
+  forgotPasswordBtn.textContent = 'Kirim Link Reset';
+
+  if (error) {
+    showAuthStatus(forgotPasswordStatus, 'Gagal mengirim: ' + error.message, 'error');
+    return;
+  }
+
+  showAuthStatus(forgotPasswordStatus, 'Link reset password sudah dikirim! Cek email kamu (termasuk folder spam).', 'success');
 });
 
 // ---------- LOGIN ----------
@@ -145,6 +185,7 @@ function showAuth() {
   authContainer.style.display = 'block';
   loginView.style.display = 'block';
   signupView.style.display = 'none';
+  forgotPasswordView.style.display = 'none';
 
   const bottomNav = document.getElementById('bottomNav');
   if (bottomNav) {
