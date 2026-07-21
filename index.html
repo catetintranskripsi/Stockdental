@@ -15,7 +15,7 @@
     <!-- INFO PRODUK + HARGA - kelihatan tanpa login, untuk calon user & keperluan review Midtrans -->
     <div class="landing-info">
       <h1>StockDental</h1>
-      <p class="landing-tagline">Aplikasi manajemen stok barang untuk klinik gigi. Catat transaksi stok, pantau barang menipis/expired, dan kelola inventaris langsung dari ponsel.</p>
+      <p class="landing-tagline">Aplikasi manajemen stok barang dengan teknologi AI untuk klinik gigi. Catat transaksi stok, pantau barang menipis/expired, dan kelola inventaris langsung dari ponsel.</p>
       <div class="landing-pricing">
         <a href="upgrade.html" class="landing-price-item">
           <span class="landing-price-label">Free</span>
@@ -47,7 +47,26 @@
       </form>
 
       <p class="switch-text">Belum punya akun? <a href="#" id="showSignup">Daftar di sini</a></p>
+      <p class="switch-text"><a href="#" id="showForgotPassword">Lupa password?</a></p>
       <div id="loginStatus" class="status-message"></div>
+    </div>
+
+    <!-- FORGOT PASSWORD FORM -->
+    <div id="forgotPasswordView" style="display:none;">
+      <h2>Lupa Password</h2>
+      <p class="switch-text">Masukkan email akun kamu. Kami akan kirim link untuk atur ulang password.</p>
+
+      <form id="formForgotPassword">
+        <div class="form-group">
+          <label for="forgotEmail">Email</label>
+          <input type="email" id="forgotEmail" required placeholder="email@klinik.com">
+        </div>
+
+        <button type="submit" id="forgotPasswordBtn">Kirim Link Reset</button>
+      </form>
+
+      <p class="switch-text"><a href="#" id="backToLoginFromForgot">Kembali ke Login</a></p>
+      <div id="forgotPasswordStatus" class="status-message"></div>
     </div>
 
     <!-- SIGNUP FORM -->
@@ -80,6 +99,19 @@
 
       <p class="switch-text">Sudah punya akun? <a href="#" id="showLogin">Login di sini</a></p>
       <div id="signupStatus" class="status-message"></div>
+    </div>
+
+    <!-- FOOTER KONTAK -->
+    <div class="auth-footer" style="text-align:center; margin-top:24px; padding-top:16px; border-top:1px solid #E5E7EB;">
+      <div class="auth-footer-links" style="font-size:13px; line-height:1.8;">
+        <a href="https://wa.me/6285156216621?text=Halo%20StockDental%2C%20saya%20mau%20bertanya" target="_blank" rel="noopener" style="color:#0F6B5C; text-decoration:none;">WhatsApp</a>
+        <span class="auth-footer-sep" style="color:#9CA3AF; margin:0 6px;">·</span>
+        <a href="mailto:catetin.transkripsi@gmail.com" style="color:#0F6B5C; text-decoration:none;">Email</a>
+        <span class="auth-footer-sep" style="color:#9CA3AF; margin:0 6px;">·</span>
+        <a href="syarat-ketentuan.html" style="color:#0F6B5C; text-decoration:none;">Syarat & Ketentuan</a>
+        <span class="auth-footer-sep" style="color:#9CA3AF; margin:0 6px;">·</span>
+        <a href="kebijakan-privasi.html" style="color:#0F6B5C; text-decoration:none;">Kebijakan Privasi</a>
+      </div>
     </div>
 
   </div>
