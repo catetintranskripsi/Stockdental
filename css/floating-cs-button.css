@@ -6,7 +6,11 @@
 
 .cs-float-btn {
   position: fixed;
-  bottom: 20px;
+  /* Tinggi .bottom-nav asli (dari style.css) ~59px di HP tanpa gesture bar.
+     max(0px, env(safe-area-inset-bottom) - 6px) = tambahan tinggi kalau HP
+     punya gesture bar bawah (nav jadi lebih tinggi dari 59px di HP itu).
+     +16px = jarak kosong biar tombol tidak mepet ke nav bar. */
+  bottom: calc(59px + max(0px, env(safe-area-inset-bottom, 0px) - 6px) + 16px);
   right: 20px;
   z-index: 998; /* di bawah clinicLockedBanner (999) supaya tidak menutupinya kalau muncul bersamaan */
 
@@ -82,7 +86,7 @@
 @media (max-width: 480px) {
   .cs-float-btn {
     padding: 14px;
-    bottom: 16px;
+    bottom: calc(59px + max(0px, env(safe-area-inset-bottom, 0px) - 6px) + 12px);
     right: 16px;
   }
 
