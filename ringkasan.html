@@ -50,6 +50,21 @@
       min-height: 40px;
       width: auto;
     }
+    .info-akun-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin: 0 0 8px;
+      font-size: 14px;
+    }
+    .info-akun-label {
+      color: var(--color-text-muted);
+    }
+    .info-akun-row span:last-child {
+      font-weight: 600;
+      color: var(--color-text);
+      text-align: right;
+    }
   </style>
 </head>
 <body>
@@ -88,6 +103,30 @@
           </div>
           <button id="subscriptionActionBtn" type="button" class="btn-secondary" style="display:none;">
           </button>
+        </div>
+      </div>
+
+      <!-- Info Akun -->
+      <div class="ringkasan-card" id="infoAkunCard">
+        <h3>Info Akun</h3>
+        <p class="info-akun-row"><span class="info-akun-label">Nama Klinik</span><span id="infoAkunClinicName">-</span></p>
+        <p class="info-akun-row"><span class="info-akun-label">Email</span><span id="infoAkunEmail">-</span></p>
+
+        <button type="button" id="showGantiPassword" class="btn-secondary" style="margin-top:12px;">Ganti Password</button>
+
+        <!-- Form ganti password, tersembunyi sampai tombol di atas diklik -->
+        <div id="gantiPasswordForm" style="display:none; margin-top:12px;">
+          <div class="form-group">
+            <label for="akunNewPassword">Password Baru</label>
+            <input type="password" id="akunNewPassword" placeholder="Minimal 6 karakter" minlength="6">
+          </div>
+          <div class="form-group">
+            <label for="akunNewPasswordConfirm">Konfirmasi Password Baru</label>
+            <input type="password" id="akunNewPasswordConfirm" minlength="6">
+          </div>
+          <button type="button" id="submitGantiPassword">Simpan Password Baru</button>
+          <button type="button" id="cancelGantiPassword" class="btn-secondary" style="margin-top:8px;">Batal</button>
+          <div id="gantiPasswordStatus" class="status-message"></div>
         </div>
       </div>
 
