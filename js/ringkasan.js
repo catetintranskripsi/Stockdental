@@ -14,6 +14,7 @@ const RINGKASAN_MAX_ITEMS = 5;
 async function onPageReady() {
   await loadRingkasan();
   initSubscriptionStatus();
+  initInfoAkun();
 }
 
 async function loadRingkasan() {
@@ -425,4 +426,113 @@ function initSubscriptionStatus() {
   }
 
   card.style.display = 'block';
+}
+
+// ============================================
+// INFO AKUN (nama klinik, email, ganti password)
+// Nama klinik diambil dari tabel `clinics` (sumber utama, via
+// CURRENT_CLINIC_ID) dengan fallback ke user_metadata.clinic_name
+// kalau query clinics gagal/kosong -- jaga-jaga skema berbeda dugaan.
+// ============================================
+async function initInfoAkun() {
+  const clinicNameEl = document.getElementById('infoAkunClinicName');
+  const emailEl = document.getElementById('infoAkunEmail');
+
+  // ---------- EMAIL ----------
+  const { data: { user } } = await supabaseClient.auth.getUser();
+  if (user && emailEl) {
+    emailEl.textContent = user.email || '-';
+  }
+
+  // ---------- NAMA KLINIK ----------
+  if (clinicNameEl) {
+    let clinicName = null;
+
+    try {
+      const { data: clinic, error } = await supabaseClient
+        .from('clinics')
+        .select('name')
+        .eq('id', CURRENT_CLINIC_ID)
+        .single();
+
+      if (!error && clinic && clinic.name) {
+        clinicName = clinic.name;
+      }
+    } catch (e) {
+      console.warn('Gagal ambil nama klinik dari tabel clinics, coba fallback:', e);
+    }
+
+    // Fallback ke user_metadata kalau query di atas gagal/kosong
+    if (!clinicName && user?.user_metadata?.clinic_name) {
+      clinicName = user.user_metadata.clinic_name;
+    }
+
+    clinicNameEl.textContent = clinicName || '-';
+  }
+
+  setupGantiPasswordHandlers();
+}
+
+// ---------- TOGGLE & SUBMIT GANTI PASSWORD ----------
+function setupGantiPasswordHandlers() {
+  const showBtn = document.getElementById('showGantiPassword');
+  const cancelBtn = document.getElementById('cancelGantiPassword');
+  const submitBtn = document.getElementById('submitGantiPassword');
+  const formWrap = document.getElementById('gantiPasswordForm');
+  const statusEl = document.getElementById('gantiPasswordStatus');
+
+  if (!showBtn) return; // guard kalau elemen belum ada
+
+  showBtn.addEventListener('click', () => {
+    formWrap.style.display = 'block';
+    showBtn.style.display = 'none';
+  });
+
+  cancelBtn.addEventListener('click', () => {
+    formWrap.style.display = 'none';
+    showBtn.style.display = 'inline-block';
+    document.getElementById('akunNewPassword').value = '';
+    document.getElementById('akunNewPasswordConfirm').value = '';
+    statusEl.style.display = 'none';
+  });
+
+  submitBtn.addEventListener('click', async () => {
+    const newPassword = document.getElementById('akunNewPassword').value;
+    const newPasswordConfirm = document.getElementById('akunNewPasswordConfirm').value;
+
+    if (!newPassword || newPassword.length < 6) {
+      showGantiPasswordStatus('Password minimal 6 karakter.', 'error');
+      return;
+    }
+
+    if (newPassword !== newPasswordConfirm) {
+      showGantiPasswordStatus('Password tidak cocok!', 'error');
+      return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Menyimpan...';
+
+    const { error } = await supabaseClient.auth.updateUser({
+      password: newPassword
+    });
+
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Simpan Password Baru';
+
+    if (error) {
+      showGantiPasswordStatus('Gagal mengubah password: ' + error.message, 'error');
+      return;
+    }
+
+    showGantiPasswordStatus('Password berhasil diubah!', 'success');
+    document.getElementById('akunNewPassword').value = '';
+    document.getElementById('akunNewPasswordConfirm').value = '';
+  });
+
+  function showGantiPasswordStatus(message, type) {
+    statusEl.textContent = message;
+    statusEl.className = 'status-message ' + (type === 'success' ? 'status-success' : 'status-error');
+    statusEl.style.display = 'block';
+  }
 }
