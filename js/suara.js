@@ -573,7 +573,10 @@ async function handleSaveAllClick() {
       successCount++;
     } catch (error) {
       console.error('Gagal simpan item:', item.nama, error);
-      failedItems.push(item.nama);
+      // Percakapan [Perbaikan Pesan Error Simpan Batch] - tampilkan alasan
+      // asli per item (misal tanggal invalid), bukan selalu "cek koneksi"
+      const reason = (error && error.message) ? error.message : 'Gagal menyimpan';
+      failedItems.push(`${item.nama}: ${reason}`);
     }
   }
 
@@ -586,7 +589,7 @@ async function handleSaveAllClick() {
       resetSuaraPage();
     }, 1500);
   } else {
-    showSaveStatus(`${successCount} berhasil, ${failedItems.length} gagal (${failedItems.join(', ')}). Cek koneksi dan coba lagi untuk yang gagal.`, 'error');
+    showSaveStatus(`${successCount} berhasil, ${failedItems.length} gagal:\n${failedItems.join('\n')}`, 'error');
   }
 }
 
