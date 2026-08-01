@@ -117,6 +117,15 @@ async function loadTransaksiHariIni() {
 
 // ============================================
 // TOP 5 BARANG PALING SERING DIPAKAI BULAN INI
+// Percakapan [Opname sebagai Pemakaian] - selain movement_type='out',
+// sekarang juga ikut menghitung selisih TURUN dari Stok Opname
+// (stock_before - stock_after, kalau positif) sebagai "pemakaian".
+// Alasan: klinik sering pakai opname untuk barang yang pemakaiannya
+// tidak sempat dicatat manual satu-satu (repot di lapangan) -- selisih
+// turunnya secara praktis ya itu pemakaian (entah dipakai/rusak/hilang,
+// tidak perlu dibedakan alasannya di sini).
+// Opname yang naik (stok ketemu lebih banyak dari catatan) TIDAK
+// dihitung sebagai pemakaian negatif -- diabaikan saja dari list ini.
 // ============================================
 async function loadTopProdukBulanIni() {
   const startOfMonth = new Date();
@@ -125,16 +134,27 @@ async function loadTopProdukBulanIni() {
 
   const { data: movements, error } = await supabaseClient
     .from('stock_movements')
-    .select('quantity, product_id, products(name, unit)')
+    .select('quantity, product_id, movement_type, stock_before, stock_after, products(name, unit)')
     .eq('clinic_id', CURRENT_CLINIC_ID)
-    .eq('movement_type', 'out')
+    .in('movement_type', ['out', 'opname_adjustment'])
     .gte('created_at', startOfMonth.toISOString());
 
   if (error) throw error;
 
-  // Group by product_id, jumlahkan quantity
+  // Group by product_id, jumlahkan quantity ('out') atau selisih turun ('opname_adjustment')
   const grouped = {};
   (movements || []).forEach(m => {
+    // Tentukan jumlah yang dianggap "pemakaian" dari baris ini
+    let pemakaian = 0;
+    if (m.movement_type === 'out') {
+      pemakaian = parseFloat(m.quantity);
+    } else if (m.movement_type === 'opname_adjustment') {
+      const selisih = parseFloat(m.stock_before) - parseFloat(m.stock_after);
+      pemakaian = selisih > 0 ? selisih : 0; // opname naik (stok nambah) tidak dihitung
+    }
+
+    if (pemakaian <= 0) return; // tidak ada kontribusi pemakaian dari baris ini
+
     const id = m.product_id;
     if (!grouped[id]) {
       grouped[id] = {
@@ -143,7 +163,7 @@ async function loadTopProdukBulanIni() {
         total: 0
       };
     }
-    grouped[id].total += parseFloat(m.quantity);
+    grouped[id].total += pemakaian;
   });
 
   const top5 = Object.values(grouped)

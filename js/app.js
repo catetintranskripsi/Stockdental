@@ -465,7 +465,6 @@ async function handleStockIn() {
 async function handleStockOut() {
   const productId = productSelectedId.value;
   const quantity = parseInt(document.getElementById('outQuantity').value, 10);
-  const reason = document.getElementById('outReason').value.trim() || null;
 
   if (!productId) {
     throw new Error('Pilih barang dari daftar terlebih dahulu (klik salah satu hasil pencarian).');
@@ -481,7 +480,7 @@ async function handleStockOut() {
     p_quantity: quantity,
     p_movement_type: 'out',
     p_user_id: CURRENT_USER_ID,
-    p_reason: reason
+    p_reason: null
   });
 
   if (rpcResult.error) throw rpcResult.error;
@@ -490,7 +489,6 @@ async function handleStockOut() {
 async function handleOpname() {
   const productId = productSelectedId.value;
   const physicalCount = parseInt(document.getElementById('opnamePhysicalCount').value, 10);
-  const opnameNote = document.getElementById('opnameNote').value.trim() || null;
 
   if (!productId) {
     throw new Error('Pilih barang dari daftar terlebih dahulu (klik salah satu hasil pencarian).');
@@ -505,7 +503,7 @@ async function handleOpname() {
     p_product_id: productId,
     p_jumlah_fisik: physicalCount,
     p_user_id: CURRENT_USER_ID,
-    p_opname_note: opnameNote
+    p_opname_note: null
   });
 
   if (rpcResult.error) throw rpcResult.error;
