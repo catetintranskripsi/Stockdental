@@ -1,48 +1,65 @@
 // ============================================
 // HISTORY - Riwayat transaksi stock_movements
-// Filter by bulan & tahun
+// Percakapan [Filter Rentang Tanggal] - GANTI dari dropdown Bulan/Tahun
+// ke 2 date picker (Dari - Sampai). Default saat halaman dibuka:
+// tanggal awal = tanggal 1 bulan berjalan, tanggal akhir = hari ini.
+// User bisa ubah bebas ke rentang tanggal manapun, lalu tap "Terapkan".
 // ============================================
 
-const filterMonth = document.getElementById('filterMonth');
-const filterYear = document.getElementById('filterYear');
+const filterStartDate = document.getElementById('filterStartDate');
+const filterEndDate = document.getElementById('filterEndDate');
+const filterApplyBtn = document.getElementById('filterApplyBtn');
+const filterDateError = document.getElementById('filterDateError');
 const historySummary = document.getElementById('historySummary');
 const historyList = document.getElementById('historyList');
 
 // Dipanggil oleh auth-check.js setelah user terverifikasi login
 async function onPageReady() {
-  setupYearOptions();
-  setupDefaultMonth();
+  setupDefaultDateRange();
   await loadHistory();
 }
 
-// Isi dropdown tahun: 2 tahun ke belakang sampai tahun sekarang
-function setupYearOptions() {
-  const currentYear = new Date().getFullYear();
-  filterYear.innerHTML = '';
-  for (let y = currentYear; y >= currentYear - 2; y--) {
-    const opt = document.createElement('option');
-    opt.value = y;
-    opt.textContent = y;
-    filterYear.appendChild(opt);
-  }
+// Default filter: tanggal 1 bulan berjalan sampai hari ini
+function setupDefaultDateRange() {
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  filterStartDate.value = formatDateForInput(startOfMonth);
+  filterEndDate.value = formatDateForInput(now);
 }
 
-// Default filter: bulan & tahun berjalan
-function setupDefaultMonth() {
-  const now = new Date();
-  filterMonth.value = now.getMonth();
-  filterYear.value = now.getFullYear();
+// Format Date jadi 'YYYY-MM-DD' untuk value <input type="date">, hindari isu timezone dari toISOString()
+function formatDateForInput(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
 }
 
 async function loadHistory() {
+  const startValue = filterStartDate.value;
+  const endValue = filterEndDate.value;
+
+  if (!startValue || !endValue) {
+    showFilterDateError('Pilih tanggal awal dan tanggal akhir.');
+    return;
+  }
+
+  if (startValue > endValue) {
+    showFilterDateError('Tanggal awal tidak boleh lebih dari tanggal akhir.');
+    return;
+  }
+
+  hideFilterDateError();
   historyList.innerHTML = '<p class="loading-text">Memuat data...</p>';
 
-  const month = parseInt(filterMonth.value);
-  const year = parseInt(filterYear.value);
-
-  // Rentang awal & akhir bulan yang dipilih
-  const startDate = new Date(year, month, 1).toISOString();
-  const endDate = new Date(year, month + 1, 1).toISOString();
+  // startValue dipakai apa adanya (awal hari), endValue digeser +1 hari
+  // supaya transaksi PADA tanggal akhir yang dipilih ikut kehitung penuh
+  // (pola sama seperti versi lama yang pakai .lt() ke awal bulan berikutnya)
+  const startDate = new Date(startValue + 'T00:00:00').toISOString();
+  const endDateExclusive = new Date(endValue + 'T00:00:00');
+  endDateExclusive.setDate(endDateExclusive.getDate() + 1);
+  const endDate = endDateExclusive.toISOString();
 
   const { data: movements, error } = await supabaseClient
     .from('stock_movements')
@@ -72,11 +89,21 @@ async function loadHistory() {
   renderHistory(movements || []);
 }
 
+function showFilterDateError(message) {
+  filterDateError.textContent = message;
+  filterDateError.style.display = 'block';
+}
+
+function hideFilterDateError() {
+  filterDateError.style.display = 'none';
+  filterDateError.textContent = '';
+}
+
 function renderHistory(movements) {
   renderSummary(movements);
 
   if (movements.length === 0) {
-    historyList.innerHTML = '<p class="loading-text">Tidak ada transaksi di bulan ini.</p>';
+    historyList.innerHTML = '<p class="loading-text">Tidak ada transaksi di rentang tanggal ini.</p>';
     return;
   }
 
@@ -148,7 +175,6 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
-// Reload data setiap filter bulan/tahun berubah
-filterMonth.addEventListener('change', loadHistory);
-filterYear.addEventListener('change', loadHistory);
+// Reload data saat tombol Terapkan ditekan
+filterApplyBtn.addEventListener('click', loadHistory);
     
