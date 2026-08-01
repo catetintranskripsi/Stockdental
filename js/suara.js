@@ -392,10 +392,17 @@ function renderExtractedItems() {
             <span>Barang Masuk</span>
           </label>
           <label class="radio-label">
+            <input type="radio" name="jenis_${item.tempId}" class="item-jenis-out" value="out" ${item.jenis_transaksi === 'out' ? 'checked' : ''}>
+            <span>Barang Keluar</span>
+          </label>
+          <label class="radio-label">
             <input type="radio" name="jenis_${item.tempId}" class="item-jenis-opname" value="opname" ${item.jenis_transaksi === 'opname' ? 'checked' : ''}>
             <span>Stok Fisik Saat Ini</span>
           </label>
         </div>
+        <p class="field-jenis-out-note" style="display:${item.jenis_transaksi === 'out' ? 'block' : 'none'}; font-size:0.8rem; color:var(--color-text-muted); margin-top:4px;">
+          Barang Keluar hanya berlaku untuk barang yang sudah tercatat di Inventaris.
+        </p>
       </div>
 
       <div class="item-fields">
@@ -410,20 +417,20 @@ function renderExtractedItems() {
             <label>Jumlah</label>
             <input type="number" class="item-jumlah" value="${item.jumlah}" min="0" step="0.01">
           </div>
-          <div class="field-group" style="position:relative;">
+          <div class="field-group item-fields-in-only" style="position:relative; display:${item.jenis_transaksi === 'out' ? 'none' : 'block'};">
             <label>Satuan</label>
             <input type="text" class="item-satuan" value="${escapeHtml(item.satuan || 'pcs')}" placeholder="pcs / box / botol" autocomplete="off">
             <div class="item-satuan-results product-search-results" style="display:none;"></div>
           </div>
         </div>
 
-        <div class="field-group" style="position:relative;">
+        <div class="field-group item-fields-in-only" style="position:relative; display:${item.jenis_transaksi === 'out' ? 'none' : 'block'};">
           <label>Kategori</label>
           <input type="text" class="item-kategori" value="${escapeHtml(item.kategori)}" placeholder="Misal: APD, Obat, Alat" autocomplete="off">
           <div class="item-kategori-results product-search-results" style="display:none;"></div>
         </div>
 
-        <div class="field-row">
+        <div class="field-row item-fields-in-only" style="display:${item.jenis_transaksi === 'out' ? 'none' : 'flex'};">
           <div class="field-group">
             <label>Tanggal Kedaluwarsa</label>
             <input type="text" class="item-expiry" inputmode="numeric" placeholder="DDMMYYYY" maxlength="8">
@@ -435,7 +442,7 @@ function renderExtractedItems() {
           </div>
         </div>
 
-        <div class="field-row">
+        <div class="field-row item-fields-in-only" style="display:${item.jenis_transaksi === 'out' ? 'none' : 'flex'};">
           <div class="field-group">
             <label>Nomor Batch (manual)</label>
             <input type="text" class="item-batch" value="${escapeHtml(item.batch_number)}" placeholder="Contoh: BTC-2026-001">
@@ -453,11 +460,30 @@ function renderExtractedItems() {
       row.classList.toggle('item-excluded', !e.target.checked);
     });
 
+    function toggleInOnlyFields(isOut) {
+      row.querySelectorAll('.item-fields-in-only').forEach((el) => {
+        el.style.display = isOut ? 'none' : (el.classList.contains('field-row') ? 'flex' : 'block');
+      });
+      row.querySelector('.field-jenis-out-note').style.display = isOut ? 'block' : 'none';
+    }
+
     row.querySelector('.item-jenis-in').addEventListener('change', (e) => {
-      if (e.target.checked) updateItemField(item.tempId, 'jenis_transaksi', 'in');
+      if (e.target.checked) {
+        updateItemField(item.tempId, 'jenis_transaksi', 'in');
+        toggleInOnlyFields(false);
+      }
+    });
+    row.querySelector('.item-jenis-out').addEventListener('change', (e) => {
+      if (e.target.checked) {
+        updateItemField(item.tempId, 'jenis_transaksi', 'out');
+        toggleInOnlyFields(true);
+      }
     });
     row.querySelector('.item-jenis-opname').addEventListener('change', (e) => {
-      if (e.target.checked) updateItemField(item.tempId, 'jenis_transaksi', 'opname');
+      if (e.target.checked) {
+        updateItemField(item.tempId, 'jenis_transaksi', 'opname');
+        toggleInOnlyFields(false);
+      }
     });
 
     row.querySelector('.btn-delete-row').addEventListener('click', () => {
@@ -623,6 +649,14 @@ async function saveExtractedItemToSupabase(item) {
   let productId;
   const isNewProduct = !existingProduct;
 
+  // Percakapan [Barang Keluar via Suara] - "Barang Keluar" cuma masuk akal
+  // untuk produk yang SUDAH ada di Inventaris (tidak mungkin ada barang
+  // keluar dari stok yang belum pernah tercatat masuk). Tolak di sini,
+  // SEBELUM sempat insert produk baru / pakai kuota limit jenis barang.
+  if (isNewProduct && item.jenis_transaksi === 'out') {
+    throw new Error(`${productName}: barang belum tercatat di Inventaris, tidak bisa dicatat sebagai Barang Keluar. Pilih "Barang Masuk" dulu untuk barang baru.`);
+  }
+
   if (existingProduct) {
     productId = existingProduct.id;
   } else {
@@ -668,6 +702,17 @@ async function saveExtractedItemToSupabase(item) {
       p_jumlah_fisik: quantity,
       p_user_id: CURRENT_USER_ID,
       p_opname_note: 'Input via suara AI'
+    });
+
+    if (rpcError) throw rpcError;
+  } else if (jenisTransaksi === 'out') {
+    const { error: rpcError } = await supabaseClient.rpc('deduct_stock_fefo', {
+      p_clinic_id: CURRENT_CLINIC_ID,
+      p_product_id: productId,
+      p_quantity: quantity,
+      p_movement_type: 'out',
+      p_user_id: CURRENT_USER_ID,
+      p_reason: 'Input via suara AI'
     });
 
     if (rpcError) throw rpcError;

@@ -258,6 +258,16 @@ document.addEventListener('click', function(e) {
   }
 });
 
+// Percakapan [Keterangan Jenis Transaksi] - teks bantuan singkat di bawah
+// dropdown, supaya user paham kapan pakai jenis transaksi yang mana
+// tanpa perlu buka tutorial terpisah.
+const MOVEMENT_TYPE_HINTS = {
+  in: 'Silakan input data barang baru yang masuk ke stok klinik.',
+  out: 'Silakan input data penggunaan barang. Contoh: hari ini alginat habis 1 bungkus, maka input pemakaian alginat di sini sebagai 1 bungkus.',
+  opname_adjustment: 'Bila tidak tahu jumlah pemakaian, input saja jumlah fisik barang saat ini. Contoh: jumlah alginat sekarang tersisa 1 bungkus. Aplikasi akan otomatis menghitung selisihnya dari stok sebelumnya.'
+};
+const movementTypeHint = document.getElementById('movementTypeHint');
+
 movementTypeSelect.addEventListener('change', function() {
   const type = movementTypeSelect.value;
 
@@ -268,6 +278,16 @@ movementTypeSelect.addEventListener('change', function() {
 
   productSelectGroup.style.display = (type === 'out' || type === 'opname_adjustment') ? 'block' : 'none';
   newProductFields.style.display = (type === 'in') ? 'block' : 'none';
+
+  if (movementTypeHint) {
+    if (MOVEMENT_TYPE_HINTS[type]) {
+      movementTypeHint.textContent = MOVEMENT_TYPE_HINTS[type];
+      movementTypeHint.style.display = 'block';
+    } else {
+      movementTypeHint.textContent = '';
+      movementTypeHint.style.display = 'none';
+    }
+  }
 
   resetProductSelection();
   resetMetadataPlaceholders();
