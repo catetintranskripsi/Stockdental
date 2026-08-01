@@ -30,31 +30,21 @@
       <button id="logoutBtn" class="btn-secondary">Logout</button>
     </div>
 
-    <!-- FILTER BULAN & TAHUN -->
+    <!-- FILTER RENTANG TANGGAL -->
     <div class="filter-row">
       <div class="form-group">
-        <label for="filterMonth">Bulan</label>
-        <select id="filterMonth">
-          <option value="0">Januari</option>
-          <option value="1">Februari</option>
-          <option value="2">Maret</option>
-          <option value="3">April</option>
-          <option value="4">Mei</option>
-          <option value="5">Juni</option>
-          <option value="6">Juli</option>
-          <option value="7">Agustus</option>
-          <option value="8">September</option>
-          <option value="9">Oktober</option>
-          <option value="10">November</option>
-          <option value="11">Desember</option>
-        </select>
+        <label for="filterStartDate">Dari Tanggal</label>
+        <input type="date" id="filterStartDate">
       </div>
 
       <div class="form-group">
-        <label for="filterYear">Tahun</label>
-        <select id="filterYear"></select>
+        <label for="filterEndDate">Sampai Tanggal</label>
+        <input type="date" id="filterEndDate">
       </div>
     </div>
+
+    <button type="button" id="filterApplyBtn" class="btn-primary" style="margin-bottom:12px;">Terapkan</button>
+    <div id="filterDateError" class="status-message status-error" style="display:none;"></div>
 
     <!-- RINGKASAN -->
     <div id="historySummary" class="history-summary"></div>
