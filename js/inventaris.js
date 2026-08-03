@@ -37,10 +37,14 @@ const STARTER_CATEGORIES = ['APD', 'BMHP', 'Obat', 'Alat Kesehatan', 'Bahan Tamb
 const STARTER_UNITS = ['pcs', 'box', 'botol', 'tube', 'dus', 'pack', 'set', 'lembar'];
 
 async function loadAutocompleteOptionsInventaris() {
+  // Percakapan [Fix: Nama Barang Hilang Setelah Dihapus] - filter
+  // is_active=true, supaya barang yang sudah dihapus tidak lagi muncul
+  // di dropdown autocomplete form Edit Data Barang.
   const { data: products, error } = await supabaseClient
     .from('products')
     .select('name, category, storage_location, unit')
-    .eq('clinic_id', CURRENT_CLINIC_ID);
+    .eq('clinic_id', CURRENT_CLINIC_ID)
+    .eq('is_active', true);
 
   if (error) {
     console.error('Gagal load histori nama/kategori/lokasi/satuan:', error);

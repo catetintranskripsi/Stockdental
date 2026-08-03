@@ -96,10 +96,14 @@ async function loadProductOptions() {
 }
 
 async function loadAutocompleteOptions() {
+  // Percakapan [Fix: Nama Barang Hilang Setelah Dihapus] - filter
+  // is_active=true, supaya barang yang sudah dihapus tidak lagi muncul
+  // di dropdown autocomplete kategori/lokasi/satuan.
   const { data: products, error: productsError } = await supabaseClient
     .from('products')
     .select('category, storage_location, unit')
-    .eq('clinic_id', CURRENT_CLINIC_ID);
+    .eq('clinic_id', CURRENT_CLINIC_ID)
+    .eq('is_active', true);
 
   if (productsError) {
     console.error('Gagal load histori kategori/lokasi/satuan:', productsError);
@@ -401,11 +405,16 @@ async function handleStockIn() {
     throw new Error('Nama barang dan jumlah wajib diisi dengan benar.');
   }
 
+  // Percakapan [Fix: Nama Barang Hilang Setelah Dihapus] - WAJIB filter
+  // is_active=true. Tanpa ini, produk yang sudah di-soft-delete masih
+  // "ketemu", sehingga input berikutnya dengan nama sama malah nge-restock
+  // ke baris mati itu (tidak pernah muncul lagi di Inventaris).
   let existingProductResult = await supabaseClient
     .from('products')
     .select('id')
     .eq('clinic_id', CURRENT_CLINIC_ID)
     .eq('name', productName)
+    .eq('is_active', true)
     .maybeSingle();
 
   if (existingProductResult.error) throw existingProductResult.error;

@@ -54,10 +54,14 @@ const STARTER_CATEGORIES = ['APD', 'BMHP', 'Obat', 'Alat Kesehatan', 'Bahan Tamb
 const STARTER_UNITS = ['pcs', 'box', 'botol', 'tube', 'dus', 'pack', 'set', 'lembar'];
 
 async function loadAutocompleteOptionsSuara() {
+  // Percakapan [Fix: Nama Barang Hilang Setelah Dihapus] - filter
+  // is_active=true, supaya barang yang sudah dihapus tidak lagi muncul
+  // di dropdown autocomplete ATAU dikirim ke AI sebagai existing_product_names.
   const { data: products, error } = await supabaseClient
     .from('products')
     .select('name, category, storage_location, unit')
-    .eq('clinic_id', CURRENT_CLINIC_ID);
+    .eq('clinic_id', CURRENT_CLINIC_ID)
+    .eq('is_active', true);
 
   if (error) {
     console.error('Gagal load histori nama/kategori/lokasi/satuan:', error);
@@ -644,11 +648,16 @@ async function saveExtractedItemToSupabase(item) {
   const batchNumber = item.batch_number.trim() || null;
   const minimumStock = parseFloat(item.minimum_stock) || 0;
 
+  // Percakapan [Fix: Nama Barang Hilang Setelah Dihapus] - WAJIB filter
+  // is_active=true. Tanpa ini, produk yang sudah di-soft-delete masih
+  // "ketemu", sehingga input berikutnya dengan nama sama malah nge-restock
+  // ke baris mati itu (tidak pernah muncul lagi di Inventaris).
   let { data: existingProduct, error: findError } = await supabaseClient
     .from('products')
     .select('id')
     .eq('clinic_id', CURRENT_CLINIC_ID)
     .eq('name', productName)
+    .eq('is_active', true)
     .maybeSingle();
 
   if (findError) throw findError;

@@ -33,10 +33,14 @@ const STARTER_CATEGORIES = ['APD', 'BMHP', 'Obat', 'Alat Kesehatan', 'Bahan Tamb
 const STARTER_UNITS = ['pcs', 'box', 'botol', 'tube', 'dus', 'pack', 'set', 'lembar'];
 
 async function loadAutocompleteOptionsFoto() {
+  // Percakapan [Fix: Nama Barang Hilang Setelah Dihapus] - filter
+  // is_active=true, supaya barang yang sudah dihapus tidak lagi muncul
+  // di dropdown autocomplete ATAU dikirim ke AI sebagai existing_product_names.
   const { data: products, error } = await supabaseClient
     .from('products')
     .select('name, category, storage_location, unit')
-    .eq('clinic_id', CURRENT_CLINIC_ID);
+    .eq('clinic_id', CURRENT_CLINIC_ID)
+    .eq('is_active', true);
 
   if (error) {
     console.error('Gagal load histori nama/kategori/lokasi/satuan:', error);
@@ -555,12 +559,21 @@ async function saveExtractedItemToSupabase(item) {
   const batchNumber = item.batch_number.trim() || null;
   const minimumStock = parseFloat(item.minimum_stock) || 0;
 
-  // Cari produk existing, atau buat baru kalau belum ada
+  // Cari produk existing, atau buat baru kalau belum ada.
+  // Percakapan [Fix: Nama Barang Hilang Setelah Dihapus] - WAJIB filter
+  // is_active=true di sini. Tanpa ini, produk yang sudah di-soft-delete
+  // (is_active=false, lewat handleDeleteProduct di inventaris.js) masih
+  // "ketemu" oleh query ini, sehingga input berikutnya dengan nama yang
+  // sama malah nge-restock ke baris mati itu -- bukan bikin produk baru.
+  // Baris mati itu tidak pernah muncul di Inventaris (yang query-nya
+  // filter is_active=true), jadi kelihatan seperti barang "hilang"
+  // walau proses simpan sukses tanpa error.
   let { data: existingProduct, error: findError } = await supabaseClient
     .from('products')
     .select('id')
     .eq('clinic_id', CURRENT_CLINIC_ID)
     .eq('name', productName)
+    .eq('is_active', true)
     .maybeSingle();
 
   if (findError) throw findError;
