@@ -71,6 +71,12 @@ const exportStatus = document.getElementById('exportStatus');
 const toggleMergeModeBtn = document.getElementById('toggleMergeModeBtn');
 const confirmMergeBtn = document.getElementById('confirmMergeBtn');
 const mergeStatus = document.getElementById('mergeStatus');
+
+// Percakapan [Cek Barang Mirip (AI)] - elemen baru
+const suggestMergeBtn = document.getElementById('suggestMergeBtn');
+const suggestMergeSection = document.getElementById('suggestMergeSection');
+const suggestMergeList = document.getElementById('suggestMergeList');
+const suggestMergeStatus = document.getElementById('suggestMergeStatus');
 const mergeConfirmModal = document.getElementById('mergeConfirmModal');
 const mergeConfirmBody = document.getElementById('mergeConfirmBody');
 const mergeExecuteBtn = document.getElementById('mergeExecuteBtn');
@@ -103,6 +109,9 @@ async function onPageReady() {
   confirmMergeBtn.addEventListener('click', handleMergeClick);
   mergeExecuteBtn.addEventListener('click', executeMerge);
   mergeCancelBtn.addEventListener('click', closeMergeConfirmModal);
+
+  // Percakapan [Cek Barang Mirip (AI)]
+  suggestMergeBtn.addEventListener('click', handleSuggestMergeClick);
 }
 
 async function loadInventaris() {
@@ -737,6 +746,143 @@ function openMergeConfirmModal(survivor, merged, survivorCount, mergedCount) {
   mergeConfirmModal.dataset.survivorId = survivor.id;
   mergeConfirmModal.dataset.mergedId = merged.id;
   mergeConfirmModal.style.display = 'flex';
+}
+
+// ============================================
+// Percakapan [Cek Barang Mirip (AI)] - saran pasangan barang duplikat
+// via edge function suggest-merge-candidates. Reuse SELECTED_IDS +
+// handleMergeClick() yang sudah ada untuk alur konfirmasi & eksekusi
+// gabung -- tidak duplikasi logic penentuan survivor.
+// ============================================
+async function handleSuggestMergeClick() {
+  suggestMergeBtn.disabled = true;
+  suggestMergeBtn.textContent = 'Menganalisis...';
+  hideSuggestMergeStatus();
+  suggestMergeSection.style.display = 'none';
+  suggestMergeList.innerHTML = '';
+
+  try {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+
+    if (!session) {
+      showSuggestMergeStatus('Sesi login sudah habis, silakan login ulang.', 'error');
+      return;
+    }
+
+    const response = await fetch(
+      `${window.SUPABASE_URL || SUPABASE_URL}/functions/v1/suggest-merge-candidates`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+          'apikey': window.SUPABASE_ANON_KEY || SUPABASE_ANON_KEY
+        },
+        body: JSON.stringify({ clinic_id: CURRENT_CLINIC_ID })
+      }
+    );
+
+    const result = await response.json();
+
+    if (response.status === 429 && result.error === 'quota_exceeded') {
+      showSuggestMergeStatus(
+        `Kuota AI klinik ini sudah habis (${result.used}/${result.limit} bulan ini). Kamu tetap bisa gabungkan barang secara manual lewat "🔗 Gabungkan Barang".`,
+        'error'
+      );
+      return;
+    }
+
+    if (!response.ok) {
+      showSuggestMergeStatus(result.error || 'Gagal menganalisis barang. Coba lagi.', 'error');
+      return;
+    }
+
+    renderSuggestMergeCandidates(result.candidates || []);
+
+  } catch (err) {
+    console.error('Gagal cek barang mirip:', err);
+    showSuggestMergeStatus('Terjadi kesalahan jaringan. Coba lagi.', 'error');
+  } finally {
+    suggestMergeBtn.disabled = false;
+    suggestMergeBtn.textContent = '🤖 Cek Barang Mirip (AI)';
+  }
+}
+
+function renderSuggestMergeCandidates(candidates) {
+  if (candidates.length === 0) {
+    showSuggestMergeStatus('Tidak ditemukan barang yang kemungkinan sama saat ini. 👍', 'success');
+    return;
+  }
+
+  suggestMergeSection.style.display = 'block';
+  suggestMergeList.innerHTML = candidates.map((c, index) => `
+    <div class="suggest-merge-card" data-index="${index}">
+      <p class="suggest-merge-pair">
+        <strong>${escapeHtml(c.nama_a)}</strong> &harr; <strong>${escapeHtml(c.nama_b)}</strong>
+      </p>
+      <p class="suggest-merge-reason">${escapeHtml(c.alasan || '')}</p>
+      <div class="suggest-merge-actions">
+        <button type="button" class="btn-secondary suggest-merge-dismiss" data-index="${index}">Bukan Barang Sama</button>
+        <button type="button" class="btn-primary suggest-merge-confirm" data-index="${index}">Tinjau & Gabungkan</button>
+      </div>
+    </div>
+  `).join('');
+
+  suggestMergeList.querySelectorAll('.suggest-merge-dismiss').forEach(btn => {
+    btn.addEventListener('click', () => {
+      btn.closest('.suggest-merge-card').remove();
+      if (suggestMergeList.children.length === 0) {
+        suggestMergeSection.style.display = 'none';
+      }
+    });
+  });
+
+  suggestMergeList.querySelectorAll('.suggest-merge-confirm').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const index = parseInt(btn.dataset.index, 10);
+      const candidate = candidates[index];
+      handleReviewSuggestedPair(candidate);
+    });
+  });
+}
+
+// Percakapan [Cek Barang Mirip (AI)] - cari product id dari nama (hasil
+// AI berupa nama, bukan id), lalu reuse SELECTION_MODE + SELECTED_IDS +
+// handleMergeClick() yang SUDAH ADA -- supaya validasi satuan, hitung
+// riwayat transaksi, penentuan survivor, dan modal konfirmasi semuanya
+// pakai jalur yang sama persis dengan gabung manual (tidak ada logic
+// gabung yang terpisah/duplikat untuk jalur AI ini).
+function handleReviewSuggestedPair(candidate) {
+  const productA = ALL_INVENTARIS_ITEMS.find(p => p.name === candidate.nama_a);
+  const productB = ALL_INVENTARIS_ITEMS.find(p => p.name === candidate.nama_b);
+
+  if (!productA || !productB) {
+    showSuggestMergeStatus('Salah satu barang sudah tidak ada lagi (mungkin baru saja diubah/dihapus). Coba cek ulang.', 'error');
+    return;
+  }
+
+  if (!SELECTION_MODE) {
+    handleToggleMergeMode();
+  }
+  SELECTED_IDS.clear();
+  SELECTED_IDS.add(productA.id);
+  SELECTED_IDS.add(productB.id);
+  confirmMergeBtn.style.display = 'inline-block';
+
+  renderInventaris(inventarisSearchInput.value);
+  inventarisList.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  showSuggestMergeStatus(`"${candidate.nama_a}" dan "${candidate.nama_b}" sudah dipilih di bawah. Tap "Gabungkan (2)" untuk tinjau & konfirmasi.`, 'success');
+}
+
+function showSuggestMergeStatus(message, type) {
+  suggestMergeStatus.textContent = message;
+  suggestMergeStatus.className = 'status-message status-' + type;
+  suggestMergeStatus.style.display = 'block';
+}
+
+function hideSuggestMergeStatus() {
+  suggestMergeStatus.style.display = 'none';
 }
 
 function closeMergeConfirmModal() {
