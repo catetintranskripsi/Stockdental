@@ -944,9 +944,14 @@ function handleReviewSuggestedPair(candidate) {
   confirmMergeBtn.style.display = 'inline-block';
 
   renderInventaris(inventarisSearchInput.value);
-  inventarisList.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
-  showSuggestMergeStatus(`"${candidate.nama_a}" dan "${candidate.nama_b}" sudah dipilih di bawah. Tap "Gabungkan (2)" untuk tinjau & konfirmasi.`, 'success');
+  // Percakapan [Fix Auto-scroll Tinjau & Gabungkan] - LANGSUNG buka modal
+  // konfirmasi (reuse handleMergeClick(), sama dengan alur gabung manual),
+  // BUKAN scroll ke daftar barang. Kedua barang bisa saja ada di halaman
+  // pagination berbeda -- scroll ke list tidak menjamin user lihat
+  // keduanya. Modal (position:fixed, menutupi layar) sudah menampilkan
+  // jelas arah gabung tanpa bergantung posisi scroll/halaman sama sekali.
+  handleMergeClick();
 }
 
 function showSuggestMergeStatus(message, type) {
