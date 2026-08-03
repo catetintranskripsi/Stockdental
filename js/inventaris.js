@@ -736,11 +736,17 @@ function openMergeConfirmModal(survivor, merged, survivorCount, mergedCount) {
   const totalStock = Number(survivor.current_stock) + Number(merged.current_stock);
 
   mergeConfirmBody.innerHTML = `
-    <p>Produk <strong>${escapeHtml(merged.name)}</strong> (${mergedCount} riwayat transaksi) akan digabung ke <strong>${escapeHtml(survivor.name)}</strong> (${survivorCount} riwayat transaksi).</p>
+    <p class="merge-direction">
+      <span class="merge-direction-from">${escapeHtml(merged.name)}</span>
+      <span class="merge-direction-arrow">→</span>
+      <span class="merge-direction-to">${escapeHtml(survivor.name)}</span>
+    </p>
+    <p>Barang <strong>${escapeHtml(merged.name)}</strong> (${mergedCount} riwayat transaksi) akan digabung ke <strong>${escapeHtml(survivor.name)}</strong> (${survivorCount} riwayat transaksi) — dipilih otomatis karena riwayat transaksinya lebih banyak/lebih lama dipakai.</p>
     <p>Kategori hasil gabungan: <strong>${escapeHtml(survivor.category || '-')}</strong></p>
     <p>Lokasi hasil gabungan: <strong>${escapeHtml(survivor.storage_location || '-')}</strong></p>
     <p>Total stok setelah gabung: <strong>${totalStock} ${escapeHtml(survivor.unit || '')}</strong></p>
-    <p class="merge-warning">Aksi ini tidak bisa dibatalkan.</p>
+    <p class="merge-note-edit">Nama/kategori/lokasi hasil gabungan bisa diubah lagi kapan saja lewat Edit Data Barang setelah ini.</p>
+    <p class="merge-warning">Aksi gabung ini sendiri tidak bisa dibatalkan.</p>
   `;
 
   mergeConfirmModal.dataset.survivorId = survivor.id;
@@ -797,7 +803,7 @@ async function handleSuggestMergeClick() {
       return;
     }
 
-    renderSuggestMergeCandidates(result.candidates || []);
+    await renderSuggestMergeCandidates(result.candidates || []);
 
   } catch (err) {
     console.error('Gagal cek barang mirip:', err);
@@ -808,19 +814,24 @@ async function handleSuggestMergeClick() {
   }
 }
 
-function renderSuggestMergeCandidates(candidates) {
+async function renderSuggestMergeCandidates(candidates) {
   if (candidates.length === 0) {
     showSuggestMergeStatus('Tidak ditemukan barang yang kemungkinan sama saat ini. 👍', 'success');
     return;
   }
 
   suggestMergeSection.style.display = 'block';
+
+  // Percakapan [Cek Barang Mirip (AI)] - tampilkan dulu kartu tanpa
+  // badge survivor (biar user tidak menunggu), lalu isi badge-nya
+  // begitu hasil hitung riwayat transaksi selesai per kartu.
   suggestMergeList.innerHTML = candidates.map((c, index) => `
     <div class="suggest-merge-card" data-index="${index}">
       <p class="suggest-merge-pair">
         <strong>${escapeHtml(c.nama_a)}</strong> &harr; <strong>${escapeHtml(c.nama_b)}</strong>
       </p>
       <p class="suggest-merge-reason">${escapeHtml(c.alasan || '')}</p>
+      <p class="suggest-merge-survivor-hint" data-role="survivor-hint">Menghitung barang mana yang bakal jadi utama...</p>
       <div class="suggest-merge-actions">
         <button type="button" class="btn-secondary suggest-merge-dismiss" data-index="${index}">Bukan Barang Sama</button>
         <button type="button" class="btn-primary suggest-merge-confirm" data-index="${index}">Tinjau & Gabungkan</button>
@@ -841,9 +852,72 @@ function renderSuggestMergeCandidates(candidates) {
     btn.addEventListener('click', () => {
       const index = parseInt(btn.dataset.index, 10);
       const candidate = candidates[index];
+      // Percakapan [Cek Barang Mirip (AI)] - hilangkan kartu ini SEGERA
+      // setelah diklik, supaya user tahu kartu mana yang sudah ditinjau
+      // (tidak menunggu sampai modal konfirmasi selesai/dibatalkan).
+      btn.closest('.suggest-merge-card').remove();
+      if (suggestMergeList.children.length === 0) {
+        suggestMergeSection.style.display = 'none';
+      }
       handleReviewSuggestedPair(candidate);
     });
   });
+
+  // Isi badge prediksi survivor per kartu, paralel semua kartu sekaligus
+  candidates.forEach((c, index) => {
+    fillSurvivorHint(c, index);
+  });
+}
+
+// Percakapan [Cek Barang Mirip (AI)] - hitung BETULAN (bukan cuma
+// prediksi) siapa yang bakal jadi survivor kalau pasangan ini digabung,
+// pakai logic SAMA PERSIS dengan handleMergeClick() (jumlah riwayat
+// transaksi, fallback ke created_at lebih awal). Ditampilkan sebagai
+// hint di kartu SEBELUM user klik apapun, supaya user tidak bingung
+// arah gabungnya sebelum memutuskan untuk menindaklanjuti kartu ini.
+async function fillSurvivorHint(candidate, index) {
+  const card = suggestMergeList.querySelector(`.suggest-merge-card[data-index="${index}"]`);
+  if (!card) return; // kartu sudah dihapus (dismiss/confirm) sebelum hint selesai dihitung
+
+  const hintEl = card.querySelector('[data-role="survivor-hint"]');
+  if (!hintEl) return;
+
+  const productA = ALL_INVENTARIS_ITEMS.find(p => p.name === candidate.nama_a);
+  const productB = ALL_INVENTARIS_ITEMS.find(p => p.name === candidate.nama_b);
+
+  if (!productA || !productB) {
+    hintEl.textContent = 'Salah satu barang sudah tidak ada lagi.';
+    return;
+  }
+
+  const { data: movementsData, error } = await supabaseClient
+    .from('stock_movements')
+    .select('product_id')
+    .in('product_id', [productA.id, productB.id]);
+
+  // Kartu mungkin sudah dihapus user selagi query ini jalan -- cek lagi.
+  if (!suggestMergeList.querySelector(`.suggest-merge-card[data-index="${index}"]`)) return;
+
+  if (error) {
+    hintEl.textContent = '';
+    return;
+  }
+
+  const countA = (movementsData || []).filter(m => m.product_id === productA.id).length;
+  const countB = (movementsData || []).filter(m => m.product_id === productB.id).length;
+
+  let survivorName, mergedName;
+  if (countA > countB) {
+    survivorName = productA.name; mergedName = productB.name;
+  } else if (countB > countA) {
+    survivorName = productB.name; mergedName = productA.name;
+  } else {
+    const aOlder = (productA.created_at || '') <= (productB.created_at || '');
+    survivorName = aOlder ? productA.name : productB.name;
+    mergedName = aOlder ? productB.name : productA.name;
+  }
+
+  hintEl.innerHTML = `↳ Kalau digabung: <strong>${escapeHtml(mergedName)}</strong> → <strong>${escapeHtml(survivorName)}</strong> (jadi nama utama)`;
 }
 
 // Percakapan [Cek Barang Mirip (AI)] - cari product id dari nama (hasil
