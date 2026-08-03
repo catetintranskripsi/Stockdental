@@ -248,7 +248,15 @@ async function callGeminiExtraction(base64Image, mimeType) {
     inputType: 'image',
     mediaFields: {
       image_base64: base64Image,
-      mime_type: mimeType
+      mime_type: mimeType,
+      // Percakapan [Pencocokan Nama Barang Existing] - kirim daftar nama
+      // produk klinik ini (sudah dimuat loadAutocompleteOptionsFoto()
+      // saat halaman dibuka) supaya AI bisa mengenali kalau barang di
+      // foto sebenarnya sudah pernah diinput dengan nama tertentu, dan
+      // memakai nama yang SAMA PERSIS itu -- mengurangi barang duplikat
+      // akibat variasi penulisan AI (misal "Composite 3M A2" vs
+      // "Komposit 3M A2" yang sudah ada di database).
+      existing_product_names: ALL_PRODUCT_NAMES
     }
   });
 

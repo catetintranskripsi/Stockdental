@@ -329,7 +329,14 @@ async function callGeminiExtractionAudio(segments) {
     clinicId: CURRENT_CLINIC_ID,
     inputType: 'audio',
     mediaFields: {
-      audio_parts: audioParts
+      audio_parts: audioParts,
+      // Percakapan [Pencocokan Nama Barang Existing] - kirim daftar nama
+      // produk klinik ini (sudah dimuat loadAutocompleteOptionsSuara()
+      // saat halaman dibuka) supaya AI bisa mengenali kalau barang yang
+      // diucapkan sebenarnya sudah pernah diinput dengan nama tertentu,
+      // dan memakai nama yang SAMA PERSIS itu -- mengurangi barang
+      // duplikat akibat variasi penulisan AI.
+      existing_product_names: ALL_PRODUCT_NAMES
     }
   });
 
