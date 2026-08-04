@@ -16,7 +16,7 @@ let ALL_BATCH_NUMBERS = [];
 const STARTER_CATEGORIES = ['APD', 'BMHP', 'Obat', 'Alat Kesehatan', 'Bahan Tambal/Restorasi', 'Lainnya'];
 const STARTER_UNITS = ['pcs', 'box', 'botol', 'tube', 'dus', 'pack', 'set', 'lembar'];
 
-const DEFAULT_MIN_STOCK_PLACEHOLDER = 'Kosongkan jika belum tahu';
+const DEFAULT_MIN_STOCK_PLACEHOLDER = 'Kosongkan jika belum tahu (cth: 3 atau 0.25 utk 1/4)';
 const DEFAULT_CATEGORY_PLACEHOLDER = 'Contoh: APD, Obat, BMHP';
 const DEFAULT_LOCATION_PLACEHOLDER = 'Contoh: Lemari A - Rak 2';
 const DEFAULT_UNIT_PLACEHOLDER = 'pcs / box / botol';
@@ -384,7 +384,7 @@ function parseErrorMessage(error) {
 async function handleStockIn() {
   const productName = document.getElementById('productName').value.trim();
   const category = document.getElementById('category').value.trim();
-  const quantity = parseInt(document.getElementById('quantity').value, 10);
+  const quantity = parseFloat(document.getElementById('quantity').value);
   const unit = document.getElementById('unit').value.trim() || 'pcs';
 
   // Percakapan [Format Tanggal DDMMYYYY] - parse & validasi input manual
@@ -473,10 +473,10 @@ async function handleStockIn() {
 
 async function handleStockOut() {
   const productId = productSelectedId.value;
-  const quantity = parseInt(document.getElementById('outQuantity').value, 10);
+  const quantity = parseFloat(document.getElementById('outQuantity').value);
 
   if (!productId) {
-    throw new Error('Pilih barang dari daftar terlebih dahulu (klik salah satu hasil pencarian).');
+    throw new Error('Barang belum dipilih dari daftar. Ketik nama barang di kolom "Pilih Barang" lalu klik salah satu hasil yang muncul. Kalau barang tidak muncul di hasil pencarian, berarti barang ini belum pernah diinput -- input dulu lewat transaksi Tambah Barang (Barang Masuk).');
   }
 
   if (isNaN(quantity) || quantity <= 0) {
@@ -497,10 +497,10 @@ async function handleStockOut() {
 
 async function handleOpname() {
   const productId = productSelectedId.value;
-  const physicalCount = parseInt(document.getElementById('opnamePhysicalCount').value, 10);
+  const physicalCount = parseFloat(document.getElementById('opnamePhysicalCount').value);
 
   if (!productId) {
-    throw new Error('Pilih barang dari daftar terlebih dahulu (klik salah satu hasil pencarian).');
+    throw new Error('Barang belum dipilih dari daftar. Ketik nama barang di kolom "Pilih Barang" lalu klik salah satu hasil yang muncul. Kalau barang tidak muncul di hasil pencarian, berarti barang ini belum pernah diinput -- Stok Opname hanya untuk mencatat pemakaian lewat selisih jumlah yang sudah tercatat sebelumnya dengan jumlah fisik sekarang, jadi barang baru wajib diinput dulu lewat transaksi Tambah Barang (Barang Masuk).');
   }
 
   if (isNaN(physicalCount) || physicalCount < 0) {

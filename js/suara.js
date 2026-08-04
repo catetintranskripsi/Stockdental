@@ -426,7 +426,7 @@ function renderExtractedItems() {
         <div class="field-row">
           <div class="field-group">
             <label>Jumlah</label>
-            <input type="number" class="item-jumlah" value="${item.jumlah}" min="0" step="0.01">
+            <input type="number" class="item-jumlah" value="${item.jumlah}" min="0" step="0.01" placeholder="cth: 3 atau 0.25 utk 1/4">
           </div>
           <div class="field-group item-fields-in-only" style="position:relative; display:${item.jenis_transaksi === 'out' ? 'none' : 'block'};">
             <label>Satuan</label>
@@ -460,7 +460,7 @@ function renderExtractedItems() {
           </div>
           <div class="field-group">
             <label>Stok Minimum (barang baru)</label>
-            <input type="number" class="item-minstock" value="${item.minimum_stock}" min="0" step="0.01">
+            <input type="number" class="item-minstock" value="${item.minimum_stock}" min="0" step="0.01" placeholder="cth: 3 atau 0.25 utk 1/4">
           </div>
         </div>
       </div>
@@ -632,7 +632,7 @@ async function handleSaveAllClick() {
 
 async function saveExtractedItemToSupabase(item) {
   const productName = item.nama.trim();
-  const quantity = parseInt(item.jumlah, 10);
+  const quantity = parseFloat(item.jumlah);
   const unit = item.satuan || 'pcs';
   const category = item.kategori.trim() || null;
 
