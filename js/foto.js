@@ -89,16 +89,25 @@ function onPageReady() {
 
 // ============================================
 // Percakapan [BARU] - KOMPRESI FOTO SEBELUM UPLOAD
-// Resize ke maksimal 1280px di sisi terpanjang + compress JPEG quality 0.75.
+// Resize ke maksimal 1600px di sisi terpanjang + compress JPEG quality 0.8.
 // Tujuan: hindari gagal upload karena file kamera terlalu besar (beberapa MB),
 // tanpa perlu user turunkan kualitas kamera manual.
+//
+// Percakapan [Fix: Barang Hilang di Foto Padat Banyak Item] - NAIKKAN dari
+// 1280px/0.75 ke 1600px/0.8. Root cause: foto dengan banyak barang kecil
+// berdekatan (misal rak penuh) kehilangan detail tulisan/label setelah
+// di-resize ke 1280px, sehingga Gemini tidak bisa mengenali sebagian barang
+// walau foto aslinya jelas. Aplikasi Gemini resmi mengirim resolusi jauh
+// lebih tinggi, itu sebabnya hasilnya lebih lengkap dibanding StockDental
+// untuk foto yang sama. 1600px dipilih sebagai titik tengah: cukup detail
+// untuk foto padat, tapi ukuran file tetap wajar untuk upload dari HP.
 //
 // Cara kerja: gambar dimuat ke <img> di memori, digambar ulang ke <canvas>
 // dengan ukuran baru, lalu diekspor sebagai JPEG base64 lewat canvas.toDataURL().
 // Semua terjadi di browser (client-side), tidak ada upload sementara ke server.
 // ============================================
-const MAX_DIMENSION = 1280;
-const JPEG_QUALITY = 0.75;
+const MAX_DIMENSION = 1600;
+const JPEG_QUALITY = 0.8;
 
 function compressImage(file) {
   return new Promise((resolve, reject) => {
@@ -698,5 +707,3 @@ function escapeHtml(text) {
   div.textContent = text;
   return div.innerHTML;
 }
-
-
