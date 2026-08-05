@@ -20,6 +20,21 @@
 // aneh). Start/stop biasa per segmen jauh lebih stabil, dan user bisa
 // hapus 1 segmen tertentu kalau salah ngomong tanpa ulang dari awal.
 //
+// Percakapan [Deteksi Jenis Transaksi dari Suara] - BARU:
+// - smooth-responder sekarang mengembalikan field jenis_transaksi
+//   ('in'/'out'/'opname') hasil tebakan AI dari kata kunci ucapan
+//   (misal "sisa 2" -> opname, "buang 1 rusak" -> out).
+// - Radio button di hasil ekstraksi sekarang otomatis diarahkan ke
+//   hasil tebakan itu, TAPI staff tetap bisa ubah manual sebelum simpan
+//   (tidak ada perubahan di render/listener radio, cuma nilai awalnya).
+// - Pengaman: kalau nama barang belum ada di ALL_PRODUCT_NAMES (produk
+//   baru), jenis_transaksi dipaksa 'in' SAAT RENDER juga -- supaya
+//   radio button yang tampil ke staff konsisten dengan apa yang bakal
+//   benar-benar tersimpan (saveExtractedItemToSupabase() sudah lama
+//   punya pengaman sejenis di sisi simpan: isNewProduct ? 'in' : ...).
+//   Tanpa ini, radio bisa nampilkan "Stok Fisik" padahal saat disimpan
+//   dipaksa jadi "Barang Masuk" -- membingungkan staff.
+//
 // CATATAN: CURRENT_CLINIC_ID, CURRENT_USER_ID, supabaseClient
 // sudah didefinisikan di auth-check.js dan supabase-client.js.
 // File ini TIDAK boleh redeclare variabel itu.
@@ -74,6 +89,18 @@ async function loadAutocompleteOptionsSuara() {
     ALL_LOCATIONS = uniqueMerge([], products.map(function(p) { return p.storage_location; }).filter(Boolean));
     ALL_UNITS = uniqueMerge(STARTER_UNITS, products.map(function(p) { return p.unit; }).filter(Boolean));
   }
+}
+
+// Percakapan [Deteksi Jenis Transaksi dari Suara] - BARU: helper cek
+// apakah nama barang (hasil AI) sudah ada di daftar produk existing
+// klinik ini. Perbandingan case-insensitive + trim, supaya beda kapital/
+// spasi kecil tidak dianggap "barang baru" secara keliru.
+function isKnownProductName(nama) {
+  if (!nama) return false;
+  const target = nama.trim().toLowerCase();
+  return ALL_PRODUCT_NAMES.some(function(n) {
+    return n.trim().toLowerCase() === target;
+  });
 }
 
 // Elemen-elemen DOM
@@ -279,21 +306,43 @@ async function handleProcessAllClick() {
       return;
     }
 
-    // Struktur SAMA PERSIS dengan foto.js: batch_number & minimum_stock
-    // selalu manual input, tidak pernah dari AI.
-    extractedItems = items.map((item, index) => ({
-      tempId: 'item_' + index,
-      nama: item.nama || '',
-      jumlah: item.jumlah || 0,
-      satuan: item.satuan || 'pcs',
-      kategori: item.kategori || '',
-      expiry_date: item.expiry_date || '',
-      lokasi_penyimpanan: item.lokasi_penyimpanan || '',
-      batch_number: '',
-      minimum_stock: 0,
-      jenis_transaksi: 'in',
-      included: true
-    }));
+    // Struktur SAMA PERSIS dengan foto.js, kecuali jenis_transaksi:
+    // batch_number & minimum_stock selalu manual input, tidak pernah dari AI.
+    //
+    // Percakapan [Deteksi Jenis Transaksi dari Suara] - jenis_transaksi
+    // sekarang diambil dari hasil tebakan AI (item.jenis_transaksi,
+    // salah satu dari 'in'/'out'/'opname', default 'in' kalau AI tidak
+    // mengembalikan field ini atau nilainya di luar tiga itu).
+    //
+    // Pengaman: kalau nama barang belum ada di ALL_PRODUCT_NAMES (belum
+    // pernah diinput sebelumnya), paksa 'in' di sini juga -- supaya
+    // radio button yang tampil ke staff SUDAH konsisten dari awal dengan
+    // apa yang bakal benar-benar tersimpan (saveExtractedItemToSupabase()
+    // punya pengaman yang sama di titik simpan, ini cuma menyamakan
+    // tampilannya supaya tidak membingungkan staff).
+    const VALID_JENIS = ['in', 'out', 'opname'];
+    extractedItems = items.map((item, index) => {
+      const namaBarang = item.nama || '';
+      let jenisTransaksi = VALID_JENIS.includes(item.jenis_transaksi) ? item.jenis_transaksi : 'in';
+
+      if (jenisTransaksi !== 'in' && !isKnownProductName(namaBarang)) {
+        jenisTransaksi = 'in';
+      }
+
+      return {
+        tempId: 'item_' + index,
+        nama: namaBarang,
+        jumlah: item.jumlah || 0,
+        satuan: item.satuan || 'pcs',
+        kategori: item.kategori || '',
+        expiry_date: item.expiry_date || '',
+        lokasi_penyimpanan: item.lokasi_penyimpanan || '',
+        batch_number: '',
+        minimum_stock: 0,
+        jenis_transaksi: jenisTransaksi,
+        included: true
+      };
+    });
 
     renderExtractedItems();
     recordStatus.style.display = 'none';
@@ -375,7 +424,10 @@ function blobToBase64(blob) {
 // ============================================
 // RENDER, EDIT, SIMPAN — SEMUA DI BAWAH INI DI-COPY APA ADANYA DARI foto.js
 // Tidak ada perubahan logic sama sekali, karena struktur extractedItems
-// dan field-nya identik.
+// dan field-nya identik. (Radio button jenis transaksi sudah otomatis
+// terpilih sesuai item.jenis_transaksi yang di-set di handleProcessAllClick()
+// di atas -- markup di bawah cuma membaca item.jenis_transaksi seperti biasa,
+// tidak ada perubahan di render/listener radio itu sendiri.)
 // ============================================
 function renderExtractedItems() {
   resultSummary.textContent = `Ditemukan ${extractedItems.length} barang. Periksa dan koreksi sebelum simpan.`;
