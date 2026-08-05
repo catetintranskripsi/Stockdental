@@ -476,7 +476,7 @@ async function handleStockOut() {
   const quantity = parseFloat(document.getElementById('outQuantity').value);
 
   if (!productId) {
-    throw new Error('Barang belum dipilih dari daftar. Ketik nama barang di kolom "Pilih Barang" lalu klik salah satu hasil yang muncul. Kalau barang tidak muncul di hasil pencarian, berarti barang ini belum pernah diinput -- input dulu lewat transaksi Tambah Barang (Barang Masuk).');
+    throw new Error('Barang belum dipilih. Klik salah satu hasil pencarian di bawah kolom nama barang. Kalau tidak muncul hasil, berarti barang ini belum pernah diinput -- input dulu lewat Tambah Barang (Barang Masuk).');
   }
 
   if (isNaN(quantity) || quantity <= 0) {
@@ -500,7 +500,7 @@ async function handleOpname() {
   const physicalCount = parseFloat(document.getElementById('opnamePhysicalCount').value);
 
   if (!productId) {
-    throw new Error('Barang belum dipilih dari daftar. Ketik nama barang di kolom "Pilih Barang" lalu klik salah satu hasil yang muncul. Kalau barang tidak muncul di hasil pencarian, berarti barang ini belum pernah diinput -- Stok Opname hanya untuk mencatat pemakaian lewat selisih jumlah yang sudah tercatat sebelumnya dengan jumlah fisik sekarang, jadi barang baru wajib diinput dulu lewat transaksi Tambah Barang (Barang Masuk).');
+    throw new Error('Barang belum dipilih. Klik salah satu hasil pencarian di bawah kolom nama barang. Kalau tidak muncul hasil, berarti barang ini belum pernah diinput -- input dulu lewat Tambah Barang (Barang Masuk).');
   }
 
   if (isNaN(physicalCount) || physicalCount < 0) {
@@ -536,5 +536,5 @@ function showStatus(message, type) {
     statusDiv.className = '';
     statusDiv.style.display = 'none';
     statusDiv.textContent = '';
-  }, 4000);
+  }, 7000);
     }
