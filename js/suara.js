@@ -320,12 +320,19 @@ async function handleProcessAllClick() {
     // apa yang bakal benar-benar tersimpan (saveExtractedItemToSupabase()
     // punya pengaman yang sama di titik simpan, ini cuma menyamakan
     // tampilannya supaya tidak membingungkan staff).
+    // Percakapan [Unifikasi Field Produk Baru/Existing - Foto & Suara] -
+    // is_known_product disimpan di sini (bukan cuma dipakai sesaat utk
+    // koreksi jenis_transaksi), dipakai renderExtractedItems() untuk
+    // sembunyikan field identitas produk (kategori/lokasi/satuan/stok-min).
+    // Digabung dengan toggleInOnlyFields() yang sudah ada: field
+    // disembunyikan kalau jenis='out' ATAU produk sudah dikenal.
     const VALID_JENIS = ['in', 'out', 'opname'];
     extractedItems = items.map((item, index) => {
       const namaBarang = item.nama || '';
+      const isKnown = isKnownProductName(namaBarang);
       let jenisTransaksi = VALID_JENIS.includes(item.jenis_transaksi) ? item.jenis_transaksi : 'in';
 
-      if (jenisTransaksi !== 'in' && !isKnownProductName(namaBarang)) {
+      if (jenisTransaksi !== 'in' && !isKnown) {
         jenisTransaksi = 'in';
       }
 
@@ -340,6 +347,7 @@ async function handleProcessAllClick() {
         batch_number: '',
         minimum_stock: 0,
         jenis_transaksi: jenisTransaksi,
+        is_known_product: isKnown,
         included: true
       };
     });
@@ -480,14 +488,14 @@ function renderExtractedItems() {
             <label>Jumlah</label>
             <input type="number" class="item-jumlah" value="${item.jumlah}" min="0" step="0.01" placeholder="cth: 3 atau 0.25 utk 1/4">
           </div>
-          <div class="field-group item-fields-in-only" style="position:relative; display:${item.jenis_transaksi === 'out' ? 'none' : 'block'};">
+          <div class="field-group item-fields-in-only item-fields-new-only" style="position:relative; display:${(item.jenis_transaksi === 'out' || item.is_known_product) ? 'none' : 'block'};">
             <label>Satuan</label>
             <input type="text" class="item-satuan" value="${escapeHtml(item.satuan || 'pcs')}" placeholder="pcs / box / botol" autocomplete="off">
             <div class="item-satuan-results product-search-results" style="display:none;"></div>
           </div>
         </div>
 
-        <div class="field-group item-fields-in-only" style="position:relative; display:${item.jenis_transaksi === 'out' ? 'none' : 'block'};">
+        <div class="field-group item-fields-in-only item-fields-new-only" style="position:relative; display:${(item.jenis_transaksi === 'out' || item.is_known_product) ? 'none' : 'block'};">
           <label>Kategori</label>
           <input type="text" class="item-kategori" value="${escapeHtml(item.kategori)}" placeholder="Misal: APD, Obat, Alat" autocomplete="off">
           <div class="item-kategori-results product-search-results" style="display:none;"></div>
@@ -498,7 +506,7 @@ function renderExtractedItems() {
             <label>Tanggal Kedaluwarsa</label>
             <input type="text" class="item-expiry" inputmode="numeric" placeholder="DDMMYYYY" maxlength="8">
           </div>
-          <div class="field-group" style="position:relative;">
+          <div class="field-group item-fields-new-only" style="position:relative; display:${(item.jenis_transaksi === 'out' || item.is_known_product) ? 'none' : 'block'};">
             <label>Lokasi Simpan</label>
             <input type="text" class="item-lokasi" value="${escapeHtml(item.lokasi_penyimpanan)}" placeholder="Misal: Lemari A" autocomplete="off">
             <div class="item-lokasi-results product-search-results" style="display:none;"></div>
@@ -510,11 +518,15 @@ function renderExtractedItems() {
             <label>Nomor Batch (manual)</label>
             <input type="text" class="item-batch" value="${escapeHtml(item.batch_number)}" placeholder="Contoh: BTC-2026-001">
           </div>
-          <div class="field-group">
+          <div class="field-group item-fields-new-only" style="display:${(item.jenis_transaksi === 'out' || item.is_known_product) ? 'none' : 'block'};">
             <label>Stok Minimum (barang baru)</label>
             <input type="number" class="item-minstock" value="${item.minimum_stock}" min="0" step="0.01" placeholder="cth: 3 atau 0.25 utk 1/4">
           </div>
         </div>
+
+        <p class="field-known-product-note" style="display:${(item.is_known_product && item.jenis_transaksi !== 'out') ? 'block' : 'none'}; font-size:0.8rem; color:var(--color-text-muted); margin-top:4px;">
+          Barang ini sudah tercatat di Inventaris -- kategori/lokasi/satuan/stok minimum dipakai dari data yang sudah ada.
+        </p>
       </div>
     `;
 
@@ -523,11 +535,24 @@ function renderExtractedItems() {
       row.classList.toggle('item-excluded', !e.target.checked);
     });
 
+    // Percakapan [Unifikasi Field Produk Baru/Existing - Foto & Suara] -
+    // toggleInOnlyFields() sekarang mempertimbangkan DUA kondisi:
+    // - isOut: field expiry/batch/kategori/lokasi/satuan/stok-min semua
+    //   sembunyi (Barang Keluar cuma butuh jumlah)
+    // - isKnownProduct (dibaca dari currentIsKnown, di-update tiap kali
+    //   nama diedit): field IDENTITAS produk (kategori/lokasi/satuan/
+    //   stok-min) sembunyi, TAPI expiry/batch tetap tampil (properti lot,
+    //   relevan walau produknya sudah ada).
+    let currentIsKnown = item.is_known_product;
+
     function toggleInOnlyFields(isOut) {
       row.querySelectorAll('.item-fields-in-only').forEach((el) => {
-        el.style.display = isOut ? 'none' : (el.classList.contains('field-row') ? 'flex' : 'block');
+        const hideForNewOnly = el.classList.contains('item-fields-new-only') && currentIsKnown;
+        const shouldHide = isOut || hideForNewOnly;
+        el.style.display = shouldHide ? 'none' : (el.classList.contains('field-row') ? 'flex' : 'block');
       });
       row.querySelector('.field-jenis-out-note').style.display = isOut ? 'block' : 'none';
+      row.querySelector('.field-known-product-note').style.display = (currentIsKnown && !isOut) ? 'block' : 'none';
     }
 
     row.querySelector('.item-jenis-in').addEventListener('change', (e) => {
@@ -555,7 +580,16 @@ function renderExtractedItems() {
       updateResultSummary();
     });
 
-    row.querySelector('.item-nama').addEventListener('input', (e) => updateItemField(item.tempId, 'nama', e.target.value));
+    row.querySelector('.item-nama').addEventListener('input', (e) => {
+      updateItemField(item.tempId, 'nama', e.target.value);
+      currentIsKnown = isKnownProductName(e.target.value);
+      updateItemField(item.tempId, 'is_known_product', currentIsKnown);
+      // Re-toggle pakai status "out" saat ini (baca dari radio yang aktif),
+      // supaya field kategori/lokasi/dst konsisten dengan kombinasi
+      // jenis transaksi + status produk yang terbaru.
+      const isOutNow = row.querySelector('.item-jenis-out').checked;
+      toggleInOnlyFields(isOutNow);
+    });
     row.querySelector('.item-jumlah').addEventListener('input', (e) => updateItemField(item.tempId, 'jumlah', parseFloat(e.target.value) || 0));
     row.querySelector('.item-satuan').addEventListener('input', (e) => updateItemField(item.tempId, 'satuan', e.target.value));
     row.querySelector('.item-kategori').addEventListener('input', (e) => updateItemField(item.tempId, 'kategori', e.target.value));
@@ -622,6 +656,7 @@ function handleAddManualRow() {
     batch_number: '',
     minimum_stock: 0,
     jenis_transaksi: 'in',
+    is_known_product: false, // baris kosong, belum ada nama -> dianggap baru sampai user ketik
     included: true
   };
   extractedItems.push(newItem);

@@ -55,6 +55,19 @@ async function loadAutocompleteOptionsFoto() {
   }
 }
 
+// Percakapan [Unifikasi Field Produk Baru/Existing - Foto & Suara] - helper
+// cek apakah nama barang (hasil AI atau ketikan user) sudah ada di daftar
+// produk existing klinik ini. Case-insensitive + trim, supaya beda kapital/
+// spasi kecil tidak dianggap "barang baru" secara keliru. Sama persis
+// dengan isKnownProductName() di suara.js.
+function isKnownProductName(nama) {
+  if (!nama) return false;
+  const target = nama.trim().toLowerCase();
+  return ALL_PRODUCT_NAMES.some(function(n) {
+    return n.trim().toLowerCase() === target;
+  });
+}
+
 // Elemen-elemen DOM (di-query sekali di top level, aman karena DOM sudah ada
 // walau appContainer masih display:none saat ini)
 const photoInput = document.getElementById('photoInput');
@@ -216,6 +229,12 @@ async function handleAnalyzeClick() {
     // CATATAN: batch_number & minimum_stock SENGAJA tidak diminta dari AI
     // (keputusan desain: AI tidak reliable membaca teks kecil/barcode batch,
     // jadi kedua field ini selalu manual input oleh user).
+    // Percakapan [Unifikasi Field Produk Baru/Existing - Foto & Suara] -
+    // is_known_product dicek sekali di sini (dari existing_product_names
+    // yang sudah dimuat saat halaman dibuka), dipakai renderExtractedItems()
+    // untuk sembunyikan field identitas produk (kategori/lokasi/satuan/
+    // stok-minimum) kalau barangnya sudah pernah tercatat. expiry & batch
+    // TETAP selalu muncul (properti lot, bukan properti produk).
     extractedItems = items.map((item, index) => ({
       tempId: 'item_' + index,
       nama: item.nama || '',
@@ -227,6 +246,7 @@ async function handleAnalyzeClick() {
       batch_number: '', // manual, tidak dari AI
       minimum_stock: 0, // manual, tidak dari AI
       jenis_transaksi: 'in', // default: Barang Masuk. Bisa diubah ke 'opname' oleh user.
+      is_known_product: isKnownProductName(item.nama || ''),
       included: true
     }));
 
@@ -337,6 +357,9 @@ function renderExtractedItems() {
           <label>Nama Barang</label>
           <input type="text" class="item-nama" value="${escapeHtml(item.nama)}" placeholder="Nama barang" autocomplete="off">
           <div class="item-nama-results product-search-results" style="display:none;"></div>
+          <p class="field-known-product-note" style="display:${item.is_known_product ? 'block' : 'none'}; font-size:0.8rem; color:var(--color-text-muted); margin-top:4px;">
+            Barang ini sudah tercatat di Inventaris -- kategori/lokasi/satuan/stok minimum dipakai dari data yang sudah ada.
+          </p>
         </div>
 
         <div class="field-row">
@@ -344,14 +367,14 @@ function renderExtractedItems() {
             <label>Jumlah</label>
             <input type="number" class="item-jumlah" value="${item.jumlah}" min="0" step="0.01" placeholder="cth: 3 atau 0.25 utk 1/4">
           </div>
-          <div class="field-group" style="position:relative;">
+          <div class="field-group item-fields-new-only" style="position:relative; display:${item.is_known_product ? 'none' : 'block'};">
             <label>Satuan</label>
             <input type="text" class="item-satuan" value="${escapeHtml(item.satuan)}" placeholder="pcs / box / botol" autocomplete="off">
             <div class="item-satuan-results product-search-results" style="display:none;"></div>
           </div>
         </div>
 
-        <div class="field-group" style="position:relative;">
+        <div class="field-group item-fields-new-only" style="position:relative; display:${item.is_known_product ? 'none' : 'block'};">
           <label>Kategori</label>
           <input type="text" class="item-kategori" value="${escapeHtml(item.kategori)}" placeholder="Misal: APD, Obat, Alat" autocomplete="off">
           <div class="item-kategori-results product-search-results" style="display:none;"></div>
@@ -362,7 +385,7 @@ function renderExtractedItems() {
             <label>Tanggal Kedaluwarsa</label>
             <input type="text" class="item-expiry" inputmode="numeric" placeholder="DDMMYYYY" maxlength="8">
           </div>
-          <div class="field-group" style="position:relative;">
+          <div class="field-group item-fields-new-only" style="position:relative; display:${item.is_known_product ? 'none' : 'block'};">
             <label>Lokasi Simpan</label>
             <input type="text" class="item-lokasi" value="${escapeHtml(item.lokasi_penyimpanan)}" placeholder="Misal: Lemari A" autocomplete="off">
             <div class="item-lokasi-results product-search-results" style="display:none;"></div>
@@ -374,7 +397,7 @@ function renderExtractedItems() {
             <label>Nomor Batch (manual)</label>
             <input type="text" class="item-batch" value="${escapeHtml(item.batch_number)}" placeholder="Contoh: BTC-2026-001">
           </div>
-          <div class="field-group">
+          <div class="field-group item-fields-new-only" style="display:${item.is_known_product ? 'none' : 'block'};">
             <label>Stok Minimum (barang baru)</label>
             <input type="number" class="item-minstock" value="${item.minimum_stock}" min="0" step="0.01" placeholder="cth: 3 atau 0.25 utk 1/4">
           </div>
@@ -400,7 +423,25 @@ function renderExtractedItems() {
       updateResultSummary();
     });
 
-    row.querySelector('.item-nama').addEventListener('input', (e) => updateItemField(item.tempId, 'nama', e.target.value));
+    // Percakapan [Unifikasi Field Produk Baru/Existing - Foto & Suara] -
+    // toggle field identitas produk (kategori/lokasi/satuan/stok-min)
+    // berdasarkan apakah nama yang diketik SEKARANG match produk existing.
+    // Dipanggil ulang tiap kali user edit nama, supaya kalau AI salah baca
+    // (nama tidak match) lalu user koreksi ke nama yang sudah ada, field-nya
+    // otomatis menyesuaikan tanpa perlu foto ulang.
+    function toggleNewOnlyFields(isKnown) {
+      row.querySelectorAll('.item-fields-new-only').forEach((el) => {
+        el.style.display = isKnown ? 'none' : (el.classList.contains('field-row') ? 'flex' : 'block');
+      });
+      row.querySelector('.field-known-product-note').style.display = isKnown ? 'block' : 'none';
+    }
+
+    row.querySelector('.item-nama').addEventListener('input', (e) => {
+      updateItemField(item.tempId, 'nama', e.target.value);
+      const isKnown = isKnownProductName(e.target.value);
+      updateItemField(item.tempId, 'is_known_product', isKnown);
+      toggleNewOnlyFields(isKnown);
+    });
     row.querySelector('.item-jumlah').addEventListener('input', (e) => updateItemField(item.tempId, 'jumlah', parseFloat(e.target.value) || 0));
     row.querySelector('.item-satuan').addEventListener('input', (e) => updateItemField(item.tempId, 'satuan', e.target.value));
     row.querySelector('.item-kategori').addEventListener('input', (e) => updateItemField(item.tempId, 'kategori', e.target.value));
@@ -479,6 +520,7 @@ function handleAddManualRow() {
     batch_number: '',
     minimum_stock: 0,
     jenis_transaksi: 'in',
+    is_known_product: false, // baris kosong, belum ada nama -> dianggap baru sampai user ketik
     included: true
   };
   extractedItems.push(newItem);
