@@ -1,7 +1,26 @@
 // ============================================
 // APP LOGIC - Form Input Stok (3 jenis transaksi)
 // stock_movements: in, out, opname_adjustment
-// Versi: P9 - Lot/Batch Tracking + FEFO otomatis
+// Versi: P10 - Unifikasi Barang Masuk & Stok Opname utk produk baru
+//
+// Percakapan [Unifikasi Barang Masuk/Stok Opname] - perubahan alur:
+// - Barang Masuk & Stok Opname sekarang SAMA-SAMA bisa dipakai utk barang
+//   baru (dulu cuma Barang Masuk yang bisa). User cari nama dulu lewat
+//   productSearchInput; kalau ketemu & dipilih -> field produk baru
+//   disembunyikan (existing product, cuma isi jumlah). Kalau tidak
+//   ketemu/belum dipilih -> field produk baru (newProductFields) muncul.
+// - Barang Keluar TETAP wajib pilih dari dropdown (tidak ada mode
+//   produk baru) -- kalau search kosong, tampilkan pesan arahan ke
+//   Stok Opname.
+// - Field newProductFields (nama, kategori, lokasi, stok min, satuan,
+//   expiry, batch) sekarang SHARED, dipakai gantian oleh Barang Masuk
+//   maupun Stok Opname -- lihat resetNewProductFields() supaya tidak
+//   ada nilai nyangkut saat pindah jenis transaksi.
+// - Stok Opname produk baru memanggil add_stock_lot() dengan
+//   p_movement_type: 'opname_adjustment' (bukan RPC adjust_stock_opname
+//   biasa), supaya expiry & batch number tetap tersimpan sekaligus
+//   Riwayat mencatat jenis transaksi yang benar. Lihat migration
+//   [add_movement_type_param_to_add_stock_lot] di Supabase.
 // ============================================
 
 let CURRENT_CLINIC_ID = null;
@@ -42,6 +61,11 @@ const categoryInput = document.getElementById('category');
 const storageLocationInput = document.getElementById('storageLocation');
 const unitInput = document.getElementById('unit');
 const minimumStockInput = document.getElementById('minimumStock');
+
+// Percakapan [Unifikasi Barang Masuk/Stok Opname] - jenis transaksi yang
+// boleh menampilkan field produk baru (Barang Keluar TIDAK termasuk,
+// karena tidak boleh dipakai utk barang yang belum pernah tercatat).
+const TYPES_ALLOWING_NEW_PRODUCT = ['in', 'opname_adjustment'];
 
 async function onUserLoggedIn() {
   const { data: { user }, error: userAuthError } = await supabaseClient.auth.getUser();
@@ -159,7 +183,7 @@ function updateMetadataPlaceholders() {
   // Satuan beda dari field lain: selalu ada default value "pcs",
   // jadi placeholder tidak akan kelihatan kalau tidak dikosongkan dulu.
   // Aman dikosongkan karena field ini diabaikan sepenuhnya saat submit
-  // untuk produk existing (lihat handleStockIn).
+  // untuk produk existing (lihat handleStockIn/handleOpname).
   unitInput.value = '';
   unitInput.placeholder = 'Satuan saat ini: ' + matchedProduct.unit;
 }
@@ -171,10 +195,27 @@ function resetMetadataPlaceholders() {
   minimumStockInput.placeholder = DEFAULT_MIN_STOCK_PLACEHOLDER;
 }
 
+// Percakapan [Unifikasi Barang Masuk/Stok Opname] - bersihkan semua
+// field produk baru + kembalikan ke default. Dipanggil setiap kali
+// ganti jenis transaksi & setelah submit sukses, supaya tidak ada nilai
+// "nyangkut" dari transaksi sebelumnya (field ini dipakai gantian oleh
+// Barang Masuk maupun Stok Opname).
+function resetNewProductFields() {
+  productNameInput.value = '';
+  categoryInput.value = '';
+  storageLocationInput.value = '';
+  minimumStockInput.value = '';
+  unitInput.value = 'pcs';
+  document.getElementById('expiryDate').value = '';
+  document.getElementById('batchNumber').value = '';
+  resetMetadataPlaceholders();
+}
+
 productNameInput.addEventListener('input', updateMetadataPlaceholders);
 
 function renderProductResults(filterText) {
   const keyword = filterText.trim().toLowerCase();
+  const movementType = movementTypeSelect.value;
 
   const filtered = keyword === ''
     ? ALL_PRODUCTS.slice(0, 50)
@@ -185,7 +226,16 @@ function renderProductResults(filterText) {
   if (filtered.length === 0) {
     const noResult = document.createElement('div');
     noResult.className = 'product-search-no-result';
-    noResult.textContent = 'Barang tidak ditemukan.';
+
+    // Percakapan [Unifikasi Barang Masuk/Stok Opname] - Barang Keluar
+    // TIDAK boleh dipakai utk barang baru, jadi kalau search kosong,
+    // arahkan user ke Stok Opname alih-alih pesan generik.
+    if (movementType === 'out') {
+      noResult.textContent = 'Barang belum pernah tercatat, silakan input dulu melalui Stok Opname.';
+    } else {
+      noResult.textContent = 'Barang tidak ditemukan. Ini akan tercatat sebagai barang baru -- lengkapi data di bawah.';
+    }
+
     productSearchResults.appendChild(noResult);
     productSearchResults.style.display = 'block';
     return;
@@ -215,6 +265,12 @@ function selectProduct(product) {
   productSearchInput.value = product.name + ' (stok: ' + product.current_stock + ' ' + product.unit + ')';
   productSearchInput.dataset.currentStock = product.current_stock;
   productSearchResults.style.display = 'none';
+
+  // Percakapan [Unifikasi Barang Masuk/Stok Opname] - barang sudah ada
+  // di sistem -> sembunyikan field produk baru, cukup isi jumlah.
+  newProductFields.style.display = 'none';
+  resetNewProductFields();
+
   updateOpnamePreview();
 }
 
@@ -226,13 +282,25 @@ function resetProductSelection() {
   productSearchResults.innerHTML = '';
 }
 
+// Percakapan [Unifikasi Barang Masuk/Stok Opname] - tampilkan/sembunyikan
+// newProductFields tergantung: (a) jenis transaksi mengizinkan produk
+// baru, DAN (b) user belum memilih barang existing dari dropdown.
+function toggleNewProductFields() {
+  const movementType = movementTypeSelect.value;
+  const allowsNewProduct = TYPES_ALLOWING_NEW_PRODUCT.includes(movementType);
+  const hasSelectedExisting = !!productSelectedId.value;
+
+  newProductFields.style.display = (allowsNewProduct && !hasSelectedExisting) ? 'block' : 'none';
+}
+
 productSearchInput.addEventListener('focus', function() {
-  renderProductResults('');
+  renderProductResults(productSearchInput.value);
 });
 
 productSearchInput.addEventListener('input', function() {
   productSelectedId.value = '';
   renderProductResults(productSearchInput.value);
+  toggleNewProductFields();
 });
 
 setupSimpleAutocomplete('productName', 'productNameResults', function() {
@@ -265,10 +333,12 @@ document.addEventListener('click', function(e) {
 // Percakapan [Keterangan Jenis Transaksi] - teks bantuan singkat di bawah
 // dropdown, supaya user paham kapan pakai jenis transaksi yang mana
 // tanpa perlu buka tutorial terpisah.
+// Percakapan [Unifikasi Barang Masuk/Stok Opname] - teks hint diupdate:
+// Barang Masuk & Stok Opname sekarang sama-sama bisa utk barang baru.
 const MOVEMENT_TYPE_HINTS = {
-  in: 'Silakan input data barang baru yang masuk ke stok klinik.',
-  out: 'Silakan input data penggunaan barang. Contoh: hari ini alginat habis 1 bungkus, maka input pemakaian alginat di sini sebagai 1 bungkus.',
-  opname_adjustment: 'Bila tidak tahu jumlah pemakaian, input saja jumlah fisik barang saat ini. Contoh: jumlah alginat sekarang tersisa 1 bungkus. Aplikasi akan otomatis menghitung selisihnya dari stok sebelumnya.'
+  in: 'Barang baru datang dari supplier/pembelian. Cari dulu namanya -- kalau belum pernah tercatat, lengkapi data barangnya di bawah.',
+  out: 'Barang dipakai untuk pasien/operasional. Contoh: hari ini alginat habis 1 bungkus, maka input pemakaian alginat di sini sebagai 1 bungkus. Hanya bisa untuk barang yang sudah pernah tercatat.',
+  opname_adjustment: 'Catat jumlah fisik barang yang ada di klinik sekarang, walau belum pernah diinput sebelumnya. Cari dulu namanya -- kalau belum pernah tercatat, lengkapi data barangnya di bawah. Kalau barang sudah pernah tercatat, aplikasi otomatis menghitung selisihnya dari stok sebelumnya.'
 };
 const movementTypeHint = document.getElementById('movementTypeHint');
 
@@ -280,8 +350,10 @@ movementTypeSelect.addEventListener('change', function() {
   fieldsOpname.style.display = type === 'opname_adjustment' ? 'block' : 'none';
   opnamePreview.textContent = '';
 
-  productSelectGroup.style.display = (type === 'out' || type === 'opname_adjustment') ? 'block' : 'none';
-  newProductFields.style.display = (type === 'in') ? 'block' : 'none';
+  // Percakapan [Unifikasi Barang Masuk/Stok Opname] - dropdown pencarian
+  // sekarang tampil utk KETIGA jenis transaksi (in/out/opname), bukan
+  // cuma out/opname seperti dulu.
+  productSelectGroup.style.display = (type === 'in' || type === 'out' || type === 'opname_adjustment') ? 'block' : 'none';
 
   if (movementTypeHint) {
     if (MOVEMENT_TYPE_HINTS[type]) {
@@ -294,7 +366,8 @@ movementTypeSelect.addEventListener('change', function() {
   }
 
   resetProductSelection();
-  resetMetadataPlaceholders();
+  resetNewProductFields();
+  toggleNewProductFields();
 });
 
 function updateOpnamePreview() {
@@ -357,8 +430,7 @@ form.addEventListener('submit', async function(e) {
     productSelectGroup.style.display = 'none';
     newProductFields.style.display = 'none';
     resetProductSelection();
-    document.getElementById('unit').value = 'pcs';
-    resetMetadataPlaceholders();
+    resetNewProductFields();
     await loadProductOptions();
     await loadAutocompleteOptions();
 
@@ -381,28 +453,20 @@ function parseErrorMessage(error) {
   return msg;
 }
 
-async function handleStockIn() {
+// Percakapan [Unifikasi Barang Masuk/Stok Opname] - dipakai bersama oleh
+// handleStockIn() & handleOpname() untuk insert produk baru (nama,
+// kategori, satuan, lokasi, stok minimum), termasuk cek limit 70 jenis
+// barang. Mengembalikan productId baru.
+async function insertNewProduct() {
   const productName = document.getElementById('productName').value.trim();
   const category = document.getElementById('category').value.trim();
-  const quantity = parseFloat(document.getElementById('quantity').value);
   const unit = document.getElementById('unit').value.trim() || 'pcs';
-
-  // Percakapan [Format Tanggal DDMMYYYY] - parse & validasi input manual
-  const expiryRaw = document.getElementById('expiryDate').value;
-  const expiryParsed = parseDDMMYYYY(expiryRaw);
-  if (!expiryParsed.valid) {
-    showStatus(expiryParsed.error, 'error');
-    return;
-  }
-  const expiryDate = expiryParsed.isoDate;
-
-  const batchNumber = document.getElementById('batchNumber').value.trim() || null;
   const storageLocation = document.getElementById('storageLocation').value.trim();
   const minimumStockRaw = document.getElementById('minimumStock').value;
   const minimumStock = minimumStockRaw === '' ? 0 : parseFloat(minimumStockRaw);
 
-  if (!productName || isNaN(quantity) || quantity <= 0) {
-    throw new Error('Nama barang dan jumlah wajib diisi dengan benar.');
+  if (!productName) {
+    throw new Error('Nama barang wajib diisi.');
   }
 
   // Percakapan [Fix: Nama Barang Hilang Setelah Dihapus] - WAJIB filter
@@ -419,44 +483,70 @@ async function handleStockIn() {
 
   if (existingProductResult.error) throw existingProductResult.error;
 
-  const existingProduct = existingProductResult.data;
+  if (existingProductResult.data) {
+    // Nama persis sudah ada tapi user tidak memilihnya dari dropdown
+    // (mungkin typo pas ngetik ulang) -- pakai saja produk yang ada,
+    // supaya tidak accidentally bikin percobaan insert duplikat.
+    return existingProductResult.data.id;
+  }
+
+  // Percakapan [Batas Jumlah Barang & Kunci Akun Expired] - cek limit
+  // HANYA untuk produk baru (bukan restock produk lama), karena limit
+  // ini soal jumlah JENIS barang, bukan jumlah transaksi.
+  const limitCheck = await supabaseClient.rpc('check_product_limit', {
+    p_clinic_id: CURRENT_CLINIC_ID
+  });
+
+  if (limitCheck.error) throw limitCheck.error;
+
+  if (limitCheck.data.allowed === false) {
+    throw new Error(
+      `Batas jenis barang tercapai (${limitCheck.data.product_count}/${limitCheck.data.max_products}). ` +
+      `Upgrade ke Premium untuk tambah jenis barang baru, atau hapus barang lama di Inventaris.`
+    );
+  }
+
+  const insertResult = await supabaseClient
+    .from('products')
+    .insert({
+      clinic_id: CURRENT_CLINIC_ID,
+      name: productName,
+      category: category,
+      unit: unit,
+      storage_location: storageLocation,
+      minimum_stock: minimumStock,
+      current_stock: 0
+    })
+    .select('id')
+    .single();
+
+  if (insertResult.error) throw insertResult.error;
+  return insertResult.data.id;
+}
+
+async function handleStockIn() {
+  const isNewProduct = !productSelectedId.value;
+  const quantity = parseFloat(document.getElementById('quantity').value);
+
+  // Percakapan [Format Tanggal DDMMYYYY] - parse & validasi input manual
+  const expiryRaw = document.getElementById('expiryDate').value;
+  const expiryParsed = parseDDMMYYYY(expiryRaw);
+  if (!expiryParsed.valid) {
+    showStatus(expiryParsed.error, 'error');
+    return;
+  }
+  const expiryDate = expiryParsed.isoDate;
+  const batchNumber = document.getElementById('batchNumber').value.trim() || null;
+
+  if (isNaN(quantity) || quantity <= 0) {
+    throw new Error('Nama barang dan jumlah wajib diisi dengan benar.');
+  }
+
   let productId;
-
-  if (existingProduct) {
-    productId = existingProduct.id;
+  if (isNewProduct) {
+    productId = await insertNewProduct();
   } else {
-    // Percakapan [Batas Jumlah Barang & Kunci Akun Expired] - cek limit
-    // HANYA untuk produk baru (bukan restock produk lama), karena limit
-    // ini soal jumlah JENIS barang, bukan jumlah transaksi.
-    const limitCheck = await supabaseClient.rpc('check_product_limit', {
-      p_clinic_id: CURRENT_CLINIC_ID
-    });
-
-    if (limitCheck.error) throw limitCheck.error;
-
-    if (limitCheck.data.allowed === false) {
-      throw new Error(
-        `Batas jenis barang tercapai (${limitCheck.data.product_count}/${limitCheck.data.max_products}). ` +
-        `Upgrade ke Premium untuk tambah jenis barang baru, atau hapus barang lama di Inventaris.`
-      );
-    }
-
-    const insertResult = await supabaseClient
-      .from('products')
-      .insert({
-        clinic_id: CURRENT_CLINIC_ID,
-        name: productName,
-        category: category,
-        unit: unit,
-        storage_location: storageLocation,
-        minimum_stock: minimumStock,
-        current_stock: 0
-      })
-      .select('id')
-      .single();
-
-    if (insertResult.error) throw insertResult.error;
-    productId = insertResult.data.id;
+    productId = productSelectedId.value;
   }
 
   const rpcResult = await supabaseClient.rpc('add_stock_lot', {
@@ -465,7 +555,8 @@ async function handleStockIn() {
     p_quantity: quantity,
     p_batch_number: batchNumber,
     p_expiry_date: expiryDate,
-    p_user_id: CURRENT_USER_ID
+    p_user_id: CURRENT_USER_ID,
+    p_movement_type: 'in'
   });
 
   if (rpcResult.error) throw rpcResult.error;
@@ -476,7 +567,7 @@ async function handleStockOut() {
   const quantity = parseFloat(document.getElementById('outQuantity').value);
 
   if (!productId) {
-    throw new Error('Barang belum dipilih. Klik salah satu hasil pencarian di bawah kolom nama barang. Kalau tidak muncul hasil, berarti barang ini belum pernah diinput -- input dulu lewat Tambah Barang (Barang Masuk).');
+    throw new Error('Barang belum dipilih. Klik salah satu hasil pencarian di bawah kolom nama barang. Kalau tidak muncul hasil, berarti barang ini belum pernah diinput -- input dulu lewat Stok Opname.');
   }
 
   if (isNaN(quantity) || quantity <= 0) {
@@ -496,11 +587,57 @@ async function handleStockOut() {
 }
 
 async function handleOpname() {
+  const isNewProduct = !productSelectedId.value;
+
+  if (isNewProduct) {
+    // Percakapan [Unifikasi Barang Masuk/Stok Opname] - produk baru lewat
+    // Stok Opname: insert produk (sama seperti Barang Masuk), lalu pakai
+    // add_stock_lot() dengan p_movement_type: 'opname_adjustment' supaya
+    // expiry/batch tetap tersimpan TAPI Riwayat mencatat sebagai opname,
+    // bukan barang masuk biasa. adjust_stock_opname() RPC lama TIDAK
+    // dipakai di sini karena dia hardcode expiry/batch = NULL.
+    const physicalCount = parseFloat(document.getElementById('opnamePhysicalCount').value);
+
+    if (isNaN(physicalCount) || physicalCount < 0) {
+      throw new Error('Isi jumlah fisik dengan benar.');
+    }
+
+    const expiryRaw = document.getElementById('expiryDate').value;
+    const expiryParsed = parseDDMMYYYY(expiryRaw);
+    if (!expiryParsed.valid) {
+      showStatus(expiryParsed.error, 'error');
+      return;
+    }
+    const expiryDate = expiryParsed.isoDate;
+    const batchNumber = document.getElementById('batchNumber').value.trim() || null;
+
+    const productId = await insertNewProduct();
+
+    // physicalCount = 0 valid secara input (misal barang baru dicatat
+    // habis), tapi tidak ada gunanya bikin lot kosong -- skip lot kalau 0.
+    if (physicalCount > 0) {
+      const rpcResult = await supabaseClient.rpc('add_stock_lot', {
+        p_clinic_id: CURRENT_CLINIC_ID,
+        p_product_id: productId,
+        p_quantity: physicalCount,
+        p_batch_number: batchNumber,
+        p_expiry_date: expiryDate,
+        p_user_id: CURRENT_USER_ID,
+        p_movement_type: 'opname_adjustment'
+      });
+
+      if (rpcResult.error) throw rpcResult.error;
+    }
+
+    return;
+  }
+
+  // Produk sudah ada -- behavior lama, tidak berubah.
   const productId = productSelectedId.value;
   const physicalCount = parseFloat(document.getElementById('opnamePhysicalCount').value);
 
   if (!productId) {
-    throw new Error('Barang belum dipilih. Klik salah satu hasil pencarian di bawah kolom nama barang. Kalau tidak muncul hasil, berarti barang ini belum pernah diinput -- input dulu lewat Tambah Barang (Barang Masuk).');
+    throw new Error('Barang belum dipilih. Klik salah satu hasil pencarian di bawah kolom nama barang.');
   }
 
   if (isNaN(physicalCount) || physicalCount < 0) {
@@ -537,4 +674,4 @@ function showStatus(message, type) {
     statusDiv.style.display = 'none';
     statusDiv.textContent = '';
   }, 7000);
-    }
+}
