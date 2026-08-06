@@ -501,31 +501,31 @@ function renderExtractedItems() {
           <div class="item-kategori-results product-search-results" style="display:none;"></div>
         </div>
 
-        <div class="field-row item-fields-in-only" style="display:${item.jenis_transaksi === 'out' ? 'none' : 'flex'};">
+        <div class="field-row item-fields-in-only item-fields-new-only" style="display:${(item.jenis_transaksi === 'out' || item.is_known_product) ? 'none' : 'flex'};">
           <div class="field-group">
             <label>Tanggal Kedaluwarsa</label>
             <input type="text" class="item-expiry" inputmode="numeric" placeholder="DDMMYYYY" maxlength="8">
           </div>
-          <div class="field-group item-fields-new-only" style="position:relative; display:${(item.jenis_transaksi === 'out' || item.is_known_product) ? 'none' : 'block'};">
+          <div class="field-group" style="position:relative;">
             <label>Lokasi Simpan</label>
             <input type="text" class="item-lokasi" value="${escapeHtml(item.lokasi_penyimpanan)}" placeholder="Misal: Lemari A" autocomplete="off">
             <div class="item-lokasi-results product-search-results" style="display:none;"></div>
           </div>
         </div>
 
-        <div class="field-row item-fields-in-only" style="display:${item.jenis_transaksi === 'out' ? 'none' : 'flex'};">
+        <div class="field-row item-fields-in-only item-fields-new-only" style="display:${(item.jenis_transaksi === 'out' || item.is_known_product) ? 'none' : 'flex'};">
           <div class="field-group">
             <label>Nomor Batch (manual)</label>
             <input type="text" class="item-batch" value="${escapeHtml(item.batch_number)}" placeholder="Contoh: BTC-2026-001">
           </div>
-          <div class="field-group item-fields-new-only" style="display:${(item.jenis_transaksi === 'out' || item.is_known_product) ? 'none' : 'block'};">
+          <div class="field-group">
             <label>Stok Minimum (barang baru)</label>
             <input type="number" class="item-minstock" value="${item.minimum_stock}" min="0" step="0.01" placeholder="cth: 3 atau 0.25 utk 1/4">
           </div>
         </div>
 
         <p class="field-known-product-note" style="display:${(item.is_known_product && item.jenis_transaksi !== 'out') ? 'block' : 'none'}; font-size:0.8rem; color:var(--color-text-muted); margin-top:4px;">
-          Barang ini sudah tercatat di Inventaris -- kategori/lokasi/satuan/stok minimum dipakai dari data yang sudah ada.
+          Barang ini sudah tercatat di Inventaris -- cukup isi jumlah, data lain dipakai dari yang sudah ada.
         </p>
       </div>
     `;
