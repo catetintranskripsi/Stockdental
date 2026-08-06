@@ -13,10 +13,46 @@ const filterDateError = document.getElementById('filterDateError');
 const historySummary = document.getElementById('historySummary');
 const historyList = document.getElementById('historyList');
 
+// Percakapan [Tab Penggunaan Barang] - elemen sub-tab & section, plus
+// cache movements terakhir supaya pindah tab tidak perlu query ulang
+// (kedua tab pakai rentang tanggal & data mentah yang sama, cuma beda
+// cara agregasi/tampilannya).
+const tabTransaksiBtn = document.getElementById('tabTransaksiBtn');
+const tabPenggunaanBtn = document.getElementById('tabPenggunaanBtn');
+const tabTransaksiSection = document.getElementById('tabTransaksiSection');
+const tabPenggunaanSection = document.getElementById('tabPenggunaanSection');
+const usageList = document.getElementById('usageList');
+
+let lastLoadedMovements = [];
+let activeTab = 'transaksi'; // 'transaksi' | 'penggunaan'
+
 // Dipanggil oleh auth-check.js setelah user terverifikasi login
 async function onPageReady() {
   setupDefaultDateRange();
+  setupTabSwitching();
   await loadHistory();
+}
+
+// Percakapan [Tab Penggunaan Barang] - switch tampilan section, TIDAK
+// query ulang ke Supabase (data mentah sudah di-cache di
+// lastLoadedMovements dari loadHistory() sebelumnya, agregasi/render
+// tab Penggunaan Barang dihitung dari cache itu saja).
+function setupTabSwitching() {
+  tabTransaksiBtn.addEventListener('click', () => switchTab('transaksi'));
+  tabPenggunaanBtn.addEventListener('click', () => switchTab('penggunaan'));
+}
+
+function switchTab(tab) {
+  activeTab = tab;
+
+  tabTransaksiBtn.classList.toggle('sub-tab-active', tab === 'transaksi');
+  tabPenggunaanBtn.classList.toggle('sub-tab-active', tab === 'penggunaan');
+  tabTransaksiSection.style.display = tab === 'transaksi' ? 'block' : 'none';
+  tabPenggunaanSection.style.display = tab === 'penggunaan' ? 'block' : 'none';
+
+  if (tab === 'penggunaan') {
+    renderUsageSummary(lastLoadedMovements);
+  }
 }
 
 // Default filter: tanggal 1 bulan berjalan sampai hari ini
@@ -83,10 +119,19 @@ async function loadHistory() {
   if (error) {
     console.error('Gagal load riwayat:', error);
     historyList.innerHTML = '<p class="error-text">Gagal memuat data. Coba refresh halaman.</p>';
+    usageList.innerHTML = '<p class="error-text">Gagal memuat data. Coba refresh halaman.</p>';
     return;
   }
 
-  renderHistory(movements || []);
+  lastLoadedMovements = movements || [];
+  renderHistory(lastLoadedMovements);
+
+  // Percakapan [Tab Penggunaan Barang] - kalau tab Penggunaan Barang
+  // sedang aktif saat user klik Terapkan, render ulang juga (biar tidak
+  // ketinggalan data lama sampai user klik pindah tab manual).
+  if (activeTab === 'penggunaan') {
+    renderUsageSummary(lastLoadedMovements);
+  }
 }
 
 function showFilterDateError(message) {
@@ -145,7 +190,7 @@ function renderHistory(movements) {
 function getTypeLabel(type) {
   if (type === 'in') return 'Masuk';
   if (type === 'out') return 'Keluar';
-  if (type === 'opname_adjustment') return 'Opname';
+  if (type === 'opname_adjustment') return 'Stok Fisik';
   if (type === 'merge_marker') return '🔗 Digabung';
   return type;
 }
@@ -157,10 +202,77 @@ function renderSummary(movements) {
 
   historySummary.innerHTML = `
     <p class="summary-stats">
-      🟢 ${inCount} masuk · 🔴 ${outCount} keluar · 🔵 ${opnameCount} opname
+      🟢 ${inCount} masuk · 🔴 ${outCount} keluar · 🔵 ${opnameCount} stok fisik
       (total ${movements.length} transaksi)
     </p>
   `;
+}
+
+// ============================================
+// Percakapan [Tab Penggunaan Barang] - rekap total pemakaian per barang
+// pada rentang tanggal yang difilter. Definisi "pemakaian" KONSISTEN
+// dengan Top 5 Barang di dashboard (ringkasan.js):
+// - Barang Keluar (movement_type='out') -> quantity dihitung penuh
+// - Stok Fisik Saat Ini (movement_type='opname_adjustment') yang membuat
+//   stok TURUN (stock_after < stock_before) -> selisihnya (stock_before -
+//   stock_after) dihitung sebagai pemakaian juga, walau tidak pernah
+//   dicatat lewat Barang Keluar
+// - Stok Fisik yang membuat stok NAIK (ketemu lebih banyak dari catatan)
+//   TIDAK dihitung sebagai pemakaian (itu temuan barang, bukan pemakaian)
+// - merge_marker diabaikan (bukan transaksi stok riil)
+// ============================================
+function aggregateUsage(movements) {
+  const usageMap = {}; // productName -> { quantity, unit }
+
+  movements.forEach(m => {
+    const productName = m.products ? m.products.name : null;
+    if (!productName) return; // barang sudah dihapus, tidak ada nama utk direkap
+
+    const unit = m.products.unit || '';
+
+    if (m.movement_type === 'out') {
+      if (!usageMap[productName]) usageMap[productName] = { quantity: 0, unit };
+      usageMap[productName].quantity += Number(m.quantity) || 0;
+    } else if (m.movement_type === 'opname_adjustment') {
+      const stockBefore = Number(m.stock_before);
+      const stockAfter = Number(m.stock_after);
+      if (!isNaN(stockBefore) && !isNaN(stockAfter) && stockAfter < stockBefore) {
+        const selisih = stockBefore - stockAfter;
+        if (!usageMap[productName]) usageMap[productName] = { quantity: 0, unit };
+        usageMap[productName].quantity += selisih;
+      }
+    }
+  });
+
+  return Object.keys(usageMap)
+    .map(name => ({ name, quantity: usageMap[name].quantity, unit: usageMap[name].unit }))
+    .sort((a, b) => b.quantity - a.quantity); // paling banyak dipakai dulu
+}
+
+function renderUsageSummary(movements) {
+  const usage = aggregateUsage(movements);
+
+  if (usage.length === 0) {
+    usageList.innerHTML = '<p class="loading-text">Tidak ada pemakaian barang di rentang tanggal ini.</p>';
+    return;
+  }
+
+  usageList.innerHTML = '';
+
+  usage.forEach((u, index) => {
+    const item = document.createElement('div');
+    item.className = 'history-item';
+    item.innerHTML = `
+      <div class="history-item-main">
+        <span class="history-badge badge-out">#${index + 1}</span>
+      </div>
+      <div class="history-item-name">${escapeHtml(u.name)}</div>
+      <div class="history-item-detail">
+        <span>Total dipakai: ${u.quantity} ${escapeHtml(u.unit)}</span>
+      </div>
+    `;
+    usageList.appendChild(item);
+  });
 }
 
 function formatDateTime(isoString) {

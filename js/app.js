@@ -231,7 +231,7 @@ function renderProductResults(filterText) {
     // TIDAK boleh dipakai utk barang baru, jadi kalau search kosong,
     // arahkan user ke Stok Opname alih-alih pesan generik.
     if (movementType === 'out') {
-      noResult.textContent = 'Barang belum pernah tercatat, silakan input dulu melalui Stok Opname.';
+      noResult.textContent = 'Barang belum pernah tercatat, silakan input dulu melalui Stok Fisik Saat Ini.';
     } else {
       noResult.textContent = 'Barang tidak ditemukan. Ini akan tercatat sebagai barang baru -- lengkapi data di bawah.';
     }
@@ -338,7 +338,7 @@ document.addEventListener('click', function(e) {
 const MOVEMENT_TYPE_HINTS = {
   in: 'Barang baru datang dari supplier/pembelian. Cari dulu namanya -- kalau belum pernah tercatat, lengkapi data barangnya di bawah.',
   out: 'Barang dipakai untuk pasien/operasional. Contoh: hari ini alginat habis 1 bungkus, maka input pemakaian alginat di sini sebagai 1 bungkus. Hanya bisa untuk barang yang sudah pernah tercatat.',
-  opname_adjustment: 'Catat jumlah fisik barang yang ada di klinik sekarang, walau belum pernah diinput sebelumnya. Cari dulu namanya -- kalau belum pernah tercatat, lengkapi data barangnya di bawah. Kalau barang sudah pernah tercatat, aplikasi otomatis menghitung selisihnya dari stok sebelumnya.'
+  opname_adjustment: 'Catat jumlah fisik barang yang ada di klinik sekarang.'
 };
 const movementTypeHint = document.getElementById('movementTypeHint');
 
@@ -567,7 +567,7 @@ async function handleStockOut() {
   const quantity = parseFloat(document.getElementById('outQuantity').value);
 
   if (!productId) {
-    throw new Error('Barang belum dipilih. Klik salah satu hasil pencarian di bawah kolom nama barang. Kalau tidak muncul hasil, berarti barang ini belum pernah diinput -- input dulu lewat Stok Opname.');
+    throw new Error('Barang belum dipilih. Klik salah satu hasil pencarian di bawah kolom nama barang. Kalau tidak muncul hasil, berarti barang ini belum pernah diinput -- input dulu lewat Stok Fisik Saat Ini.');
   }
 
   if (isNaN(quantity) || quantity <= 0) {

@@ -410,7 +410,7 @@ function buildEditForm(p) {
         <label>Stok Minimum</label>
         <input type="number" class="edit-input" data-field="minimum_stock" value="${p.minimum_stock}" min="0">
       </div>
-      <p class="edit-stock-note">Untuk ubah jumlah stok, gunakan menu <strong>Stok Opname</strong> di halaman Input.</p>
+      <p class="edit-stock-note">Untuk ubah jumlah stok, gunakan menu <strong>Stok Fisik Saat Ini</strong> di halaman Input.</p>
       <div class="edit-form-actions">
         <button type="button" class="btn-secondary" data-action="cancel-edit">Batal</button>
         <button type="button" class="btn-primary" data-action="save-edit">Simpan</button>
@@ -424,11 +424,13 @@ function buildEditForm(p) {
 // Label tampilan untuk movement_type. Fallback ke nilai asli kalau tipe belum dikenal,
 // supaya tidak error/tampil kosong kalau ada jenis transaksi baru yang belum kepikiran di sini.
 // Catatan: key 'opname_adjustment' sempat tidak ke-mapping sebelumnya (tertulis 'opname') — sudah diperbaiki.
+// Percakapan [Selaraskan Istilah Stok Fisik Saat Ini] - label "Opname" (jargon)
+// diganti "Stok Fisik", konsisten dengan istilah yang dipakai di halaman Input & Riwayat.
 function movementTypeLabel(type) {
   const labels = {
     in: 'Masuk',
     out: 'Keluar',
-    opname_adjustment: 'Opname',
+    opname_adjustment: 'Stok Fisik',
     merge_marker: 'Digabung'
   };
   return labels[type] || escapeHtml(type || '-');
