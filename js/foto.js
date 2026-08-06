@@ -229,26 +229,31 @@ async function handleAnalyzeClick() {
     // CATATAN: batch_number & minimum_stock SENGAJA tidak diminta dari AI
     // (keputusan desain: AI tidak reliable membaca teks kecil/barcode batch,
     // jadi kedua field ini selalu manual input oleh user).
-    // Percakapan [Unifikasi Field Produk Baru/Existing - Foto & Suara] -
-    // is_known_product dicek sekali di sini (dari existing_product_names
-    // yang sudah dimuat saat halaman dibuka), dipakai renderExtractedItems()
+    // Percakapan [Fix: Default Jenis Transaksi & Dropdown Pilih Nama] -
+    // is_known_product dicek sekali di sini, dipakai renderExtractedItems()
     // untuk sembunyikan field identitas produk (kategori/lokasi/satuan/
-    // stok-minimum) kalau barangnya sudah pernah tercatat. expiry & batch
-    // TETAP selalu muncul (properti lot, bukan properti produk).
-    extractedItems = items.map((item, index) => ({
-      tempId: 'item_' + index,
-      nama: item.nama || '',
-      jumlah: item.jumlah || 0,
-      satuan: item.satuan || 'pcs',
-      kategori: item.kategori || '',
-      expiry_date: item.expiry_date || '',
-      lokasi_penyimpanan: item.lokasi_penyimpanan || '',
-      batch_number: '', // manual, tidak dari AI
-      minimum_stock: 0, // manual, tidak dari AI
-      jenis_transaksi: 'in', // default: Barang Masuk. Bisa diubah ke 'opname' oleh user.
-      is_known_product: isKnownProductName(item.nama || ''),
-      included: true
-    }));
+    // stok-minimum/expiry/batch) kalau barangnya sudah pernah tercatat.
+    // Default jenis_transaksi TIDAK lagi selalu 'in' -- kalau barang sudah
+    // ada di Inventaris, default ke 'opname' (Stok Fisik Saat Ini), karena
+    // skenario paling umum foto barang existing adalah verifikasi jumlah
+    // fisik, bukan barang baru masuk.
+    extractedItems = items.map((item, index) => {
+      const isKnown = isKnownProductName(item.nama || '');
+      return {
+        tempId: 'item_' + index,
+        nama: item.nama || '',
+        jumlah: item.jumlah || 0,
+        satuan: item.satuan || 'pcs',
+        kategori: item.kategori || '',
+        expiry_date: item.expiry_date || '',
+        lokasi_penyimpanan: item.lokasi_penyimpanan || '',
+        batch_number: '', // manual, tidak dari AI
+        minimum_stock: 0, // manual, tidak dari AI
+        jenis_transaksi: isKnown ? 'opname' : 'in',
+        is_known_product: isKnown,
+        included: true
+      };
+    });
 
     renderExtractedItems();
     uploadStatus.style.display = 'none';
@@ -473,10 +478,30 @@ function renderExtractedItems() {
     // autocomplete SETELAH row di-attach ke DOM (elemen ini baru lahir
     // tiap kali renderExtractedItems() jalan, beda dari app.js yang
     // elemennya statis dan dipasang sekali saja).
+    // Percakapan [Fix: Dropdown Pilih Nama Tidak Trigger Re-check] -
+    // onSelect (parameter ke-4) WAJIB diisi untuk .item-nama -- tanpa ini,
+    // klik dari dropdown cuma set inputEl.value langsung tanpa memicu
+    // event 'input', sehingga isKnownProductName() & toggleNewOnlyFields()
+    // tidak pernah terpanggil ulang saat user pilih nama dari hasil
+    // pencarian (cuma jalan kalau user ngetik manual).
     setupSimpleAutocompleteOnElement(
       row.querySelector('.item-nama'),
       row.querySelector('.item-nama-results'),
-      function() { return ALL_PRODUCT_NAMES; }
+      function() { return ALL_PRODUCT_NAMES; },
+      function(selectedName) {
+        updateItemField(item.tempId, 'nama', selectedName);
+        const isKnown = isKnownProductName(selectedName);
+        updateItemField(item.tempId, 'is_known_product', isKnown);
+        // Barang existing yang baru dipilih -> default jenis transaksi ke
+        // opname (sama seperti default awal saat hasil AI pertama muncul),
+        // konsisten dgn keputusan "Stok Fisik Saat Ini" jadi default utk
+        // barang yang sudah dikenal.
+        if (isKnown) {
+          updateItemField(item.tempId, 'jenis_transaksi', 'opname');
+          row.querySelector('.item-jenis-opname').checked = true;
+        }
+        toggleNewOnlyFields(isKnown);
+      }
     );
     setupSimpleAutocompleteOnElement(
       row.querySelector('.item-kategori'),

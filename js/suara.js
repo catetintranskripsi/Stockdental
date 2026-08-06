@@ -306,34 +306,33 @@ async function handleProcessAllClick() {
       return;
     }
 
-    // Struktur SAMA PERSIS dengan foto.js, kecuali jenis_transaksi:
-    // batch_number & minimum_stock selalu manual input, tidak pernah dari AI.
+    // Percakapan [Fix: Default Jenis Transaksi & Dropdown Pilih Nama] -
+    // is_known_product disimpan di sini, dipakai renderExtractedItems()
+    // untuk sembunyikan field identitas produk (kategori/lokasi/satuan/
+    // stok-min/expiry/batch). Digabung dengan toggleInOnlyFields() yang
+    // sudah ada: field disembunyikan kalau jenis='out' ATAU produk sudah
+    // dikenal.
     //
-    // Percakapan [Deteksi Jenis Transaksi dari Suara] - jenis_transaksi
-    // sekarang diambil dari hasil tebakan AI (item.jenis_transaksi,
-    // salah satu dari 'in'/'out'/'opname', default 'in' kalau AI tidak
-    // mengembalikan field ini atau nilainya di luar tiga itu).
-    //
-    // Pengaman: kalau nama barang belum ada di ALL_PRODUCT_NAMES (belum
-    // pernah diinput sebelumnya), paksa 'in' di sini juga -- supaya
-    // radio button yang tampil ke staff SUDAH konsisten dari awal dengan
-    // apa yang bakal benar-benar tersimpan (saveExtractedItemToSupabase()
-    // punya pengaman yang sama di titik simpan, ini cuma menyamakan
-    // tampilannya supaya tidak membingungkan staff).
-    // Percakapan [Unifikasi Field Produk Baru/Existing - Foto & Suara] -
-    // is_known_product disimpan di sini (bukan cuma dipakai sesaat utk
-    // koreksi jenis_transaksi), dipakai renderExtractedItems() untuk
-    // sembunyikan field identitas produk (kategori/lokasi/satuan/stok-min).
-    // Digabung dengan toggleInOnlyFields() yang sudah ada: field
-    // disembunyikan kalau jenis='out' ATAU produk sudah dikenal.
+    // Perbaikan default jenis_transaksi: SEBELUMNYA kalau AI menebak 'in'
+    // untuk barang yang sebenarnya sudah ada di Inventaris, default yang
+    // tampil ke staff tetap 'in' (ikut tebakan AI apa adanya) -- padahal
+    // utk barang existing, 'opname' (Stok Fisik Saat Ini) adalah default
+    // yang lebih masuk akal (skenario paling umum: verifikasi stok fisik,
+    // bukan barang baru masuk). SEKARANG: kalau barang dikenal DAN AI
+    // TIDAK secara eksplisit menebak 'out', paksa default ke 'opname'.
+    // AI menebak 'out' tetap dihormati (barang keluar tetap valid utk
+    // barang existing). Barang belum dikenal tetap selalu 'in' (tidak
+    // boleh 'out'/'opname' utk produk baru).
     const VALID_JENIS = ['in', 'out', 'opname'];
     extractedItems = items.map((item, index) => {
       const namaBarang = item.nama || '';
       const isKnown = isKnownProductName(namaBarang);
       let jenisTransaksi = VALID_JENIS.includes(item.jenis_transaksi) ? item.jenis_transaksi : 'in';
 
-      if (jenisTransaksi !== 'in' && !isKnown) {
+      if (!isKnown) {
         jenisTransaksi = 'in';
+      } else if (jenisTransaksi !== 'out') {
+        jenisTransaksi = 'opname';
       }
 
       return {
@@ -356,6 +355,18 @@ async function handleProcessAllClick() {
     recordStatus.style.display = 'none';
     resultSection.style.display = 'block';
     resultSection.scrollIntoView({ behavior: 'smooth' });
+
+    // Percakapan [Auto-clear Rekaman Setelah Analisis] - kosongkan
+    // recordedSegments SEGERA setelah analisis berhasil (bukan menunggu
+    // sampai user klik Simpan Semua di akhir). Kalau user mau rekam
+    // barang lain berikutnya, dia mulai dari kosong lagi tanpa perlu
+    // hapus manual satu-satu. Hasil ekstraksi (extractedItems) TIDAK
+    // ikut dihapus di sini -- itu tetap ada di form sampai user simpan
+    // atau reset manual. HANYA dilakukan kalau analisis SUKSES (items.length
+    // > 0, sudah lolos pengecekan di atas) -- kalau gagal/di-catch, segmen
+    // TETAP ada supaya user bisa coba analisis ulang tanpa rekam dari nol.
+    recordedSegments = [];
+    renderSegmentsList();
 
   } catch (error) {
     console.error('Edge Function error:', error);
@@ -612,10 +623,31 @@ function renderExtractedItems() {
     // Percakapan [Perbaikan Dropdown Foto/Suara/Edit Inventaris] - pasang
     // autocomplete SETELAH row di-attach ke DOM (elemen baru lahir tiap
     // kali renderExtractedItems() jalan).
+    // Percakapan [Fix: Dropdown Pilih Nama Tidak Trigger Re-check] -
+    // onSelect (parameter ke-4) WAJIB diisi -- tanpa ini, klik dari
+    // dropdown cuma set inputEl.value langsung tanpa memicu event
+    // 'input', sehingga isKnownProductName() & toggleInOnlyFields() tidak
+    // pernah terpanggil ulang saat user pilih nama dari hasil pencarian.
     setupSimpleAutocompleteOnElement(
       row.querySelector('.item-nama'),
       row.querySelector('.item-nama-results'),
-      function() { return ALL_PRODUCT_NAMES; }
+      function() { return ALL_PRODUCT_NAMES; },
+      function(selectedName) {
+        updateItemField(item.tempId, 'nama', selectedName);
+        currentIsKnown = isKnownProductName(selectedName);
+        updateItemField(item.tempId, 'is_known_product', currentIsKnown);
+
+        // Barang existing yang baru dipilih -> default ke opname, KECUALI
+        // user sedang di radio 'out' (barang keluar tetap valid utk
+        // barang existing, tidak perlu dipaksa pindah ke opname).
+        const isOutNow = row.querySelector('.item-jenis-out').checked;
+        if (currentIsKnown && !isOutNow) {
+          updateItemField(item.tempId, 'jenis_transaksi', 'opname');
+          row.querySelector('.item-jenis-opname').checked = true;
+        }
+
+        toggleInOnlyFields(isOutNow);
+      }
     );
     setupSimpleAutocompleteOnElement(
       row.querySelector('.item-kategori'),
