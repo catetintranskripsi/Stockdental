@@ -149,7 +149,7 @@
           <option value="">-- Pilih Jenis Transaksi --</option>
           <option value="in">Barang Masuk</option>
           <option value="out">Barang Keluar</option>
-          <option value="opname_adjustment">Stok Opname</option>
+          <option value="opname_adjustment">Stok Fisik Saat Ini</option>
         </select>
         <p id="movementTypeHint" style="display:none; margin-top:6px; font-size:0.85rem; color:var(--color-text-muted); line-height:1.5;"></p>
       </div>
@@ -162,7 +162,7 @@
         <div id="productSearchResults" class="product-search-results" style="display:none;"></div>
       </div>
 
-      <!-- ========== FIELD PRODUK BARU (shared: dipakai Barang Masuk MAUPUN Stok Opname,
+      <!-- ========== FIELD PRODUK BARU (shared: dipakai Barang Masuk MAUPUN Stok Fisik Saat Ini,
            HANYA muncul kalau barang belum pernah tercatat -- lihat toggleNewProductFields()
            di app.js. Satu set field ini dipakai gantian oleh kedua jenis transaksi,
            form.reset() + resetNewProductFields() di app.js memastikan tidak ada nilai
