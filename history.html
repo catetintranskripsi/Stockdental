@@ -25,12 +25,20 @@
     <div class="app-header">
       <div>
         <h1>StockDental</h1>
-        <h2>Riwayat Transaksi</h2>
+        <h2>Riwayat</h2>
       </div>
       <button id="logoutBtn" class="btn-secondary">Logout</button>
     </div>
 
-    <!-- FILTER RENTANG TANGGAL -->
+    <!-- Sub-tab: Riwayat Transaksi | Penggunaan Barang. Filter tanggal di
+         bawah ini SHARED oleh kedua tab -- pilih rentang sekali, berlaku
+         utk keduanya, pindah tab tidak perlu set ulang tanggal. -->
+    <div class="sub-tab-row">
+      <button type="button" id="tabTransaksiBtn" class="sub-tab-item sub-tab-active" style="border:none; background:none; font:inherit; cursor:pointer;">Riwayat Transaksi</button>
+      <button type="button" id="tabPenggunaanBtn" class="sub-tab-item" style="border:none; background:none; font:inherit; cursor:pointer;">Penggunaan Barang</button>
+    </div>
+
+    <!-- FILTER RENTANG TANGGAL (shared kedua tab) -->
     <div class="filter-row">
       <div class="form-group">
         <label for="filterStartDate">Dari Tanggal</label>
@@ -46,12 +54,23 @@
     <button type="button" id="filterApplyBtn" class="btn-primary" style="margin-bottom:12px;">Terapkan</button>
     <div id="filterDateError" class="status-message status-error" style="display:none;"></div>
 
-    <!-- RINGKASAN -->
-    <div id="historySummary" class="history-summary"></div>
+    <!-- ========== TAB 1: RIWAYAT TRANSAKSI ========== -->
+    <div id="tabTransaksiSection">
+      <!-- RINGKASAN -->
+      <div id="historySummary" class="history-summary"></div>
 
-    <!-- LIST RIWAYAT -->
-    <div id="historyList" class="history-list">
-      <p class="loading-text">Memuat data...</p>
+      <!-- LIST RIWAYAT -->
+      <div id="historyList" class="history-list">
+        <p class="loading-text">Memuat data...</p>
+      </div>
+    </div>
+
+    <!-- ========== TAB 2: PENGGUNAAN BARANG ========== -->
+    <div id="tabPenggunaanSection" style="display:none;">
+      <p class="page-subtitle">Rekap total pemakaian per barang pada rentang tanggal yang dipilih -- dihitung dari Barang Keluar, ditambah selisih turun dari Stok Fisik Saat Ini.</p>
+      <div id="usageList" class="history-list">
+        <p class="loading-text">Memuat data...</p>
+      </div>
     </div>
 
   </div>
