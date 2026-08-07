@@ -156,8 +156,8 @@
 
       <!-- SEARCHABLE PILIH BARANG (dipakai untuk ketiga jenis transaksi: in/out/opname) -->
       <div class="form-group" id="productSelectGroup" style="display:none; position:relative;">
-        <label for="productSearchInput">Cari Nama Barang</label>
-        <input type="text" id="productSearchInput" placeholder="Ketik nama barang..." autocomplete="off">
+        <label for="productSearchInput">Nama Barang</label>
+        <input type="text" id="productSearchInput" placeholder="Ketik nama barang (baru atau yang sudah ada)..." autocomplete="off">
         <input type="hidden" id="productSelectedId">
         <div id="productSearchResults" class="product-search-results" style="display:none;"></div>
       </div>
@@ -169,12 +169,9 @@
            "nyangkut" saat pindah jenis transaksi. ========== -->
       <div id="newProductFields" style="display:none;">
 
-        <!-- NAMA BARANG - searchable, histori dari products.name -->
-        <div class="form-group" style="position:relative;">
-          <label for="productName">Nama Barang</label>
-          <input type="text" id="productName" placeholder="Contoh: Sarung Tangan Latex M" autocomplete="off">
-          <div id="productNameResults" class="product-search-results" style="display:none;"></div>
-        </div>
+        <!-- NAMA BARANG BARU: TIDAK ADA BOX TERPISAH LAGI -- nilai nama
+             diambil langsung dari box "Cari Nama Barang" (productSearchInput)
+             di atas. Lihat insertNewProduct() di app.js. -->
 
         <!-- KATEGORI - searchable, starter list + histori -->
         <div class="form-group" style="position:relative;">
