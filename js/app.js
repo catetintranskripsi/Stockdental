@@ -56,7 +56,6 @@ const fieldsOpname = document.getElementById('fieldsOpname');
 const opnamePreview = document.getElementById('opnamePreview');
 const newProductFields = document.getElementById('newProductFields');
 
-const productNameInput = document.getElementById('productName');
 const categoryInput = document.getElementById('category');
 const storageLocationInput = document.getElementById('storageLocation');
 const unitInput = document.getElementById('unit');
@@ -160,7 +159,7 @@ async function loadAutocompleteOptions() {
 // File autocomplete-helper.js WAJIB di-load sebelum app.js di index.html.
 
 function updateMetadataPlaceholders() {
-  const typedName = productNameInput.value.trim().toLowerCase();
+  const typedName = productSearchInput.value.trim().toLowerCase();
 
   if (!typedName) {
     resetMetadataPlaceholders();
@@ -201,7 +200,6 @@ function resetMetadataPlaceholders() {
 // "nyangkut" dari transaksi sebelumnya (field ini dipakai gantian oleh
 // Barang Masuk maupun Stok Opname).
 function resetNewProductFields() {
-  productNameInput.value = '';
   categoryInput.value = '';
   storageLocationInput.value = '';
   minimumStockInput.value = '';
@@ -210,8 +208,6 @@ function resetNewProductFields() {
   document.getElementById('batchNumber').value = '';
   resetMetadataPlaceholders();
 }
-
-productNameInput.addEventListener('input', updateMetadataPlaceholders);
 
 function renderProductResults(filterText) {
   const keyword = filterText.trim().toLowerCase();
@@ -280,6 +276,7 @@ function resetProductSelection() {
   delete productSearchInput.dataset.currentStock;
   productSearchResults.style.display = 'none';
   productSearchResults.innerHTML = '';
+  resetMetadataPlaceholders();
 }
 
 // Percakapan [Unifikasi Barang Masuk/Stok Opname] - tampilkan/sembunyikan
@@ -301,10 +298,7 @@ productSearchInput.addEventListener('input', function() {
   productSelectedId.value = '';
   renderProductResults(productSearchInput.value);
   toggleNewProductFields();
-});
-
-setupSimpleAutocomplete('productName', 'productNameResults', function() {
-  return uniqueMerge([], ALL_PRODUCTS.map(function(p) { return p.name; }));
+  updateMetadataPlaceholders();
 });
 
 setupSimpleAutocomplete('category', 'categoryResults', function() {
@@ -458,7 +452,7 @@ function parseErrorMessage(error) {
 // kategori, satuan, lokasi, stok minimum), termasuk cek limit 70 jenis
 // barang. Mengembalikan productId baru.
 async function insertNewProduct() {
-  const productName = document.getElementById('productName').value.trim();
+  const productName = productSearchInput.value.trim();
   const category = document.getElementById('category').value.trim();
   const unit = document.getElementById('unit').value.trim() || 'pcs';
   const storageLocation = document.getElementById('storageLocation').value.trim();
