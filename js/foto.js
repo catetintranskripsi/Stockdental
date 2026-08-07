@@ -233,10 +233,17 @@ async function handleAnalyzeClick() {
     // is_known_product dicek sekali di sini, dipakai renderExtractedItems()
     // untuk sembunyikan field identitas produk (kategori/lokasi/satuan/
     // stok-minimum/expiry/batch) kalau barangnya sudah pernah tercatat.
-    // Default jenis_transaksi TIDAK lagi selalu 'in' -- kalau barang sudah
-    // ada di Inventaris, default ke 'opname' (Stok Fisik Saat Ini), karena
-    // skenario paling umum foto barang existing adalah verifikasi jumlah
-    // fisik, bukan barang baru masuk.
+    // LOGIC INI TIDAK DIUBAH oleh fix di bawah.
+    //
+    // Percakapan [Fix: Default Jenis Transaksi Selalu "Barang Masuk"] -
+    // jenis_transaksi SELALU default 'in', tidak lagi tergantung isKnown.
+    // Alasan: beda dengan input Suara (user menyebutkan eksplisit "barang
+    // masuk" atau "stok fisik" saat merekam, jadi AI bisa tahu maksudnya),
+    // foto tidak punya konteks itu -- foto biasanya nota/faktur pembelian
+    // berisi campuran barang baru & barang existing yang dibeli lagi,
+    // jadi asumsi "barang existing = opname" sering salah dan bikin radio
+    // kelihatan acak antar-barang. User tetap bisa ubah manual ke "Stok
+    // Fisik" per barang lewat radio button di renderExtractedItems().
     extractedItems = items.map((item, index) => {
       const isKnown = isKnownProductName(item.nama || '');
       return {
@@ -249,7 +256,7 @@ async function handleAnalyzeClick() {
         lokasi_penyimpanan: item.lokasi_penyimpanan || '',
         batch_number: '', // manual, tidak dari AI
         minimum_stock: 0, // manual, tidak dari AI
-        jenis_transaksi: isKnown ? 'opname' : 'in',
+        jenis_transaksi: 'in',
         is_known_product: isKnown,
         included: true
       };
