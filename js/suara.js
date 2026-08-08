@@ -313,16 +313,18 @@ async function handleProcessAllClick() {
     // sudah ada: field disembunyikan kalau jenis='out' ATAU produk sudah
     // dikenal.
     //
-    // Perbaikan default jenis_transaksi: SEBELUMNYA kalau AI menebak 'in'
-    // untuk barang yang sebenarnya sudah ada di Inventaris, default yang
-    // tampil ke staff tetap 'in' (ikut tebakan AI apa adanya) -- padahal
-    // utk barang existing, 'opname' (Stok Fisik Saat Ini) adalah default
-    // yang lebih masuk akal (skenario paling umum: verifikasi stok fisik,
-    // bukan barang baru masuk). SEKARANG: kalau barang dikenal DAN AI
-    // TIDAK secara eksplisit menebak 'out', paksa default ke 'opname'.
-    // AI menebak 'out' tetap dihormati (barang keluar tetap valid utk
-    // barang existing). Barang belum dikenal tetap selalu 'in' (tidak
-    // boleh 'out'/'opname' utk produk baru).
+    // Percakapan [Fix: AI Benar Tebak "in" Tapi Ditimpa Paksa jadi "opname"] -
+    // SEBELUMNYA: kalau barang dikenal DAN AI tidak eksplisit menebak
+    // 'out', jenis_transaksi DIPAKSA jadi 'opname' -- walau AI sudah
+    // benar menebak 'in' dari kata "masuk"/"datang"/"beli" yang diucapkan
+    // staff. Akibatnya radio selalu jatuh ke "Stok Fisik Saat Ini" untuk
+    // barang existing, padahal staff jelas-jelas bilang barang masuk.
+    // SEKARANG: tebakan AI dihormati apa adanya untuk barang existing
+    // (in/out/opname semua dipakai sesuai hasil deteksi smooth-responder).
+    // Barang BARU tetap dipaksa 'in' -- 'out' tidak valid untuk barang
+    // yang belum pernah tercatat, dan 'opname' untuk barang baru tetap
+    // bisa dipilih manual oleh user lewat radio kalau memang itu maksudnya
+    // (lihat toggleInOnlyFields()), cuma tidak di-default-kan otomatis.
     const VALID_JENIS = ['in', 'out', 'opname'];
     extractedItems = items.map((item, index) => {
       const namaBarang = item.nama || '';
@@ -331,8 +333,6 @@ async function handleProcessAllClick() {
 
       if (!isKnown) {
         jenisTransaksi = 'in';
-      } else if (jenisTransaksi !== 'out') {
-        jenisTransaksi = 'opname';
       }
 
       return {
