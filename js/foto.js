@@ -392,24 +392,30 @@ function renderExtractedItems() {
           <div class="item-kategori-results product-search-results" style="display:none;"></div>
         </div>
 
-        <div class="field-row item-fields-new-only" style="display:${item.is_known_product ? 'none' : 'flex'};">
-          <div class="field-group">
+        <!-- Percakapan [Fix: Expiry/Batch Selalu Muncul di Barang Masuk] -
+             expiry & batch punya class item-fields-lot (BUKAN
+             item-fields-new-only lagi) -- visibility-nya ditentukan oleh
+             jenis transaksi (selalu tampil utk 'in', ikut is_known_product
+             utk 'opname'), bukan cuma status existing/baru seperti
+             kategori/lokasi/satuan/stok-min. Lihat toggleNewOnlyFields(). -->
+        <div class="field-row">
+          <div class="field-group item-fields-lot" style="display:${(item.jenis_transaksi === 'in' || !item.is_known_product) ? 'block' : 'none'};">
             <label>Tanggal Kedaluwarsa</label>
             <input type="text" class="item-expiry" inputmode="numeric" placeholder="DDMMYYYY" maxlength="8">
           </div>
-          <div class="field-group" style="position:relative;">
+          <div class="field-group item-fields-new-only" style="position:relative; display:${item.is_known_product ? 'none' : 'block'};">
             <label>Lokasi Simpan</label>
             <input type="text" class="item-lokasi" value="${escapeHtml(item.lokasi_penyimpanan)}" placeholder="Misal: Lemari A" autocomplete="off">
             <div class="item-lokasi-results product-search-results" style="display:none;"></div>
           </div>
         </div>
 
-        <div class="field-row item-fields-new-only" style="display:${item.is_known_product ? 'none' : 'flex'};">
-          <div class="field-group">
+        <div class="field-row">
+          <div class="field-group item-fields-lot" style="display:${(item.jenis_transaksi === 'in' || !item.is_known_product) ? 'block' : 'none'};">
             <label>Nomor Batch (manual)</label>
             <input type="text" class="item-batch" value="${escapeHtml(item.batch_number)}" placeholder="Contoh: BTC-2026-001">
           </div>
-          <div class="field-group">
+          <div class="field-group item-fields-new-only" style="display:${item.is_known_product ? 'none' : 'block'};">
             <label>Stok Minimum (barang baru)</label>
             <input type="number" class="item-minstock" value="${item.minimum_stock}" min="0" step="0.01" placeholder="cth: 3 atau 0.25 utk 1/4">
           </div>
@@ -423,10 +429,16 @@ function renderExtractedItems() {
     });
 
     row.querySelector('.item-jenis-in').addEventListener('change', (e) => {
-      if (e.target.checked) updateItemField(item.tempId, 'jenis_transaksi', 'in');
+      if (e.target.checked) {
+        updateItemField(item.tempId, 'jenis_transaksi', 'in');
+        toggleNewOnlyFields(item.is_known_product);
+      }
     });
     row.querySelector('.item-jenis-opname').addEventListener('change', (e) => {
-      if (e.target.checked) updateItemField(item.tempId, 'jenis_transaksi', 'opname');
+      if (e.target.checked) {
+        updateItemField(item.tempId, 'jenis_transaksi', 'opname');
+        toggleNewOnlyFields(item.is_known_product);
+      }
     });
 
     row.querySelector('.btn-delete-row').addEventListener('click', () => {
@@ -441,10 +453,27 @@ function renderExtractedItems() {
     // Dipanggil ulang tiap kali user edit nama, supaya kalau AI salah baca
     // (nama tidak match) lalu user koreksi ke nama yang sudah ada, field-nya
     // otomatis menyesuaikan tanpa perlu foto ulang.
+    // Percakapan [Fix: Expiry/Batch Selalu Muncul di Barang Masuk] -
+    // toggleNewOnlyFields() sekarang menangani DUA kelompok field secara
+    // terpisah:
+    // - .item-fields-new-only (kategori/lokasi/satuan/stok-min): sembunyi
+    //   kalau produk sudah dikenal, TIDAK PEDULI jenis transaksi.
+    // - .item-fields-lot (expiry/batch): SELALU tampil kalau jenis
+    //   transaksi = 'in' (Barang Masuk selalu lot baru, expiry/batch bisa
+    //   beda dari lot sebelumnya walau produknya sudah ada). Untuk jenis
+    //   'opname' (Stok Fisik Saat Ini), ikut sembunyi kalau produk sudah
+    //   dikenal (itu koreksi stok pada lot yang sudah ada, bukan lot baru).
     function toggleNewOnlyFields(isKnown) {
       row.querySelectorAll('.item-fields-new-only').forEach((el) => {
         el.style.display = isKnown ? 'none' : (el.classList.contains('field-row') ? 'flex' : 'block');
       });
+
+      const isBarangMasuk = row.querySelector('.item-jenis-in').checked;
+      const showLotFields = isBarangMasuk || !isKnown;
+      row.querySelectorAll('.item-fields-lot').forEach((el) => {
+        el.style.display = showLotFields ? 'block' : 'none';
+      });
+
       row.querySelector('.field-known-product-note').style.display = isKnown ? 'block' : 'none';
     }
 
@@ -700,12 +729,20 @@ async function saveExtractedItemToSupabase(item) {
     productId = newProduct.id;
   }
 
-  // Produk baru (belum ada histori stok) selalu diperlakukan sebagai "in",
-  // karena opname tidak bermakna tanpa baseline stok sebelumnya
-  // (aturan yang sama seperti versi lama, tetap dipertahankan).
-  const jenisTransaksi = isNewProduct ? 'in' : item.jenis_transaksi;
+  // Percakapan [Fix: Jenis Transaksi Barang Baru via Stok Fisik] -
+  // SEBELUMNYA: produk baru selalu dipaksa jenisTransaksi='in', jadi
+  // walau user pilih radio "Stok Fisik Saat Ini" utk barang baru,
+  // tersimpannya tetap sebagai add_stock_lot dgn movement_type default
+  // ('in') -- Riwayat salah mencatat sebagai "Masuk" padahal user pilih
+  // "Stok Fisik". SEKARANG: barang baru tetap SELALU pakai add_stock_lot
+  // (expiry/batch perlu tersimpan, adjust_stock_opname hardcode NULL utk
+  // itu -- lihat migration [add_movement_type_param_to_add_stock_lot]),
+  // TAPI p_movement_type dikirim sesuai pilihan radio user, supaya
+  // Riwayat mencatat jenis transaksi yang benar.
+  const jenisTransaksi = item.jenis_transaksi;
+  const movementTypeForNewProduct = jenisTransaksi === 'opname' ? 'opname_adjustment' : 'in';
 
-  if (jenisTransaksi === 'opname') {
+  if (!isNewProduct && jenisTransaksi === 'opname') {
     const { error: rpcError } = await supabaseClient.rpc('adjust_stock_opname', {
       p_clinic_id: CURRENT_CLINIC_ID,
       p_product_id: productId,
@@ -722,7 +759,8 @@ async function saveExtractedItemToSupabase(item) {
       p_quantity: quantity,
       p_batch_number: batchNumber,
       p_expiry_date: expiryDate,
-      p_user_id: CURRENT_USER_ID
+      p_user_id: CURRENT_USER_ID,
+      p_movement_type: isNewProduct ? movementTypeForNewProduct : 'in'
     });
 
     if (rpcError) throw rpcError;

@@ -55,6 +55,7 @@ const fieldsOut = document.getElementById('fieldsOut');
 const fieldsOpname = document.getElementById('fieldsOpname');
 const opnamePreview = document.getElementById('opnamePreview');
 const newProductFields = document.getElementById('newProductFields');
+const lotFields = document.getElementById('lotFields');
 
 const categoryInput = document.getElementById('category');
 const storageLocationInput = document.getElementById('storageLocation');
@@ -267,6 +268,12 @@ function selectProduct(product) {
   newProductFields.style.display = 'none';
   resetNewProductFields();
 
+  // Percakapan [Fix: Expiry/Batch Selalu Muncul di Barang Masuk] - beda
+  // dari newProductFields, lotFields TIDAK otomatis disembunyikan di sini
+  // -- toggleLotFields() yang menentukan (tetap tampil kalau jenis
+  // transaksinya Barang Masuk, walau barangnya sudah existing).
+  toggleLotFields();
+
   updateOpnamePreview();
 }
 
@@ -290,6 +297,27 @@ function toggleNewProductFields() {
   newProductFields.style.display = (allowsNewProduct && !hasSelectedExisting) ? 'block' : 'none';
 }
 
+// Percakapan [Fix: Expiry/Batch Selalu Muncul di Barang Masuk] -
+// lotFields (expiry & batch) TIDAK ikut logic yang sama dengan
+// newProductFields. Barang Masuk SELALU lot baru (expiry/batch kiriman
+// baru bisa beda dari lot sebelumnya, walau nama produknya sudah ada di
+// Inventaris) -> lotFields SELALU tampil untuk jenis 'in', apapun status
+// existing-nya. Stok Fisik Saat Ini untuk barang existing = koreksi pada
+// stok yang sudah ada (bukan lot baru) -> lotFields ikut sembunyi sama
+// seperti newProductFields. Barang Keluar = tidak pernah tampil.
+function toggleLotFields() {
+  const movementType = movementTypeSelect.value;
+  const hasSelectedExisting = !!productSelectedId.value;
+
+  if (movementType === 'in') {
+    lotFields.style.display = 'block';
+  } else if (movementType === 'opname_adjustment') {
+    lotFields.style.display = hasSelectedExisting ? 'none' : 'block';
+  } else {
+    lotFields.style.display = 'none';
+  }
+}
+
 productSearchInput.addEventListener('focus', function() {
   renderProductResults(productSearchInput.value);
 });
@@ -298,6 +326,7 @@ productSearchInput.addEventListener('input', function() {
   productSelectedId.value = '';
   renderProductResults(productSearchInput.value);
   toggleNewProductFields();
+  toggleLotFields();
   updateMetadataPlaceholders();
 });
 
@@ -362,6 +391,7 @@ movementTypeSelect.addEventListener('change', function() {
   resetProductSelection();
   resetNewProductFields();
   toggleNewProductFields();
+  toggleLotFields();
 });
 
 function updateOpnamePreview() {
@@ -423,6 +453,7 @@ form.addEventListener('submit', async function(e) {
     fieldsOpname.style.display = 'none';
     productSelectGroup.style.display = 'none';
     newProductFields.style.display = 'none';
+    lotFields.style.display = 'none';
     resetProductSelection();
     resetNewProductFields();
     await loadProductOptions();
