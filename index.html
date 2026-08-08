@@ -363,7 +363,17 @@
           <input type="text" id="unit" placeholder="pcs / box / botol" value="pcs" autocomplete="off">
           <div id="unitResults" class="product-search-results" style="display:none;"></div>
         </div>
+      </div>
 
+      <!-- ========== FIELD LOT: EXPIRY & BATCH (shared, TAPI logic beda dari newProductFields)
+           Percakapan [Fix: Expiry/Batch Selalu Muncul di Barang Masuk] -
+           Barang Masuk SELALU lot baru, biarpun nama produknya sudah ada di
+           Inventaris -- kiriman baru dari supplier bisa punya expiry/batch
+           beda dari lot-lot sebelumnya (inti dari sistem FEFO). Jadi field
+           ini TIDAK ikut sembunyi cuma karena produk existing, kecuali
+           jenis transaksinya Stok Fisik Saat Ini (itu koreksi stok pada lot
+           yang sudah ada, bukan lot baru). Lihat toggleLotFields() di app.js. -->
+      <div id="lotFields" style="display:none;">
         <div class="form-group">
           <label for="expiryDate">Tanggal Kedaluwarsa (opsional)</label>
           <input type="text" id="expiryDate" inputmode="numeric" placeholder="DDMMYYYY, contoh: 15082028" maxlength="8">
