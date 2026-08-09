@@ -66,6 +66,135 @@
       color: var(--color-text);
       text-align: right;
     }
+
+    /* ============================================
+       Kartu "Coba AI" — carousel auto-rotate 5 skenario penggunaan.
+       Gradient teal senada .upgrade-hero di upgrade.html, supaya
+       terasa premium/menonjol tanpa menambah warna baru ke sistem.
+       ============================================ */
+    .ai-tips-card {
+      background: linear-gradient(135deg, var(--color-primary), #14876f);
+      border-radius: var(--radius-md);
+      padding: 20px 18px 16px;
+      margin-bottom: var(--space-md);
+      box-shadow: var(--shadow-card);
+      position: relative;
+      overflow: hidden;
+    }
+    .ai-tips-eyebrow {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.75);
+      margin-bottom: 10px;
+    }
+    .ai-tips-text {
+      color: #fff;
+      font-size: 0.92rem;
+      line-height: 1.5;
+      min-height: 4.5em;
+      display: flex;
+      align-items: center;
+      transition: opacity 0.3s ease;
+    }
+    .ai-tips-text.fading { opacity: 0; }
+    .ai-tips-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 14px;
+      gap: 12px;
+    }
+    .ai-tips-dots {
+      display: flex;
+      gap: 6px;
+    }
+    .ai-tips-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.35);
+      transition: background 0.2s ease, width 0.2s ease;
+    }
+    .ai-tips-dot.active {
+      background: #fff;
+      width: 16px;
+      border-radius: var(--radius-pill);
+    }
+    .ai-tips-btn {
+      flex-shrink: 0;
+      background: var(--color-accent);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius-pill);
+      padding: 9px 16px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      font-family: var(--font-body);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.15s ease, transform 0.05s ease;
+    }
+    .ai-tips-btn:hover { background: #b95f04; }
+    .ai-tips-btn:active { transform: scale(0.97); }
+
+    /* ============================================
+       Kartu bantuan: CS AI + Tutorial YouTube, sejajar 2 kolom.
+       Pola sama seperti .ringkasan-status-row yang sudah ada.
+       ============================================ */
+    .help-cards-row {
+      display: flex;
+      gap: var(--space-sm);
+      margin-bottom: var(--space-md);
+    }
+    .help-card {
+      flex: 1;
+      background: var(--color-surface);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-card);
+      padding: 16px 14px;
+      text-align: left;
+      text-decoration: none;
+      display: block;
+      transition: box-shadow 0.15s ease, transform 0.05s ease;
+    }
+    .help-card:active {
+      transform: scale(0.98);
+      box-shadow: var(--shadow-card-hover);
+    }
+    .help-card-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.1rem;
+      margin-bottom: 10px;
+    }
+    .help-card.help-cs .help-card-icon {
+      background: var(--color-primary-light);
+    }
+    .help-card.help-tutorial .help-card-icon {
+      background: #FEE2E2;
+    }
+    .help-card-title {
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: 0.85rem;
+      color: var(--color-text);
+      margin: 0 0 3px;
+    }
+    .help-card-desc {
+      font-size: 0.75rem;
+      color: var(--color-text-muted);
+      line-height: 1.4;
+      margin: 0;
+    }
   </style>
 </head>
 <body>
@@ -105,6 +234,34 @@
           <button id="subscriptionActionBtn" type="button" class="btn-secondary" style="display:none;">
           </button>
         </div>
+      </div>
+
+      <!-- Kartu "Coba AI" -- carousel 5 skenario penggunaan AI foto/suara.
+           Selalu tampil (tidak bergantung jumlah barang) supaya tetap
+           relevan buat staf baru / user lama yang belum pernah coba
+           semua skenario. Diisi & dirotasi via initAiTipsCard() di JS. -->
+      <div class="ai-tips-card" id="aiTipsCard">
+        <p class="ai-tips-eyebrow">✨ Tips StockDental</p>
+        <p class="ai-tips-text" id="aiTipsText"></p>
+        <div class="ai-tips-footer">
+          <div class="ai-tips-dots" id="aiTipsDots"></div>
+          <button type="button" class="ai-tips-btn" id="aiTipsBtn">Coba Sekarang</button>
+        </div>
+      </div>
+
+      <!-- Kartu bantuan: CS AI (Gem Gemini) + Tutorial YouTube -->
+      <div class="help-cards-row">
+        <a href="https://gemini.google.com/gem/1mCMToMf3yuB-s34GACXkmktKla1JQWz9?usp=sharing"
+           target="_blank" rel="noopener" class="help-card help-cs">
+          <div class="help-card-icon">🤖</div>
+          <p class="help-card-title">Tanya CS AI</p>
+          <p class="help-card-desc">Ada error atau bingung? Siap bantu 24 jam</p>
+        </a>
+        <a href="https://youtu.be/iewzFFwNjBw" target="_blank" rel="noopener" class="help-card help-tutorial">
+          <div class="help-card-icon">▶️</div>
+          <p class="help-card-title">Tutorial Video</p>
+          <p class="help-card-desc">Panduan lengkap pakai StockDental</p>
+        </a>
       </div>
 
       <!-- Info Akun -->
