@@ -145,6 +145,22 @@
       color: var(--color-text-muted);
       margin: 0 0 20px;
     }
+    /* Banner peringatan: QR masih sandbox Midtrans, belum bisa
+       dipakai bayar sungguhan. Ditaruh di atas gambar QR di dalam
+       qr-box, supaya tetap terlihat oleh reviewer Midtrans (QR-nya
+       sendiri tidak disembunyikan) tapi jelas bagi user awam bahwa
+       ini belum bisa dipakai untuk transaksi nyata. */
+    .qr-sandbox-notice {
+      background: #fffbeb;
+      border: 1px solid #f59e0b;
+      border-radius: 10px;
+      padding: 12px 14px;
+      margin: 0 0 18px;
+      font-size: 13px;
+      color: #b45309;
+      text-align: left;
+      line-height: 1.5;
+    }
     .btn-secondary {
       display: block;
       width: 100%;
@@ -336,6 +352,7 @@
     <div id="qrSection" style="display: none;">
       <div class="qr-box">
         <p class="qr-title" id="qrPaketLabel">Paket 30 Hari — Rp29.000</p>
+        <p class="qr-sandbox-notice">⚠️ QR code di bawah masih dalam tahap uji coba (sandbox Midtrans), belum bisa digunakan untuk pembayaran nyata. Silakan gunakan StockDental Free terlebih dahulu — Premium akan segera aktif.</p>
         <div id="qrLoading" class="qr-loading">Membuat QR pembayaran...</div>
         <img id="qrImage" class="qr-image" style="display: none;" alt="QR Code Pembayaran">
         <p class="qr-countdown" id="qrCountdown"></p>
