@@ -15,6 +15,7 @@ async function onPageReady() {
   await loadRingkasan();
   initSubscriptionStatus();
   initInfoAkun();
+  initAiTipsCard();
 }
 
 async function loadRingkasan() {
@@ -361,6 +362,86 @@ function escapeHtml(str) {
   const div = document.createElement('div');
   div.textContent = String(str);
   return div.innerHTML;
+}
+
+// ============================================
+// KARTU "COBA AI" -- carousel 5 skenario penggunaan AI foto/suara.
+// Selalu tampil untuk SEMUA klinik (tidak dicek jumlah barang) --
+// tetap relevan buat staf baru atau user lama yang belum coba semua
+// skenario (misal baru sadar bisa dipakai untuk stok opname via suara).
+// Auto-rotate tiap 5 detik, tombol "Coba Sekarang" ikut skenario
+// yang lagi tampil.
+// ============================================
+const AI_TIPS = [
+  {
+    text: 'Punya nota pembelian barang? Tidak perlu ketik satu per satu. Foto nota, AI yang analisis, tinggal simpan.',
+    link: 'foto.html'
+  },
+  {
+    text: 'Baru terima kiriman barang dan buru-buru? Sebutkan aja lewat suara, AI yang catat.',
+    link: 'suara.html'
+  },
+  {
+    text: '"Komposit" atau "Composite"? Analisis AI memastikan nama barang seragam — tidak ada 1 barang dengan 2 nama berbeda.',
+    link: 'foto.html'
+  },
+  {
+    text: 'Mau stok opname? Cukup bilang: "Komposit 3M A2 sisa 2 tube, alginat sisa 1 bungkus" — AI yang catat semua.',
+    link: 'suara.html'
+  },
+  {
+    text: 'Baru pertama pakai StockDental? Pindahkan data stok lama dengan mudah — foto saja daftar stok di komputer/kertas, AI akan menganalisisnya.',
+    link: 'foto.html'
+  }
+];
+
+const AI_TIPS_ROTATE_MS = 5000;
+let aiTipsIndex = 0;
+let aiTipsInterval = null;
+
+function initAiTipsCard() {
+  const textEl = document.getElementById('aiTipsText');
+  const btnEl = document.getElementById('aiTipsBtn');
+  const dotsEl = document.getElementById('aiTipsDots');
+  if (!textEl || !btnEl || !dotsEl) return; // guard kalau elemen belum ada
+
+  // Buat dot indicator sejumlah AI_TIPS
+  dotsEl.innerHTML = '';
+  AI_TIPS.forEach((_, i) => {
+    const dot = document.createElement('span');
+    dot.className = 'ai-tips-dot' + (i === 0 ? ' active' : '');
+    dotsEl.appendChild(dot);
+  });
+
+  renderAiTip(0);
+
+  if (aiTipsInterval) clearInterval(aiTipsInterval);
+  aiTipsInterval = setInterval(() => {
+    aiTipsIndex = (aiTipsIndex + 1) % AI_TIPS.length;
+    renderAiTip(aiTipsIndex);
+  }, AI_TIPS_ROTATE_MS);
+}
+
+function renderAiTip(index) {
+  const textEl = document.getElementById('aiTipsText');
+  const btnEl = document.getElementById('aiTipsBtn');
+  const dotsEl = document.getElementById('aiTipsDots');
+  if (!textEl || !btnEl || !dotsEl) return;
+
+  const tip = AI_TIPS[index];
+
+  // Fade out -> ganti isi -> fade in
+  textEl.classList.add('fading');
+  setTimeout(() => {
+    textEl.textContent = tip.text;
+    textEl.classList.remove('fading');
+  }, 300);
+
+  btnEl.onclick = () => { window.location.href = tip.link; };
+
+  Array.from(dotsEl.children).forEach((dot, i) => {
+    dot.classList.toggle('active', i === index);
+  });
 }
 
 // ============================================
