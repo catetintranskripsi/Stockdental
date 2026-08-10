@@ -508,7 +508,7 @@ async function handleCardToggle(productId) {
   const fetchLots = product.activeLots === null
     ? supabaseClient
         .from('product_lots')
-        .select('batch_number, expiry_date, quantity')
+        .select('id, batch_number, expiry_date, quantity')
         .eq('product_id', productId)
         .eq('is_active', true)
         .order('expiry_date', { ascending: true }) // FEFO: paling dekat kadaluarsa duluan
