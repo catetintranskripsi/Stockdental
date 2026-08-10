@@ -201,9 +201,10 @@ async function loadAlertKedaluwarsa() {
 
   const { data: lots, error } = await supabaseClient
     .from('product_lots')
-    .select('id, batch_number, expiry_date, quantity, products(name, unit)')
+    .select('id, batch_number, expiry_date, quantity, products!inner(name, unit, is_active)')
     .eq('clinic_id', CURRENT_CLINIC_ID)
     .eq('is_active', true)
+    .eq('products.is_active', true) // FIX: jangan hitung lot dari produk yang sudah dihapus (soft-delete)
     .gt('quantity', 0)
     .not('expiry_date', 'is', null)
     .lte('expiry_date', formatDateOnly(in30Days))
