@@ -21,6 +21,10 @@ let CURRENT_SORT = 'status'; // 'status' | 'nama' | 'stok' | 'kategori'
 let CURRENT_PAGE = 1;
 let EXPANDED_ITEM_ID = null; // tempId (product id) dari card yang sedang terbuka, atau null
 let EDITING_ITEM_ID = null; // product id dari card yang sedang dalam mode edit, atau null
+// Percakapan [Edit Lot - Batch & Kadaluarsa] - lot_id dari baris lot yang sedang
+// dalam mode edit (batch_number + expiry_date), atau null. Hanya satu lot boleh
+// diedit dalam satu waktu, terpisah dari EDITING_ITEM_ID (edit data barang).
+let EDITING_LOT_ID = null;
 
 // ---- State untuk fitur Gabungkan Barang ----
 let SELECTION_MODE = false;
@@ -301,6 +305,12 @@ function buildItemCard(p) {
           handleSaveEdit(p.id, item);
         } else if (action === 'delete-product') {
           handleDeleteProduct(p.id, p.name, item);
+        } else if (action === 'edit-lot') {
+          handleStartEditLot(btn.dataset.lotId, p.id);
+        } else if (action === 'cancel-edit-lot') {
+          handleCancelEditLot(p.id);
+        } else if (action === 'save-edit-lot') {
+          handleSaveEditLot(btn.dataset.lotId, p.id, item);
         }
       });
     });
@@ -345,13 +355,41 @@ function buildExpandContent(p) {
   } else if (p.activeLots.length === 0) {
     lotsHtml = '<p class="history-empty">Tidak ada lot aktif.</p>';
   } else {
-    lotsHtml = '<ul class="lots-list">' + p.activeLots.map(lot => `
-      <li>
-        <span class="lot-batch">${escapeHtml(lot.batch_number || '(tanpa no. batch)')}</span>
-        <span class="lot-expiry">Exp: ${formatTanggal(lot.expiry_date)}</span>
-        <span class="lot-qty">${lot.quantity}</span>
-      </li>
-    `).join('') + '</ul>';
+    // Percakapan [Edit Lot - Batch & Kadaluarsa] - tiap baris lot punya tombol
+    // edit sendiri (bisa banyak lot per barang). Kalau lot.id sedang di-edit
+    // (EDITING_LOT_ID), baris itu diganti mini-form batch_number + expiry_date.
+    // Quantity TIDAK bisa diedit di sini (tetap lewat Stok Fisik/opname).
+    lotsHtml = '<ul class="lots-list">' + p.activeLots.map(lot => {
+      if (EDITING_LOT_ID === lot.id) {
+        return `
+          <li class="lot-edit-row" data-lot-id="${lot.id}">
+            <div class="lot-edit-form">
+              <div class="edit-form-group">
+                <label>No. Batch (opsional)</label>
+                <input type="text" class="edit-input lot-edit-batch" value="${escapeAttr(lot.batch_number || '')}" placeholder="Kosongkan kalau tidak ada">
+              </div>
+              <div class="edit-form-group">
+                <label>Tanggal Kedaluwarsa (DDMMYYYY, 8 digit)</label>
+                <input type="text" class="edit-input lot-edit-expiry" inputmode="numeric" maxlength="8" value="${lot.expiry_date ? formatToDDMMYYYY(lot.expiry_date) : ''}" placeholder="Contoh: 31122026">
+              </div>
+              <div class="edit-form-actions">
+                <button type="button" class="btn-secondary" data-action="cancel-edit-lot">Batal</button>
+                <button type="button" class="btn-primary" data-action="save-edit-lot" data-lot-id="${lot.id}">Simpan</button>
+              </div>
+              <div class="edit-status-message" data-role="lot-edit-status"></div>
+            </div>
+          </li>
+        `;
+      }
+      return `
+        <li>
+          <span class="lot-batch">${escapeHtml(lot.batch_number || '(tanpa no. batch)')}</span>
+          <span class="lot-expiry">Exp: ${formatTanggal(lot.expiry_date)}</span>
+          <span class="lot-qty">${lot.quantity}</span>
+          <button type="button" class="btn-edit-lot" data-action="edit-lot" data-lot-id="${lot.id}" aria-label="Edit lot">✏️</button>
+        </li>
+      `;
+    }).join('') + '</ul>';
   }
 
   const isEditing = EDITING_ITEM_ID === p.id;
@@ -518,6 +556,78 @@ function handleStartEdit(productId) {
 
 function handleCancelEdit(productId) {
   EDITING_ITEM_ID = null;
+  renderInventaris(inventarisSearchInput.value);
+}
+
+// ============================================
+// Percakapan [Edit Lot - Batch & Kadaluarsa] - EDIT LOT: mulai edit, batal, simpan.
+// Terpisah dari edit data barang (EDITING_ITEM_ID) karena satu barang bisa
+// punya banyak lot aktif. Field yang bisa diedit: batch_number & expiry_date
+// saja. Quantity lot TIDAK bisa diedit di sini (tetap lewat Stok Fisik/opname),
+// supaya total stok tetap sinkron dengan jejak stock_movements.
+// ============================================
+function handleStartEditLot(lotId, productId) {
+  EDITING_LOT_ID = lotId;
+  renderInventaris(inventarisSearchInput.value);
+}
+
+function handleCancelEditLot(productId) {
+  EDITING_LOT_ID = null;
+  renderInventaris(inventarisSearchInput.value);
+}
+
+async function handleSaveEditLot(lotId, productId, cardEl) {
+  const row = cardEl.querySelector(`.lot-edit-row[data-lot-id="${lotId}"]`);
+  if (!row) return;
+
+  const saveBtn = row.querySelector('[data-action="save-edit-lot"]');
+  const statusEl = row.querySelector('[data-role="lot-edit-status"]');
+  const batchInput = row.querySelector('.lot-edit-batch');
+  const expiryInput = row.querySelector('.lot-edit-expiry');
+
+  const batchNumber = batchInput.value.trim();
+  const expiryRaw = expiryInput.value.trim();
+
+  // Tanggal boleh dikosongkan (lot tanpa expiry_date, misal alat non-consumable).
+  // parseDDMMYYYY() return { valid, isoDate, error } — lihat date-helper.js.
+  // Kosong tetap valid (isoDate: null), format salah/tanggal tidak ada di
+  // kalender (misal 31 Februari) ditolak dengan pesan error dari helper-nya.
+  const parsed = parseDDMMYYYY(expiryRaw);
+  if (!parsed.valid) {
+    showEditStatus(statusEl, parsed.error, 'error');
+    return;
+  }
+  const expiryDateIso = parsed.isoDate;
+
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'Menyimpan...';
+
+  const { data, error } = await supabaseClient.rpc('update_lot_details', {
+    p_lot_id: lotId,
+    p_batch_number: batchNumber || null,
+    p_expiry_date: expiryDateIso
+  });
+
+  saveBtn.disabled = false;
+  saveBtn.textContent = 'Simpan';
+
+  if (error || !data || data.success !== true) {
+    console.error('Gagal simpan perubahan lot:', error || data);
+    showEditStatus(statusEl, 'Gagal menyimpan perubahan lot. Coba lagi.', 'error');
+    return;
+  }
+
+  // Update state lokal langsung (tidak perlu fetch ulang semua lot)
+  const product = ALL_INVENTARIS_ITEMS.find(p => p.id === productId);
+  if (product && product.activeLots) {
+    const lot = product.activeLots.find(l => l.id === lotId);
+    if (lot) {
+      lot.batch_number = batchNumber || null;
+      lot.expiry_date = expiryDateIso;
+    }
+  }
+
+  EDITING_LOT_ID = null;
   renderInventaris(inventarisSearchInput.value);
 }
 
