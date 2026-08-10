@@ -192,6 +192,40 @@ function showAuth() {
   if (bottomNav) {
     bottomNav.style.display = 'none';
   }
+
+  loadPublicTestimonials();
+}
+
+// ---------- TESTIMONI PUBLIK DI HALAMAN LOGIN ----------
+// Ambil testimoni yang sudah di-approve (RPC get_public_testimonials,
+// aman dipanggil tanpa login karena RLS hanya izinkan baca status
+// 'approved'). Kalau kosong/gagal, section disembunyikan saja.
+async function loadPublicTestimonials() {
+  const wrapEl = document.getElementById('testimonialCarousel');
+  if (!wrapEl) return;
+
+  const { data, error } = await supabaseClient.rpc('get_public_testimonials');
+
+  if (error || !data || data.length === 0) {
+    wrapEl.style.display = 'none';
+    return;
+  }
+
+  wrapEl.style.display = 'block';
+  wrapEl.innerHTML = data.map(t => `
+    <div class="testimonial-slide">
+      <div class="testimonial-slide-stars">${'★'.repeat(t.rating)}${'☆'.repeat(5 - t.rating)}</div>
+      <p class="testimonial-slide-text">"${escapeAuthHtml(t.comment)}"</p>
+      <p class="testimonial-slide-clinic">${escapeAuthHtml(t.clinic_name)}</p>
+    </div>
+  `).join('');
+}
+
+// Escape sederhana untuk cegah HTML injection dari komentar/nama klinik
+function escapeAuthHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = String(str);
+  return div.innerHTML;
 }
 
 function showAuthStatus(el, message, type) {

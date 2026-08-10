@@ -16,6 +16,7 @@ async function onPageReady() {
   initSubscriptionStatus();
   initInfoAkun();
   initAiTipsCard();
+  initTestimonial();
 }
 
 async function loadRingkasan() {
@@ -636,4 +637,134 @@ function setupGantiPasswordHandlers() {
     statusEl.className = 'status-message ' + (type === 'success' ? 'status-success' : 'status-error');
     statusEl.style.display = 'block';
   }
+}
+
+// ============================================
+// RATING & TESTIMONI
+// Card di bawah Info Akun. Klinik kasih rating 1-5 + komentar singkat
+// (maks 200 karakter) + pilihan tampilkan nama klinik atau tidak.
+// Submit masuk sebagai status 'pending' -- baru tampil di halaman
+// login (index.html) setelah di-approve manual lewat Supabase dashboard.
+// Satu klinik = satu testimoni aktif (submit ulang = replace + balik
+// jadi 'pending' lagi, lihat RPC submit_testimonial di database).
+// ============================================
+let selectedRating = 0;
+
+async function initTestimonial() {
+  const card = document.getElementById('testimonialCard');
+  if (!card) return; // guard kalau elemen belum ada
+
+  const { data, error } = await supabaseClient.rpc('get_my_testimonial');
+
+  if (error) {
+    console.error('Gagal memuat testimoni:', error);
+  }
+
+  const existing = (!error && data && data.length > 0) ? data[0] : null;
+  renderTestimonialForm(existing);
+  setupTestimonialHandlers();
+}
+
+function renderTestimonialForm(existing) {
+  const statusBadge = document.getElementById('testimonialStatusBadge');
+  const commentEl = document.getElementById('testimonialComment');
+  const counterEl = document.getElementById('testimonialCharCount');
+  const checkboxEl = document.getElementById('testimonialShowName');
+  const submitBtn = document.getElementById('testimonialSubmitBtn');
+
+  if (existing) {
+    selectedRating = existing.rating;
+    commentEl.value = existing.comment;
+    checkboxEl.checked = existing.show_clinic_name;
+    counterEl.textContent = `${existing.comment.length}/200`;
+    updateStarDisplay();
+
+    submitBtn.textContent = 'Update Testimoni';
+
+    if (existing.status === 'pending') {
+      statusBadge.textContent = '⏳ Menunggu review';
+      statusBadge.className = 'testimonial-badge badge-pending';
+    } else if (existing.status === 'approved') {
+      statusBadge.textContent = '✅ Sudah tampil di halaman login';
+      statusBadge.className = 'testimonial-badge badge-approved';
+    } else if (existing.status === 'rejected') {
+      statusBadge.textContent = '❌ Tidak ditampilkan';
+      statusBadge.className = 'testimonial-badge badge-rejected';
+    }
+    statusBadge.style.display = 'inline-block';
+  } else {
+    selectedRating = 0;
+    updateStarDisplay();
+    submitBtn.textContent = 'Kirim Testimoni';
+    statusBadge.style.display = 'none';
+  }
+}
+
+function setupTestimonialHandlers() {
+  const stars = document.querySelectorAll('#testimonialStars .star-btn');
+  stars.forEach(star => {
+    star.onclick = () => {
+      selectedRating = parseInt(star.dataset.value);
+      updateStarDisplay();
+    };
+  });
+
+  const commentEl = document.getElementById('testimonialComment');
+  const counterEl = document.getElementById('testimonialCharCount');
+  commentEl.oninput = () => {
+    counterEl.textContent = `${commentEl.value.length}/200`;
+  };
+
+  document.getElementById('testimonialSubmitBtn').onclick = submitTestimonial;
+}
+
+function updateStarDisplay() {
+  const stars = document.querySelectorAll('#testimonialStars .star-btn');
+  stars.forEach(star => {
+    const val = parseInt(star.dataset.value);
+    star.classList.toggle('star-filled', val <= selectedRating);
+  });
+}
+
+async function submitTestimonial() {
+  const submitBtn = document.getElementById('testimonialSubmitBtn');
+  const comment = document.getElementById('testimonialComment').value.trim();
+  const showName = document.getElementById('testimonialShowName').checked;
+
+  if (selectedRating === 0) {
+    showTestimonialStatus('Pilih rating bintang dulu.', 'error');
+    return;
+  }
+  if (!comment) {
+    showTestimonialStatus('Komentar tidak boleh kosong.', 'error');
+    return;
+  }
+
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Mengirim...';
+
+  const { data, error } = await supabaseClient.rpc('submit_testimonial', {
+    p_rating: selectedRating,
+    p_comment: comment,
+    p_show_clinic_name: showName
+  });
+
+  submitBtn.disabled = false;
+
+  if (error || !data?.success) {
+    const msg = data?.message || error?.message || 'Gagal mengirim testimoni.';
+    showTestimonialStatus(msg, 'error');
+    submitBtn.textContent = 'Kirim Testimoni';
+    return;
+  }
+
+  showTestimonialStatus('Testimoni terkirim! Akan ditampilkan setelah direview.', 'success');
+  await initTestimonial(); // refresh form + badge status
+}
+
+function showTestimonialStatus(message, type) {
+  const el = document.getElementById('testimonialStatus');
+  el.textContent = message;
+  el.className = 'status-message ' + (type === 'success' ? 'status-success' : 'status-error');
+  el.style.display = 'block';
 }
