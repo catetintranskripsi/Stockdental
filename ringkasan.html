@@ -195,6 +195,46 @@
       line-height: 1.4;
       margin: 0;
     }
+
+    /* ============================================
+       Kartu Rating & Testimoni. Bintang pakai tombol teks (★) biar
+       tidak nambah dependency ikon baru -- warna kosong/terisi
+       dibedakan lewat class .star-filled.
+       ============================================ */
+    .testimonial-stars {
+      display: flex;
+      gap: 6px;
+    }
+    .testimonial-stars .star-btn {
+      background: none;
+      border: none;
+      font-size: 28px;
+      cursor: pointer;
+      color: var(--color-border);
+      padding: 0;
+      line-height: 1;
+    }
+    .testimonial-stars .star-btn.star-filled {
+      color: var(--color-accent);
+    }
+    .testimonial-badge {
+      font-size: 12px;
+      padding: 4px 10px;
+      border-radius: var(--radius-pill);
+      font-weight: 600;
+    }
+    .badge-pending {
+      background: #FEF3C7;
+      color: #92400E;
+    }
+    .badge-approved {
+      background: #D1FAE5;
+      color: #065F46;
+    }
+    .badge-rejected {
+      background: #FEE2E2;
+      color: #991B1B;
+    }
   </style>
 </head>
 <body>
@@ -286,6 +326,40 @@
           <button type="button" id="cancelGantiPassword" class="btn-secondary" style="margin-top:8px;">Batal</button>
           <div id="gantiPasswordStatus" class="status-message"></div>
         </div>
+      </div>
+
+      <!-- Rating & Testimoni. Submit masuk sebagai 'pending' -- baru
+           tampil di halaman login (index.html) setelah di-approve
+           manual lewat Supabase dashboard. Satu klinik = satu
+           testimoni aktif (submit ulang = replace + balik ke pending). -->
+      <div class="ringkasan-card" id="testimonialCard">
+        <h3>Beri Rating & Testimoni</h3>
+        <p style="font-size:13px; color:var(--color-text-muted); margin-bottom:12px;">
+          Pengalaman kamu bisa bantu klinik lain kenal StockDental.
+        </p>
+
+        <span id="testimonialStatusBadge" class="testimonial-badge" style="display:none; margin-bottom:10px;"></span>
+
+        <div id="testimonialStars" class="testimonial-stars">
+          <button type="button" class="star-btn" data-value="1">★</button>
+          <button type="button" class="star-btn" data-value="2">★</button>
+          <button type="button" class="star-btn" data-value="3">★</button>
+          <button type="button" class="star-btn" data-value="4">★</button>
+          <button type="button" class="star-btn" data-value="5">★</button>
+        </div>
+
+        <div class="form-group" style="margin-top:12px;">
+          <textarea id="testimonialComment" maxlength="200" rows="3" placeholder="Ceritakan pengalaman pakai StockDental..."></textarea>
+          <p style="text-align:right; font-size:11px; color:var(--color-text-faint); margin-top:4px;" id="testimonialCharCount">0/200</p>
+        </div>
+
+        <label style="display:flex; align-items:center; gap:8px; font-size:13px; margin-bottom:12px;">
+          <input type="checkbox" id="testimonialShowName" checked style="width:auto;">
+          Tampilkan nama klinik saya
+        </label>
+
+        <button type="button" id="testimonialSubmitBtn">Kirim Testimoni</button>
+        <div id="testimonialStatus" class="status-message" style="display:none;"></div>
       </div>
 
       <!-- Status Stok -->

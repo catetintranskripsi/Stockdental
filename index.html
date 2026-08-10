@@ -159,6 +159,61 @@
     .auth-footer-links .auth-sep { color: var(--color-border); }
 
     .auth-status-message { margin-top: 14px; }
+
+    /* ============================================
+       Testimoni publik (dari klinik yang testimoninya sudah
+       di-approve) + pill tutorial YouTube. Ditaruh di area gradient
+       atas (auth-brand-section), bukan di dalam sheet putih, supaya
+       tidak mengganggu fokus form login/signup.
+       ============================================ */
+    .testimonial-carousel {
+      width: 100%;
+      max-width: 320px;
+      margin-bottom: 16px;
+      display: none; /* ditampilkan via JS kalau ada data */
+    }
+    .testimonial-slide {
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 14px;
+      padding: 14px 16px;
+      text-align: left;
+    }
+    .testimonial-slide-stars {
+      color: #FBBF24;
+      font-size: 14px;
+      margin-bottom: 6px;
+    }
+    .testimonial-slide-text {
+      color: #fff;
+      font-size: 12px;
+      line-height: 1.5;
+      margin-bottom: 6px;
+      font-style: italic;
+    }
+    .testimonial-slide-clinic {
+      color: #99F6E4;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .auth-video-pill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.25);
+      border-radius: 100px;
+      padding: 8px 16px;
+      margin-bottom: 20px;
+      text-decoration: none;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 600;
+      transition: background 0.15s ease;
+    }
+    .auth-video-pill:active { background: rgba(255,255,255,0.25); }
+    .auth-video-pill-icon { font-size: 13px; }
   </style>
 </head>
 <body>
@@ -182,6 +237,15 @@
           <div class="auth-pill-value">Mulai Rp29rb</div>
         </a>
       </div>
+
+      <!-- Testimoni klinik pengguna (approved saja). Disembunyikan
+           otomatis via JS kalau belum ada testimoni yang di-approve. -->
+      <div id="testimonialCarousel" class="testimonial-carousel" style="margin-top:20px;"></div>
+
+      <a href="https://youtu.be/iewzFFwNjBw" target="_blank" rel="noopener" class="auth-video-pill">
+        <span class="auth-video-pill-icon">▶️</span>
+        <span>Lihat cara pakainya (2 menit)</span>
+      </a>
     </div>
 
     <div class="auth-sheet">
