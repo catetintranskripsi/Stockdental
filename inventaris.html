@@ -273,6 +273,42 @@
       color: #888;
     }
 
+    /* ---- Edit Lot (Batch & Kadaluarsa) ---- */
+    .btn-edit-lot {
+      flex-shrink: 0;
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 14px;
+      padding: 0 0 0 6px;
+      line-height: 1;
+    }
+
+    .lot-edit-row {
+      display: block;
+      padding: 8px 0;
+    }
+
+    .lot-edit-form {
+      background: #f8f9f9;
+      border-radius: 8px;
+      padding: 10px;
+    }
+
+    .lot-edit-form .edit-form-group {
+      margin-bottom: 8px;
+    }
+
+    .lot-edit-form .edit-form-actions {
+      margin-top: 6px;
+    }
+
+    .lot-edit-form .edit-form-actions .btn-primary,
+    .lot-edit-form .edit-form-actions .btn-secondary {
+      padding: 8px;
+      font-size: 13px;
+    }
+
     .history-loading, .history-empty {
       font-size: 13px;
       color: #888;
@@ -576,6 +612,8 @@
 <script src="js/supabase-client.js"></script>
 <script src="js/clinic-access.js"></script>
 <script src="js/autocomplete-helper.js"></script>
+<!-- Percakapan [Edit Lot - Batch & Kadaluarsa] - dibutuhkan inventaris.js untuk parseDDMMYYYY/formatToDDMMYYYY -->
+<script src="js/date-helper.js"></script>
 <script src="js/inventaris.js"></script>
 <script src="js/auth-check.js"></script>
 <a
