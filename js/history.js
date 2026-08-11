@@ -109,6 +109,7 @@ async function loadHistory() {
       reason,
       opname_note,
       notes,
+      lot_id,
       products (name, unit)
     `)
     .eq('clinic_id', CURRENT_CLINIC_ID)
@@ -174,6 +175,16 @@ function renderHistory(movements) {
         </div>
       `;
 
+    // Percakapan [Hapus Transaksi Masuk yang Salah Input] - tombol hapus
+    // HANYA untuk movement_type 'in'. Validasi final (apakah lot masih
+    // utuh/belum tersentuh transaksi lain) tetap dicek di RPC
+    // void_stock_in_transaction - tombol ini cuma menawarkan aksi, bukan
+    // menjamin akan berhasil. Kalau ditolak backend, pesan errornya
+    // ditampilkan di history-item-status milik baris ini.
+    const voidBtnHtml = (m.movement_type === 'in')
+      ? `<button type="button" class="btn-void-transaction" data-action="void-transaction" data-movement-id="${m.id}" style="margin-top:6px;padding:6px 10px;font-size:12px;border:1px solid #dc2626;color:#dc2626;background:#fff;border-radius:6px;cursor:pointer;">🗑️ Hapus (salah input)</button>`
+      : '';
+
     item.innerHTML = `
       <div class="history-item-main">
         <span class="history-badge badge-${m.movement_type}">${typeLabel}</span>
@@ -181,10 +192,70 @@ function renderHistory(movements) {
       </div>
       <div class="history-item-name">${escapeHtml(productName)}</div>
       ${detailHtml}
+      ${voidBtnHtml}
+      <div class="history-item-status" data-role="void-status" style="font-size:12px;margin-top:4px;"></div>
     `;
 
     historyList.appendChild(item);
   });
+
+  // Percakapan [Hapus Transaksi Masuk yang Salah Input] - event delegation
+  // sekali per render (bukan per-baris) supaya tidak numpuk listener saat
+  // renderHistory dipanggil ulang (filter tanggal ganti, dsb).
+  historyList.querySelectorAll('[data-action="void-transaction"]').forEach(btn => {
+    btn.addEventListener('click', () => handleVoidTransaction(btn.dataset.movementId, btn));
+  });
+}
+
+// Percakapan [Hapus Transaksi Masuk yang Salah Input] - panggil RPC
+// void_stock_in_transaction. RPC yang menentukan boleh/tidaknya (cek lot
+// masih utuh & belum tersentuh transaksi lain) - di sini cuma kirim
+// permintaan & tampilkan hasilnya, tidak menduplikasi logic validasi.
+async function handleVoidTransaction(movementId, btn) {
+  const confirmed = window.confirm(
+    'Hapus transaksi ini? Stok barang akan otomatis dikembalikan seperti sebelum transaksi ini terjadi.\n\n' +
+    'Hanya bisa dihapus kalau belum ada transaksi lain yang menyentuh barang ini sesudahnya.'
+  );
+  if (!confirmed) return;
+
+  const item = btn.closest('.history-item');
+  const statusEl = item ? item.querySelector('[data-role="void-status"]') : null;
+
+  btn.disabled = true;
+  btn.textContent = 'Menghapus...';
+
+  const { data, error } = await supabaseClient.rpc('void_stock_in_transaction', {
+    p_movement_id: movementId,
+    p_user_id: null // tidak dipakai di validasi RPC, auth sudah dicek via get_my_clinic_id()
+  });
+
+  if (error || !data || data.success !== true) {
+    console.error('Gagal hapus transaksi:', error || data);
+    btn.disabled = false;
+    btn.textContent = '🗑️ Hapus (salah input)';
+
+    const errorMessages = {
+      'sudah_ada_transaksi_lain_tidak_bisa_dihapus': 'Tidak bisa dihapus — sudah ada transaksi lain untuk barang ini setelahnya. Gunakan Stok Fisik untuk koreksi.',
+      'lot_sudah_tidak_aktif_tidak_bisa_dihapus': 'Tidak bisa dihapus — data batch terkait sudah tidak aktif.',
+      'transaksi_tidak_ditemukan': 'Transaksi tidak ditemukan, mungkin sudah dihapus sebelumnya.',
+      'hanya_transaksi_masuk_yang_bisa_dihapus': 'Hanya transaksi "Masuk" yang bisa dihapus.'
+    };
+    const errKey = data && data.error;
+    if (statusEl) {
+      statusEl.textContent = errorMessages[errKey] || 'Gagal menghapus transaksi. Coba lagi.';
+      statusEl.className = 'history-item-status status-error';
+      statusEl.style.color = '#dc2626';
+    }
+    return;
+  }
+
+  // Berhasil - hapus barisnya dari layar & dari cache lokal, tanpa fetch ulang semua
+  lastLoadedMovements = lastLoadedMovements.filter(m => m.id !== movementId);
+  if (item) item.remove();
+  renderSummary(lastLoadedMovements);
+  if (activeTab === 'penggunaan') {
+    renderUsageSummary(lastLoadedMovements);
+  }
 }
 
 function getTypeLabel(type) {
