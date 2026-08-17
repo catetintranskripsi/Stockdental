@@ -116,6 +116,9 @@ async function onPageReady() {
 
   // Percakapan [Cek Barang Mirip (AI)]
   suggestMergeBtn.addEventListener('click', handleSuggestMergeClick);
+
+  // Percakapan [Daftar Belanja]
+  setupDaftarBelanja();
 }
 
 async function loadInventaris() {
@@ -1457,4 +1460,448 @@ function showExportPremiumGate() {
 
 function hideExportStatus() {
   exportStatus.style.display = 'none';
+}
+
+// ============================================
+// Percakapan [Daftar Belanja] - user bisa checklist barang (diurutkan status
+// kritis > menipis > normal, reuse applySorting/statusPriority yang sudah ada)
+// dan isi "Jumlah kebutuhan" per barang, lalu generate teks siap-copas untuk
+// dikirim lewat WA/email. Nama klinik diambil dari tabel `clinics` via
+// CURRENT_CLINIC_ID (variabel global yang sudah dipakai loadInventaris()).
+// Tidak menyentuh RPC/skema baru — murni baca data yang sudah ada di
+// ALL_INVENTARIS_ITEMS + 1 query ringan ke tabel clinics untuk nama klinik.
+// ============================================
+
+const daftarBelanjaBtn = document.getElementById('daftarBelanjaBtn');
+const daftarBelanjaModal = document.getElementById('daftarBelanjaModal');
+const daftarBelanjaSearchInput = document.getElementById('daftarBelanjaSearchInput');
+const daftarBelanjaList = document.getElementById('daftarBelanjaList');
+const daftarBelanjaCloseBtn = document.getElementById('daftarBelanjaCloseBtn');
+const daftarBelanjaGenerateBtn = document.getElementById('daftarBelanjaGenerateBtn');
+const daftarBelanjaAiBtn = document.getElementById('daftarBelanjaAiBtn');
+const daftarBelanjaAiStatus = document.getElementById('daftarBelanjaAiStatus');
+const daftarBelanjaStatus = document.getElementById('daftarBelanjaStatus');
+const daftarBelanjaResultSection = document.getElementById('daftarBelanjaResultSection');
+const daftarBelanjaResultText = document.getElementById('daftarBelanjaResultText');
+const daftarBelanjaCopyBtn = document.getElementById('daftarBelanjaCopyBtn');
+const daftarBelanjaCopyStatus = document.getElementById('daftarBelanjaCopyStatus');
+
+// Map product id -> jumlah kebutuhan yang sudah diisi user (bertahan selama modal terbuka,
+// termasuk saat user ganti keyword pencarian, supaya centang tidak hilang)
+let DAFTAR_BELANJA_QTY = new Map();
+let DAFTAR_BELANJA_REASONING = new Map(); // product_id -> reasoning_short dari hasil AI (Isi Otomatis)
+let DAFTAR_BELANJA_CLINIC_NAME = null; // cache, supaya tidak query ulang tiap buka modal
+
+function setupDaftarBelanja() {
+  daftarBelanjaBtn.addEventListener('click', openDaftarBelanjaModal);
+  daftarBelanjaCloseBtn.addEventListener('click', closeDaftarBelanjaModal);
+  daftarBelanjaGenerateBtn.addEventListener('click', handleGenerateDaftarBelanja);
+  daftarBelanjaAiBtn.addEventListener('click', handleIsiOtomatisAI);
+  daftarBelanjaCopyBtn.addEventListener('click', handleCopyDaftarBelanja);
+
+  daftarBelanjaSearchInput.addEventListener('input', () => {
+    renderDaftarBelanjaList(daftarBelanjaSearchInput.value);
+  });
+
+  // Klik di luar modal-box (area overlay gelap) = tutup modal, konsisten dengan pola mergeConfirmModal
+  daftarBelanjaModal.addEventListener('click', (e) => {
+    if (e.target === daftarBelanjaModal) closeDaftarBelanjaModal();
+  });
+}
+
+function openDaftarBelanjaModal() {
+  DAFTAR_BELANJA_QTY = new Map();
+  DAFTAR_BELANJA_REASONING = new Map();
+  daftarBelanjaSearchInput.value = '';
+  hideDaftarBelanjaStatus();
+  hideDaftarBelanjaAiStatus();
+  daftarBelanjaResultSection.style.display = 'none';
+  daftarBelanjaCopyStatus.style.display = 'none';
+  daftarBelanjaAiBtn.disabled = true;
+
+  renderDaftarBelanjaList('');
+  daftarBelanjaModal.style.display = 'flex';
+}
+
+function closeDaftarBelanjaModal() {
+  daftarBelanjaModal.style.display = 'none';
+}
+
+// List barang di dalam modal: urut status (reuse applySorting yang sama dengan halaman utama),
+// bisa difilter pencarian nama, terpisah dari search box halaman utama.
+function renderDaftarBelanjaList(keyword) {
+  const searchTerm = keyword.trim().toLowerCase();
+
+  let items = searchTerm === ''
+    ? ALL_INVENTARIS_ITEMS
+    : ALL_INVENTARIS_ITEMS.filter(p => p.name.toLowerCase().includes(searchTerm));
+
+  // Urut berdasarkan status (kritis > menipis > normal), lepas dari CURRENT_SORT
+  // halaman utama -- daftar belanja selalu prioritaskan barang yang butuh perhatian dulu.
+  items = [...items].sort((a, b) => {
+    const priorityDiff = statusPriority(a.status) - statusPriority(b.status);
+    if (priorityDiff !== 0) return priorityDiff;
+    return a.name.localeCompare(b.name);
+  });
+
+  if (items.length === 0) {
+    daftarBelanjaList.innerHTML = '<p class="loading-text">Tidak ada barang ditemukan.</p>';
+    return;
+  }
+
+  daftarBelanjaList.innerHTML = items.map(p => buildDaftarBelanjaRow(p)).join('');
+
+  // Event listener per baris (checkbox toggle + input qty)
+  daftarBelanjaList.querySelectorAll('.db-row').forEach(row => {
+    const productId = row.dataset.productId;
+    const checkbox = row.querySelector('.db-checkbox');
+    const qtyInput = row.querySelector('.db-qty-input');
+
+    checkbox.addEventListener('change', () => {
+      const qtyGroup = row.querySelector('.db-qty-group');
+      if (checkbox.checked) {
+        qtyGroup.style.display = 'flex';
+        if (!DAFTAR_BELANJA_QTY.has(productId)) DAFTAR_BELANJA_QTY.set(productId, '');
+        qtyInput.focus();
+      } else {
+        qtyGroup.style.display = 'none';
+        DAFTAR_BELANJA_QTY.delete(productId);
+        DAFTAR_BELANJA_REASONING.delete(productId);
+      }
+      updateDaftarBelanjaAiBtnState();
+    });
+
+    if (qtyInput) {
+      qtyInput.addEventListener('input', () => {
+        DAFTAR_BELANJA_QTY.set(productId, qtyInput.value);
+      });
+    }
+  });
+
+  updateDaftarBelanjaAiBtnState();
+}
+
+// Tombol "Isi Otomatis (AI)" hanya aktif kalau minimal 1 barang tercentang
+function updateDaftarBelanjaAiBtnState() {
+  daftarBelanjaAiBtn.disabled = DAFTAR_BELANJA_QTY.size === 0;
+}
+
+function buildDaftarBelanjaRow(p) {
+  const badgeLabel = p.status === 'kritis' ? 'Kritis' : p.status === 'menipis' ? 'Menipis' : 'Normal';
+  const isChecked = DAFTAR_BELANJA_QTY.has(p.id);
+  const currentQty = DAFTAR_BELANJA_QTY.get(p.id) || '';
+  const reasoning = DAFTAR_BELANJA_REASONING.get(p.id) || '';
+
+  return `
+    <div class="db-row" data-product-id="${p.id}">
+      <div class="db-row-main">
+        <input type="checkbox" class="db-checkbox" ${isChecked ? 'checked' : ''}>
+        <div class="db-row-info">
+          <span class="db-row-name">${escapeHtml(p.name)}</span>
+          <span class="inventaris-badge badge-${p.status}">${badgeLabel}</span>
+        </div>
+      </div>
+      <div class="db-row-detail">Stok saat ini: ${p.current_stock} ${escapeHtml(p.unit)} (min: ${p.minimum_stock})</div>
+      <div class="db-qty-group" style="display:${isChecked ? 'flex' : 'none'}">
+        <label>Jumlah kebutuhan</label>
+        <input type="number" class="db-qty-input" min="0" step="any" inputmode="decimal"
+          placeholder="Contoh: 2" value="${escapeAttr(currentQty)}">
+        <span class="db-qty-unit">${escapeHtml(p.unit)}</span>
+      </div>
+      ${reasoning ? `<span class="db-reasoning">🤖 ${escapeHtml(reasoning)}</span>` : ''}
+    </div>
+  `;
+}
+
+// ============================================
+// Percakapan [Daftar Belanja - Isi Otomatis AI] - BARU.
+// Kumpulkan barang tercentang -> ambil stock_movements 90 hari terakhir
+// (movement_type='out') -> agregasi per minggu di sisi client (supaya
+// payload ke Edge Function ringkas) -> kirim ke Edge Function terpisah
+// suggest-kebutuhan (standalone, pola sama seperti suggest-merge-candidates,
+// BUKAN action di dalam smooth-responder) -> isi hasil ke DAFTAR_BELANJA_QTY
+// + DAFTAR_BELANJA_REASONING -> re-render.
+// Tidak mengubah checklist yang sudah dicentang manual sebelumnya kalau AI
+// balikin null untuk barang itu (isi manual tetap dipertahankan).
+// ============================================
+async function handleIsiOtomatisAI() {
+  const checkedIds = Array.from(DAFTAR_BELANJA_QTY.keys());
+  if (checkedIds.length === 0) return;
+
+  hideDaftarBelanjaAiStatus();
+  daftarBelanjaAiBtn.disabled = true;
+  daftarBelanjaAiBtn.textContent = 'Menganalisis...';
+
+  try {
+    const checkedItems = checkedIds
+      .map(id => ALL_INVENTARIS_ITEMS.find(p => String(p.id) === String(id)))
+      .filter(Boolean);
+
+    // Ambil riwayat stock_movements tipe 'out', 90 hari terakhir, untuk
+    // semua barang tercentang sekaligus (1 query, bukan per barang)
+    const ninetyDaysAgo = new Date();
+    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+
+    const { data: movements, error: movementsError } = await supabaseClient
+      .from('stock_movements')
+      .select('product_id, quantity, created_at')
+      .eq('clinic_id', CURRENT_CLINIC_ID)
+      .eq('movement_type', 'out')
+      .gte('created_at', ninetyDaysAgo.toISOString())
+      .in('product_id', checkedIds);
+
+    if (movementsError) throw movementsError;
+
+    // Agregasi per barang per minggu (format label minggu: "YYYY-Www")
+    const movementsByProduct = new Map();
+    (movements || []).forEach(m => {
+      const weekLabel = getWeekLabel(new Date(m.created_at));
+      if (!movementsByProduct.has(m.product_id)) movementsByProduct.set(m.product_id, new Map());
+      const weekMap = movementsByProduct.get(m.product_id);
+      weekMap.set(weekLabel, (weekMap.get(weekLabel) || 0) + Number(m.quantity || 0));
+    });
+
+    // Susun payload ringkas per barang untuk dikirim ke Edge Function
+    const itemsPayload = checkedItems.map(p => {
+      const weekMap = movementsByProduct.get(p.id) || new Map();
+      const movementsArr = Array.from(weekMap.entries())
+        .map(([period, qty_out]) => ({ period, qty_out }))
+        .sort((a, b) => a.period.localeCompare(b.period));
+
+      return {
+        product_id: p.id,
+        name: p.name,
+        unit: p.unit,
+        current_stock: p.current_stock,
+        minimum_stock: p.minimum_stock,
+        movements: movementsArr
+      };
+    });
+
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) throw new Error('Sesi login tidak ditemukan, silakan login ulang.');
+
+    const response = await fetch(
+      `${window.SUPABASE_URL || SUPABASE_URL}/functions/v1/suggest-kebutuhan`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+          'apikey': window.SUPABASE_ANON_KEY || SUPABASE_ANON_KEY
+        },
+        body: JSON.stringify({
+          clinic_id: CURRENT_CLINIC_ID,
+          items: itemsPayload
+        })
+      }
+    );
+
+    const result = await response.json().catch(() => ({}));
+
+    if (response.status === 429 && result.error === 'quota_exceeded') {
+      showDaftarBelanjaAiStatus(
+        `Kuota AI klinik sudah habis (${result.used}/${result.limit} periode ini). Isi manual, atau upgrade Premium untuk kuota lebih besar.`,
+        'error'
+      );
+      return;
+    }
+
+    if (!response.ok) {
+      showDaftarBelanjaAiStatus(result.error || 'Gagal menghubungi server AI.', 'error');
+      return;
+    }
+
+    const { suggestions } = result;
+
+    // Isi hasil ke state, tanpa mengubah checklist barang lain yang tidak
+    // termasuk dalam permintaan ini
+    let filledCount = 0;
+    (suggestions || []).forEach(s => {
+      if (s.suggested_qty !== null && s.suggested_qty !== undefined && s.suggested_qty > 0) {
+        DAFTAR_BELANJA_QTY.set(s.product_id, String(s.suggested_qty));
+        filledCount++;
+      }
+      if (s.reasoning_short) {
+        DAFTAR_BELANJA_REASONING.set(s.product_id, s.reasoning_short);
+      }
+    });
+
+    renderDaftarBelanjaList(daftarBelanjaSearchInput.value);
+
+    if (filledCount === 0) {
+      showDaftarBelanjaAiStatus('AI belum bisa menyarankan angka untuk barang yang dipilih (data riwayat belum cukup). Silakan isi manual.', 'error');
+    } else {
+      showDaftarBelanjaAiStatus(`${filledCount} barang terisi otomatis. Silakan cek dan sesuaikan kalau perlu.`, 'success');
+    }
+  } catch (error) {
+    console.error('Gagal isi otomatis AI:', error);
+    showDaftarBelanjaAiStatus('Gagal menghubungi AI: ' + error.message, 'error');
+  } finally {
+    daftarBelanjaAiBtn.disabled = DAFTAR_BELANJA_QTY.size === 0;
+    daftarBelanjaAiBtn.textContent = '🤖 Isi Otomatis (AI)';
+  }
+}
+
+// Label minggu format "YYYY-Www" (ISO week sederhana, cukup untuk pengelompokan,
+// tidak perlu presisi ISO 8601 penuh)
+function getWeekLabel(date) {
+  const firstDayOfYear = new Date(date.getFullYear(), 0, 1);
+  const pastDaysOfYear = (date - firstDayOfYear) / 86400000;
+  const weekNum = Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7);
+  return `${date.getFullYear()}-W${String(weekNum).padStart(2, '0')}`;
+}
+
+function showDaftarBelanjaAiStatus(message, type) {
+  daftarBelanjaAiStatus.textContent = message;
+  daftarBelanjaAiStatus.className = 'status-message status-' + type;
+  daftarBelanjaAiStatus.style.display = 'block';
+}
+
+function hideDaftarBelanjaAiStatus() {
+  daftarBelanjaAiStatus.style.display = 'none';
+}
+
+async function handleGenerateDaftarBelanja() {
+  hideDaftarBelanjaStatus();
+
+  // Ambil semua barang yang dicentang (ada di Map), validasi jumlah kebutuhan wajib diisi > 0
+  const checkedIds = Array.from(DAFTAR_BELANJA_QTY.keys());
+
+  if (checkedIds.length === 0) {
+    showDaftarBelanjaStatus('Pilih minimal satu barang terlebih dahulu.', 'error');
+    return;
+  }
+
+  const invalidNames = [];
+  const selectedItems = [];
+
+  checkedIds.forEach(id => {
+    const item = ALL_INVENTARIS_ITEMS.find(p => String(p.id) === String(id));
+    if (!item) return;
+
+    const rawQty = DAFTAR_BELANJA_QTY.get(id);
+    const qty = parseFloat(rawQty);
+
+    if (!rawQty || isNaN(qty) || qty <= 0) {
+      invalidNames.push(item.name);
+    } else {
+      selectedItems.push({ ...item, plannedQty: qty });
+    }
+  });
+
+  if (invalidNames.length > 0) {
+    showDaftarBelanjaStatus(
+      `Isi jumlah kebutuhan (harus lebih dari 0) untuk: ${invalidNames.join(', ')}.`,
+      'error'
+    );
+    return;
+  }
+
+  // Urut hasil akhir sesuai status juga, biar konsisten dengan urutan checklist
+  selectedItems.sort((a, b) => {
+    const priorityDiff = statusPriority(a.status) - statusPriority(b.status);
+    if (priorityDiff !== 0) return priorityDiff;
+    return a.name.localeCompare(b.name);
+  });
+
+  daftarBelanjaGenerateBtn.disabled = true;
+  daftarBelanjaGenerateBtn.textContent = 'Membuat...';
+
+  try {
+    const clinicName = await getClinicNameForDaftarBelanja();
+    const teks = buildDaftarBelanjaText(clinicName, selectedItems);
+
+    daftarBelanjaResultText.value = teks;
+    daftarBelanjaResultSection.style.display = 'block';
+    daftarBelanjaCopyStatus.style.display = 'none';
+
+    // Scroll ke hasil supaya user langsung lihat, terutama kalau listnya panjang
+    daftarBelanjaResultSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  } catch (error) {
+    console.error('Gagal membuat daftar belanja:', error);
+    showDaftarBelanjaStatus('Gagal membuat daftar belanja: ' + error.message, 'error');
+  } finally {
+    daftarBelanjaGenerateBtn.disabled = false;
+    daftarBelanjaGenerateBtn.textContent = 'Generate List';
+  }
+}
+
+// Ambil nama klinik dari tabel `clinics` (di-cache di DAFTAR_BELANJA_CLINIC_NAME
+// supaya tidak query ulang tiap kali generate dalam sesi modal yang sama)
+async function getClinicNameForDaftarBelanja() {
+  if (DAFTAR_BELANJA_CLINIC_NAME) return DAFTAR_BELANJA_CLINIC_NAME;
+
+  const { data, error } = await supabaseClient
+    .from('clinics')
+    .select('name')
+    .eq('id', CURRENT_CLINIC_ID)
+    .single();
+
+  if (error || !data || !data.name) {
+    console.error('Gagal ambil nama klinik:', error);
+    return 'Klinik'; // fallback generik supaya generate tetap jalan walau nama klinik gagal diambil
+  }
+
+  DAFTAR_BELANJA_CLINIC_NAME = data.name;
+  return DAFTAR_BELANJA_CLINIC_NAME;
+}
+
+function buildDaftarBelanjaText(clinicName, items) {
+  const statusLabel = { kritis: 'Kritis', menipis: 'Menipis', normal: 'Normal' };
+
+  let lines = [`Kebutuhan Barang — ${clinicName}`, ''];
+
+  items.forEach((item, index) => {
+    lines.push(`${index + 1}. ${item.name}`);
+    lines.push(`Jumlah stok: ${item.current_stock} ${item.unit}`);
+    lines.push(`Status: ${statusLabel[item.status] || item.status}`);
+    lines.push(`Minimal stok: ${item.minimum_stock} ${item.unit}`);
+    lines.push(`Jumlah kebutuhan: ${formatPlannedQty(item.plannedQty)} ${item.unit}`);
+    lines.push('');
+  });
+
+  return lines.join('\n').trim();
+}
+
+// Buang desimal ".0" yang tidak perlu (misal user isi "2" -> tampil "2", bukan "2.0")
+function formatPlannedQty(qty) {
+  return Number.isInteger(qty) ? String(qty) : String(qty);
+}
+
+async function handleCopyDaftarBelanja() {
+  const teks = daftarBelanjaResultText.value;
+  if (!teks) return;
+
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(teks);
+    } else {
+      // Fallback untuk browser lama/tanpa izin clipboard API: select teks lalu execCommand
+      daftarBelanjaResultText.select();
+      document.execCommand('copy');
+    }
+    showDaftarBelanjaCopyStatus('Berhasil disalin! Silakan tempel ke WhatsApp atau email.', 'success');
+  } catch (error) {
+    console.error('Gagal menyalin ke clipboard:', error);
+    // Fallback terakhir: select teksnya supaya user bisa copy manual (Ctrl+C / tap-hold)
+    daftarBelanjaResultText.select();
+    showDaftarBelanjaCopyStatus('Gagal menyalin otomatis. Teks sudah diseleksi, silakan copy manual.', 'error');
+  }
+}
+
+function showDaftarBelanjaStatus(message, type) {
+  daftarBelanjaStatus.textContent = message;
+  daftarBelanjaStatus.className = 'status-message status-' + type;
+  daftarBelanjaStatus.style.display = 'block';
+}
+
+function hideDaftarBelanjaStatus() {
+  daftarBelanjaStatus.style.display = 'none';
+}
+
+function showDaftarBelanjaCopyStatus(message, type) {
+  daftarBelanjaCopyStatus.textContent = message;
+  daftarBelanjaCopyStatus.className = 'status-message status-' + type;
+  daftarBelanjaCopyStatus.style.display = 'block';
 }
