@@ -503,6 +503,195 @@
       border-radius: 8px;
       font-size: 14px;
     }
+
+    /* ---- Modal Daftar Belanja ---- */
+    #daftarBelanjaBtn {
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 14px;
+      white-space: nowrap;
+    }
+
+    .db-modal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+
+    .db-modal-box {
+      background: #fff;
+      border-radius: 12px;
+      padding: 20px;
+      max-width: 480px;
+      width: 100%;
+      max-height: 88vh;
+      overflow-y: auto;
+    }
+
+    .db-modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .db-modal-header h3 {
+      margin: 0;
+      font-size: 17px;
+    }
+
+    .db-close-btn {
+      background: none;
+      border: none;
+      font-size: 18px;
+      cursor: pointer;
+      color: #888;
+      padding: 4px 8px;
+      line-height: 1;
+    }
+
+    .db-list {
+      max-height: 45vh;
+      overflow-y: auto;
+      margin-bottom: 14px;
+      border: 1px solid #eee;
+      border-radius: 10px;
+    }
+
+    .db-row {
+      padding: 10px 12px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+
+    .db-row:last-child {
+      border-bottom: none;
+    }
+
+    .db-row-main {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .db-checkbox {
+      flex-shrink: 0;
+      width: 18px;
+      height: 18px;
+    }
+
+    .db-row-info {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .db-row-name {
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .db-row-detail {
+      font-size: 12px;
+      color: #888;
+      margin: 4px 0 0 28px;
+    }
+
+    .db-qty-group {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      margin: 8px 0 0 28px;
+      flex-wrap: wrap;
+    }
+
+    .db-qty-group label {
+      font-size: 12px;
+      color: #666;
+      white-space: nowrap;
+    }
+
+    .db-qty-input {
+      width: 90px;
+      padding: 6px 8px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      font-size: 14px;
+    }
+
+    .db-qty-unit {
+      font-size: 13px;
+      color: #666;
+    }
+
+    .db-ai-btn {
+      width: 100%;
+      padding: 12px;
+      font-size: 15px;
+      border-radius: 8px;
+      margin-bottom: 10px;
+    }
+
+    .db-ai-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .db-reasoning {
+      display: block;
+      font-size: 11px;
+      color: #0F6B5C;
+      margin: 4px 0 0 28px;
+      font-style: italic;
+    }
+
+    .db-reasoning.db-reasoning-empty {
+      color: #999;
+    }
+
+    .db-generate-btn {
+      width: 100%;
+      padding: 12px;
+      font-size: 15px;
+      border-radius: 8px;
+    }
+
+    .db-result-divider {
+      margin: 16px 0;
+      border: none;
+      border-top: 1px dashed #ddd;
+    }
+
+    .db-result-label {
+      display: block;
+      font-size: 13px;
+      color: #666;
+      margin-bottom: 6px;
+    }
+
+    .db-result-textarea {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      font-size: 13px;
+      font-family: monospace;
+      resize: vertical;
+      margin-bottom: 10px;
+    }
+
+    .db-copy-btn {
+      width: 100%;
+      padding: 12px;
+      font-size: 15px;
+      border-radius: 8px;
+    }
   </style>
 </head>
 <body>
@@ -543,6 +732,7 @@
       <button id="toggleMergeModeBtn" class="btn-secondary">🔗 Gabungkan Barang</button>
       <button id="confirmMergeBtn">Gabungkan (2)</button>
       <button id="suggestMergeBtn" class="btn-secondary">🤖 Cek Barang Mirip (AI)</button>
+      <button id="daftarBelanjaBtn" class="btn-secondary">📋 Daftar Belanja</button>
       <button id="exportPdfBtn" class="btn-secondary">Export PDF</button>
     </div>
     <div id="exportStatus" class="status-message" style="display:none;"></div>
@@ -581,6 +771,37 @@
       <div class="modal-actions">
         <button type="button" id="mergeCancelBtn" class="btn-secondary">Batal</button>
         <button type="button" id="mergeExecuteBtn" class="btn-primary">Ya, Gabungkan</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ MODAL: Daftar Belanja ============ -->
+  <div id="daftarBelanjaModal" class="db-modal">
+    <div class="db-modal-box">
+      <div class="db-modal-header">
+        <h3>Daftar Belanja</h3>
+        <button type="button" id="daftarBelanjaCloseBtn" class="db-close-btn" aria-label="Tutup">✕</button>
+      </div>
+
+      <div class="form-group">
+        <input type="text" id="daftarBelanjaSearchInput" placeholder="Cari nama barang..." autocomplete="off">
+      </div>
+
+      <div id="daftarBelanjaStatus" class="status-message" style="display:none;"></div>
+
+      <div id="daftarBelanjaList" class="db-list"></div>
+
+      <button type="button" id="daftarBelanjaAiBtn" class="btn-secondary db-ai-btn" disabled>🤖 Isi Otomatis (AI)</button>
+      <div id="daftarBelanjaAiStatus" class="status-message" style="display:none;"></div>
+
+      <button type="button" id="daftarBelanjaGenerateBtn" class="btn-primary db-generate-btn">Generate List</button>
+
+      <div id="daftarBelanjaResultSection" style="display:none;">
+        <hr class="db-result-divider">
+        <label class="db-result-label">Hasil (siap disalin):</label>
+        <textarea id="daftarBelanjaResultText" class="db-result-textarea" readonly rows="10"></textarea>
+        <button type="button" id="daftarBelanjaCopyBtn" class="btn-primary db-copy-btn">📋 Copy Teks</button>
+        <div id="daftarBelanjaCopyStatus" class="status-message" style="display:none;"></div>
       </div>
     </div>
   </div>
