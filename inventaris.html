@@ -634,12 +634,19 @@
       padding: 12px;
       font-size: 15px;
       border-radius: 8px;
-      margin-bottom: 10px;
+      margin-bottom: 6px;
     }
 
     .db-ai-btn:disabled {
       opacity: 0.5;
       cursor: not-allowed;
+    }
+
+    .db-ai-helper-text {
+      font-size: 12px;
+      color: #888;
+      margin: 0 0 10px 0;
+      line-height: 1.4;
     }
 
     .db-reasoning {
@@ -791,10 +798,11 @@
 
       <div id="daftarBelanjaList" class="db-list"></div>
 
-      <button type="button" id="daftarBelanjaAiBtn" class="btn-secondary db-ai-btn" disabled>🤖 Isi Otomatis (AI)</button>
+      <button type="button" id="daftarBelanjaAiBtn" class="btn-secondary db-ai-btn" disabled>🤖 Hitung Otomatis (AI)</button>
+      <p class="db-ai-helper-text">Menghitung perkiraan kebutuhan 30 hari ke depan dari riwayat pemakaian barang.</p>
       <div id="daftarBelanjaAiStatus" class="status-message" style="display:none;"></div>
 
-      <button type="button" id="daftarBelanjaGenerateBtn" class="btn-primary db-generate-btn">Generate List</button>
+      <button type="button" id="daftarBelanjaGenerateBtn" class="btn-primary db-generate-btn">Buat Daftar Belanja</button>
 
       <div id="daftarBelanjaResultSection" style="display:none;">
         <hr class="db-result-divider">
