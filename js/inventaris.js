@@ -1581,7 +1581,7 @@ function renderDaftarBelanjaList(keyword) {
   updateDaftarBelanjaAiBtnState();
 }
 
-// Tombol "Isi Otomatis (AI)" hanya aktif kalau minimal 1 barang tercentang
+// Tombol "Hitung Otomatis (AI)" hanya aktif kalau minimal 1 barang tercentang
 function updateDaftarBelanjaAiBtnState() {
   daftarBelanjaAiBtn.disabled = DAFTAR_BELANJA_QTY.size === 0;
 }
@@ -1739,7 +1739,7 @@ async function handleIsiOtomatisAI() {
     showDaftarBelanjaAiStatus('Gagal menghubungi AI: ' + error.message, 'error');
   } finally {
     daftarBelanjaAiBtn.disabled = DAFTAR_BELANJA_QTY.size === 0;
-    daftarBelanjaAiBtn.textContent = '🤖 Isi Otomatis (AI)';
+    daftarBelanjaAiBtn.textContent = '🤖 Hitung Otomatis (AI)';
   }
 }
 
@@ -1823,7 +1823,7 @@ async function handleGenerateDaftarBelanja() {
     showDaftarBelanjaStatus('Gagal membuat daftar belanja: ' + error.message, 'error');
   } finally {
     daftarBelanjaGenerateBtn.disabled = false;
-    daftarBelanjaGenerateBtn.textContent = 'Generate List';
+    daftarBelanjaGenerateBtn.textContent = 'Buat Daftar Belanja';
   }
 }
 
