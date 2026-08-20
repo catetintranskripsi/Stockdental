@@ -706,15 +706,15 @@ function showStatus(message, type) {
    login, elemen #installAppBtn). Berjalan independen dari logic
    form di atas, tidak menyentuh flow auth sama sekali.
 
-   - Kalau app sudah berjalan standalone (sudah ter-install),
-     tombol tetap disembunyikan (default style="display:none"
-     di HTML, tidak pernah dimunculkan).
-   - Android/Chrome: browser fire event 'beforeinstallprompt' kalau
-     PWA memenuhi syarat installable -> tombol dimunculkan, klik
-     memicu prompt instalasi native.
-   - iOS/Safari: tidak ada API beforeinstallprompt sama sekali, jadi
-     kalau terdeteksi iOS (dan belum standalone), tombol dimunculkan
-     langsung, klik membuka modal instruksi manual (#iosInstallOverlay).
+   KHUSUS iOS/Safari SAJA. Alasan: iOS tidak mendukung event
+   'beforeinstallprompt' sama sekali, jadi satu-satunya cara install
+   di iOS adalah menuntun user manual lewat modal instruksi
+   (#iosInstallOverlay). Untuk Android/Chrome, kita SENGAJA TIDAK
+   intercept 'beforeinstallprompt' (tidak preventDefault) supaya
+   Chrome menampilkan mini infobar/pop-up install bawaannya sendiri
+   secara otomatis begitu syarat installability terpenuhi (manifest +
+   service worker) -- ini behavior default browser, tidak perlu
+   tombol custom di halaman.
    ============================================ */
 (function setupInstallToHomeScreen() {
   const installBtn = document.getElementById('installAppBtn');
@@ -726,48 +726,39 @@ function showStatus(message, type) {
   if (isStandalone) return; // sudah ter-install, tombol tetap hidden
 
   const isIos = /iphone|ipad|ipod/i.test(window.navigator.userAgent);
+  if (!isIos) return; // Android/Chrome: biarkan browser urus sendiri, tombol tetap hidden
 
-  let deferredInstallPrompt = null;
-
-  if (isIos) {
-    // iOS: tidak ada prompt otomatis, tampilkan tombol -> buka modal instruksi
-    installBtn.style.display = 'flex';
-    installBtn.addEventListener('click', function() {
-      const overlay = document.getElementById('iosInstallOverlay');
-      if (overlay) overlay.classList.add('show');
-    });
-
-    const closeBtn = document.getElementById('iosInstallCloseBtn');
+  // iOS: tidak ada prompt otomatis, tampilkan tombol -> buka modal instruksi
+  installBtn.style.display = 'flex';
+  installBtn.addEventListener('click', function() {
     const overlay = document.getElementById('iosInstallOverlay');
-    if (closeBtn && overlay) {
-      closeBtn.addEventListener('click', function() {
-        overlay.classList.remove('show');
-      });
-      // Tap area gelap di luar sheet juga menutup modal
-      overlay.addEventListener('click', function(e) {
-        if (e.target === overlay) overlay.classList.remove('show');
-      });
-    }
-  } else {
-    // Android/Chrome/browser lain yang support beforeinstallprompt
-    window.addEventListener('beforeinstallprompt', function(e) {
-      e.preventDefault();
-      deferredInstallPrompt = e;
-      installBtn.style.display = 'flex';
-    });
+    if (overlay) overlay.classList.add('show');
+  });
 
-    installBtn.addEventListener('click', async function() {
-      if (!deferredInstallPrompt) return;
-      deferredInstallPrompt.prompt();
-      await deferredInstallPrompt.userChoice;
-      deferredInstallPrompt = null;
-      installBtn.style.display = 'none';
+  const closeBtn = document.getElementById('iosInstallCloseBtn');
+  const overlay = document.getElementById('iosInstallOverlay');
+  if (closeBtn && overlay) {
+    closeBtn.addEventListener('click', function() {
+      overlay.classList.remove('show');
     });
-
-    // Kalau user install lewat jalur lain (menu browser manual),
-    // sembunyikan tombol supaya tidak nyangkut kepencet lagi
-    window.addEventListener('appinstalled', function() {
-      installBtn.style.display = 'none';
+    // Tap area gelap di luar sheet juga menutup modal
+    overlay.addEventListener('click', function(e) {
+      if (e.target === overlay) overlay.classList.remove('show');
     });
   }
 })();
+
+/* ============================================
+   REGISTRASI SERVICE WORKER — syarat wajib supaya Chrome
+   menganggap situs ini installable (tanpa ini, baik pop-up
+   otomatis Chrome MAUPUN tombol iOS di atas sama-sama tidak akan
+   pernah terpicu). Tidak melakukan caching/offline mode apa pun,
+   cuma pass-through ke network -- lihat isi service-worker.js.
+   ============================================ */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('/service-worker.js').catch(function(err) {
+      console.warn('Gagal daftar service worker:', err);
+    });
+  });
+}
