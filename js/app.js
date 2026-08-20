@@ -700,3 +700,74 @@ function showStatus(message, type) {
     statusDiv.textContent = '';
   }, 7000);
 }
+
+/* ============================================
+   INSTALL TO HOME SCREEN — tombol di index.html (dekat form
+   login, elemen #installAppBtn). Berjalan independen dari logic
+   form di atas, tidak menyentuh flow auth sama sekali.
+
+   - Kalau app sudah berjalan standalone (sudah ter-install),
+     tombol tetap disembunyikan (default style="display:none"
+     di HTML, tidak pernah dimunculkan).
+   - Android/Chrome: browser fire event 'beforeinstallprompt' kalau
+     PWA memenuhi syarat installable -> tombol dimunculkan, klik
+     memicu prompt instalasi native.
+   - iOS/Safari: tidak ada API beforeinstallprompt sama sekali, jadi
+     kalau terdeteksi iOS (dan belum standalone), tombol dimunculkan
+     langsung, klik membuka modal instruksi manual (#iosInstallOverlay).
+   ============================================ */
+(function setupInstallToHomeScreen() {
+  const installBtn = document.getElementById('installAppBtn');
+  if (!installBtn) return; // elemen tidak ada di halaman ini, skip
+
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches
+    || window.navigator.standalone === true; // fallback lama utk iOS Safari
+
+  if (isStandalone) return; // sudah ter-install, tombol tetap hidden
+
+  const isIos = /iphone|ipad|ipod/i.test(window.navigator.userAgent);
+
+  let deferredInstallPrompt = null;
+
+  if (isIos) {
+    // iOS: tidak ada prompt otomatis, tampilkan tombol -> buka modal instruksi
+    installBtn.style.display = 'flex';
+    installBtn.addEventListener('click', function() {
+      const overlay = document.getElementById('iosInstallOverlay');
+      if (overlay) overlay.classList.add('show');
+    });
+
+    const closeBtn = document.getElementById('iosInstallCloseBtn');
+    const overlay = document.getElementById('iosInstallOverlay');
+    if (closeBtn && overlay) {
+      closeBtn.addEventListener('click', function() {
+        overlay.classList.remove('show');
+      });
+      // Tap area gelap di luar sheet juga menutup modal
+      overlay.addEventListener('click', function(e) {
+        if (e.target === overlay) overlay.classList.remove('show');
+      });
+    }
+  } else {
+    // Android/Chrome/browser lain yang support beforeinstallprompt
+    window.addEventListener('beforeinstallprompt', function(e) {
+      e.preventDefault();
+      deferredInstallPrompt = e;
+      installBtn.style.display = 'flex';
+    });
+
+    installBtn.addEventListener('click', async function() {
+      if (!deferredInstallPrompt) return;
+      deferredInstallPrompt.prompt();
+      await deferredInstallPrompt.userChoice;
+      deferredInstallPrompt = null;
+      installBtn.style.display = 'none';
+    });
+
+    // Kalau user install lewat jalur lain (menu browser manual),
+    // sembunyikan tombol supaya tidak nyangkut kepencet lagi
+    window.addEventListener('appinstalled', function() {
+      installBtn.style.display = 'none';
+    });
+  }
+})();
