@@ -3,7 +3,20 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>StockDental</title>
+  <title>StockDental - Manajemen Stok Klinik Gigi dengan AI</title>
+  <meta name="description" content="Kelola stok obat & alat klinik gigi otomatis dengan AI. Input via foto/suara, tracking kedaluwarsa FEFO, alert stok menipis. Gratis untuk klinik kecil.">
+
+  <!-- Open Graph (preview saat link dibagikan ke WhatsApp/sosmed) -->
+  <meta property="og:title" content="StockDental - Manajemen Stok Klinik Gigi dengan AI">
+  <meta property="og:description" content="Kelola stok obat & alat klinik gigi otomatis dengan AI. Input via foto/suara, tracking kedaluwarsa otomatis, alert stok menipis.">
+  <meta property="og:image" content="https://stockdental-ten.vercel.app/public/images/logo-og-image.png">
+  <meta property="og:url" content="https://stockdental-ten.vercel.app/index.html">
+  <meta property="og:type" content="website">
+
+  <!-- Favicon & app icons -->
+  <link rel="icon" type="image/png" href="/public/images/favicon.png">
+  <link rel="apple-touch-icon" href="/public/images/logo-192.png">
+
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="css/pages-override.css">
   <link rel="stylesheet" href="css/floating-cs-button.css">
@@ -215,6 +228,92 @@
     }
     .auth-video-pill:active { background: rgba(255,255,255,0.25); }
     .auth-video-pill-icon { font-size: 13px; }
+
+    /* ============================================
+       Tombol "Install ke HP" — subtle pill di atas form
+       login, supaya selalu ke-notice tapi tidak mengalihkan
+       fokus dari form. Disembunyikan otomatis via JS kalau
+       app sudah berjalan standalone (sudah ter-install) atau
+       browser tidak mendukung install (lihat app.js).
+       ============================================ */
+    .auth-install-pill {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      background: #F0FBF9;
+      border: 1px solid #A7D9CF;
+      border-radius: 100px;
+      padding: 10px 16px;
+      margin-bottom: 18px;
+      font-family: var(--font-body);
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--color-primary);
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+    .auth-install-pill:active { background: #E1F5F1; }
+    .auth-install-pill-icon { font-size: 15px; line-height: 1; }
+
+    /* Modal instruksi manual untuk iOS/Safari (tidak ada API
+       beforeinstallprompt di iOS, jadi user dituntun manual) */
+    .ios-install-overlay {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 1000;
+      align-items: flex-end;
+      justify-content: center;
+    }
+    .ios-install-overlay.show { display: flex; }
+    .ios-install-sheet {
+      background: #fff;
+      width: 100%;
+      max-width: 480px;
+      border-radius: 24px 24px 0 0;
+      padding: 24px 24px 28px;
+      font-family: var(--font-body);
+    }
+    .ios-install-sheet h3 {
+      font-family: var(--font-display);
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--color-text);
+      margin-bottom: 16px;
+    }
+    .ios-install-step {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 0;
+      font-size: 13.5px;
+      color: var(--color-text);
+      line-height: 1.5;
+    }
+    .ios-install-step-icon {
+      flex-shrink: 0;
+      width: 34px; height: 34px;
+      border-radius: 10px;
+      background: #F0FBF9;
+      border: 1px solid #A7D9CF;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--color-primary);
+    }
+    .ios-install-close {
+      width: 100%;
+      margin-top: 18px;
+      background: none;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      padding: 12px;
+      font-family: var(--font-body);
+      font-weight: 600;
+      font-size: 13px;
+      color: var(--color-text-muted);
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
@@ -251,6 +350,17 @@
 
     <div class="auth-sheet">
       <div class="auth-handle"></div>
+
+      <!-- Tombol Install ke Home Screen — disembunyikan default,
+           dimunculkan via JS di app.js kalau browser mendukung
+           (Android/Chrome: beforeinstallprompt; iOS: selalu tampil,
+           klik membuka modal instruksi manual). Diletakkan di sini
+           (bukan di area gradient atas) supaya selalu terlihat user
+           setiap kali membuka halaman ini, dekat dengan form login. -->
+      <button type="button" id="installAppBtn" class="auth-install-pill" style="display:none;">
+        <span class="auth-install-pill-icon">📲</span>
+        <span>Install StockDental ke HP</span>
+      </button>
 
       <!-- LOGIN FORM -->
       <div id="loginView">
@@ -503,6 +613,35 @@
       <span class="nav-label">Riwayat</span>
     </a>
   </nav>
+
+  <!-- ============ MODAL INSTRUKSI INSTALL (khusus iOS/Safari) ============
+       iOS tidak punya API beforeinstallprompt seperti Android/Chrome,
+       jadi user dituntun manual lewat modal ini. Dibuka/ditutup via
+       JS di app.js (fungsi showIosInstallModal / tombol close di bawah). -->
+  <div class="ios-install-overlay" id="iosInstallOverlay">
+    <div class="ios-install-sheet">
+      <h3>Install StockDental ke HP</h3>
+      <div class="ios-install-step">
+        <span class="ios-install-step-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+        </span>
+        <span>Tap ikon <strong>Share/Bagikan</strong> di bar bawah Safari (kotak dengan panah ke atas)</span>
+      </div>
+      <div class="ios-install-step">
+        <span class="ios-install-step-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+        </span>
+        <span>Scroll ke bawah, pilih <strong>"Add to Home Screen"</strong> / "Tambah ke Layar Utama"</span>
+      </div>
+      <div class="ios-install-step">
+        <span class="ios-install-step-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </span>
+        <span>Tap <strong>"Add"</strong> / "Tambah" — ikon StockDental muncul di Home Screen</span>
+      </div>
+      <button type="button" class="ios-install-close" id="iosInstallCloseBtn">Mengerti</button>
+    </div>
+  </div>
 
   <!-- Supabase library dari CDN -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
