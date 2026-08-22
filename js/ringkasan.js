@@ -69,6 +69,10 @@ async function loadStatusStok() {
   document.getElementById('countKritis').textContent = kritisList.length;
   document.getElementById('countMenipis').textContent = menipisList.length;
 
+  // Percakapan [Ringkasan Lebih Visual] - donut proporsi Normal/Menipis/Kritis
+  const normalCount = (products || []).length - kritisList.length - menipisList.length;
+  renderStatusStokDonut(kritisList.length, menipisList.length, normalCount);
+
   renderExpandableList({
     containerId: 'listKritis',
     items: kritisList,
@@ -89,6 +93,71 @@ function getStockStatus(currentStock, minimumStock) {
   if (currentStock <= 0) return 'kritis';
   if (currentStock <= minimumStock) return 'menipis';
   return 'normal';
+}
+
+// ============================================
+// Percakapan [Ringkasan Lebih Visual] - DONUT STATUS STOK
+// Pakai Chart.js dari CDN. Kalau library gagal load (CDN diblokir, offline,
+// dll), wrapper disembunyikan total dan angka teks kotak Kritis/Menipis yang
+// sudah ada (tidak disentuh sama sekali) tetap jadi satu-satunya sumber info
+// -- tidak ada fitur yang hilang, cuma visual tambahan yang tidak muncul.
+// Instance chart disimpan supaya bisa di-destroy sebelum re-render (kalau
+// loadStatusStok dipanggil ulang, misal habis refresh data).
+// ============================================
+let statusStokChartInstance = null;
+
+function renderStatusStokDonut(kritisCount, menipisCount, normalCount) {
+  const wrap = document.getElementById('statusStokVisual');
+  const canvas = document.getElementById('statusStokDonut');
+  const centerEl = document.getElementById('statusStokDonutCenter');
+  if (!wrap || !canvas || !centerEl) return;
+
+  const total = kritisCount + menipisCount + normalCount;
+  if (typeof Chart === 'undefined' || total === 0) {
+    wrap.style.display = 'none';
+    return;
+  }
+  wrap.style.display = 'flex';
+
+  // Ambil warna asli dari elemen .status-kritis/.status-menipis yang sudah
+  // dipakai di tempat lain di halaman ini (computed style), supaya donut
+  // otomatis konsisten dengan palet warna project tanpa perlu hardcode /
+  // tanpa perlu tahu isi css/style.css.
+  const kritisBoxEl = document.querySelector('.status-kritis');
+  const menipisBoxEl = document.querySelector('.status-menipis');
+  const colorKritis = kritisBoxEl ? getComputedStyle(kritisBoxEl).backgroundColor : '#DC2626';
+  const colorMenipis = menipisBoxEl ? getComputedStyle(menipisBoxEl).backgroundColor : '#D97706';
+  const colorNormal = '#E5E7EB'; // abu netral, tidak ada elemen existing yang mewakili "normal"
+
+  centerEl.innerHTML = `<strong>${total}</strong>jenis barang`;
+
+  if (statusStokChartInstance) {
+    statusStokChartInstance.destroy();
+  }
+
+  statusStokChartInstance = new Chart(canvas, {
+    type: 'doughnut',
+    data: {
+      labels: ['Kritis', 'Menipis', 'Normal'],
+      datasets: [{
+        data: [kritisCount, menipisCount, normalCount],
+        backgroundColor: [colorKritis, colorMenipis, colorNormal],
+        borderWidth: 0
+      }]
+    },
+    options: {
+      cutout: '70%',
+      responsive: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => `${ctx.label}: ${ctx.parsed} jenis barang`
+          }
+        }
+      }
+    }
+  });
 }
 
 // ============================================
@@ -115,6 +184,14 @@ async function loadTransaksiHariIni() {
   document.getElementById('countIn').textContent = countIn;
   document.getElementById('countOut').textContent = countOut;
   document.getElementById('countOpname').textContent = countOpname;
+
+  // Percakapan [Ringkasan Lebih Visual] - ikon panah, angka sama, elemen beda
+  const countInVisualEl = document.getElementById('countInVisual');
+  const countOutVisualEl = document.getElementById('countOutVisual');
+  const countOpnameVisualEl = document.getElementById('countOpnameVisual');
+  if (countInVisualEl) countInVisualEl.textContent = countIn;
+  if (countOutVisualEl) countOutVisualEl.textContent = countOut;
+  if (countOpnameVisualEl) countOpnameVisualEl.textContent = countOpname;
 }
 
 // ============================================
@@ -180,9 +257,25 @@ async function loadTopProdukBulanIni() {
     return;
   }
 
+  // Percakapan [Ringkasan Lebih Visual] - bar horizontal proporsional
+  // (panjang bar = total / total item pertama, item pertama selalu 100%)
+  // dibanding list angka polos. Pakai <li> murni CSS, tidak perlu Chart.js
+  // untuk bentuk bar horizontal sederhana seperti ini.
+  const maxTotal = top5[0].total;
+
   top5.forEach(item => {
     const li = document.createElement('li');
-    li.textContent = `${item.name} — ${item.total} ${item.unit}`;
+    li.className = 'top-produk-bar-item';
+    const widthPercent = maxTotal > 0 ? Math.max(6, Math.round((item.total / maxTotal) * 100)) : 0;
+    li.innerHTML = `
+      <div class="top-produk-bar-label">
+        <span class="top-produk-bar-name">${escapeHtml(item.name)}</span>
+        <span class="top-produk-bar-value">${item.total} ${escapeHtml(item.unit)}</span>
+      </div>
+      <div class="top-produk-bar-track">
+        <div class="top-produk-bar-fill" style="width:${widthPercent}%;"></div>
+      </div>
+    `;
     listEl.appendChild(li);
   });
 }
@@ -199,16 +292,21 @@ async function loadAlertKedaluwarsa() {
   const in30Days = new Date(today);
   in30Days.setDate(in30Days.getDate() + 30);
 
+  // Percakapan [Open Date & PAO] - filter & urut sekarang pakai
+  // effective_expiry_date (bisa lebih pendek dari expiry_date pabrik kalau
+  // lot sudah dibuka & ada PAO), bukan expiry_date mentah lagi. Lot yang
+  // belum pernah dibuka (effective_expiry_date = expiry_date, di-maintain
+  // trigger DB) perilakunya sama persis seperti sebelumnya.
   const { data: lots, error } = await supabaseClient
     .from('product_lots')
-    .select('id, batch_number, expiry_date, quantity, products!inner(name, unit, is_active)')
+    .select('id, batch_number, expiry_date, quantity, status, opened_at, pao_days, effective_expiry_date, products!inner(name, unit, is_active)')
     .eq('clinic_id', CURRENT_CLINIC_ID)
     .eq('is_active', true)
     .eq('products.is_active', true) // FIX: jangan hitung lot dari produk yang sudah dihapus (soft-delete)
     .gt('quantity', 0)
-    .not('expiry_date', 'is', null)
-    .lte('expiry_date', formatDateOnly(in30Days))
-    .order('expiry_date', { ascending: true });
+    .not('effective_expiry_date', 'is', null)
+    .lte('effective_expiry_date', formatDateOnly(in30Days))
+    .order('effective_expiry_date', { ascending: true });
 
   if (error) throw error;
 
@@ -217,15 +315,21 @@ async function loadAlertKedaluwarsa() {
   const h30List = [];
 
   (lots || []).forEach(lot => {
-    const expiryDate = new Date(lot.expiry_date + 'T00:00:00');
+    const expiryDate = new Date(lot.effective_expiry_date + 'T00:00:00');
     const diffDays = Math.round((expiryDate - today) / (1000 * 60 * 60 * 24));
+
+    // Tandai kalau expiry ini lebih cepat gara-gara PAO (bukan expiry pabrik
+    // asli) -- supaya user tahu kenapa barang ini muncul padahal expiry
+    // pabriknya mungkin masih jauh.
+    const isPaoDriven = lot.pao_days && lot.expiry_date && lot.effective_expiry_date < lot.expiry_date;
 
     const item = {
       name: lot.products?.name || 'Barang tidak diketahui',
       unit: lot.products?.unit || '',
       quantity: lot.quantity,
       expiryDate: expiryDate,
-      diffDays: diffDays
+      diffDays: diffDays,
+      isPaoDriven: isPaoDriven
     };
 
     if (diffDays < 0) expiredList.push(item);
@@ -247,6 +351,9 @@ async function loadAlertKedaluwarsa() {
     if (emptyEl) emptyEl.style.display = 'none';
     if (listsWrapEl) listsWrapEl.style.display = 'block';
   }
+
+  // Percakapan [Ringkasan Lebih Visual] - bar overview 3 kategori sebelum list detail
+  renderKedaluwarsaBars(expiredList.length, h7List.length, h30List.length);
 
   renderExpandableList({
     containerId: 'listExpired',
@@ -285,7 +392,50 @@ function formatLotAlertItem(item) {
   } else {
     sisaStr = `${item.diffDays} hari lagi`;
   }
-  return `${escapeHtml(item.name)} — ${item.quantity} ${escapeHtml(item.unit)}, exp ${tanggalStr} (${sisaStr})`;
+  // Percakapan [Open Date & PAO] - tandai kalau expiry ini dipercepat karena
+  // PAO (bukan expiry pabrik asli), supaya user tidak bingung kenapa barang
+  // ini muncul di alert padahal expiry pabriknya mungkin masih jauh.
+  const paoTag = item.isPaoDriven ? ' <em>(dipercepat: sudah dibuka)</em>' : '';
+  return `${escapeHtml(item.name)} — ${item.quantity} ${escapeHtml(item.unit)}, exp ${tanggalStr} (${sisaStr})${paoTag}`;
+}
+
+// ============================================
+// Percakapan [Ringkasan Lebih Visual] - BAR OVERVIEW KEDALUWARSA
+// 3 bar (Sudah Expired / H-7 / H-30) sebelum list detail. Panjang bar
+// proporsional terhadap totalAlert (bukan Chart.js -- bar horizontal
+// sederhana lebih ringan pakai CSS murni). Warna diambil dari
+// .ringkasan-alert-subheading kalau ada styling warna di sana, kalau tidak
+// pakai fallback merah/oranye/kuning standar (warna alert universal, aman
+// dipakai walau tidak tahu isi persis style.css).
+// ============================================
+function renderKedaluwarsaBars(expiredCount, h7Count, h30Count) {
+  const el = document.getElementById('kedaluwarsaBars');
+  if (!el) return;
+
+  const total = expiredCount + h7Count + h30Count;
+  if (total === 0) {
+    el.innerHTML = '';
+    return;
+  }
+
+  const rows = [
+    { label: 'Expired', count: expiredCount, color: '#DC2626' },
+    { label: 'H-7', count: h7Count, color: '#D97706' },
+    { label: 'H-30', count: h30Count, color: '#CA8A04' }
+  ];
+
+  el.innerHTML = rows.map(row => {
+    const widthPercent = total > 0 ? Math.round((row.count / total) * 100) : 0;
+    return `
+      <div class="bar-row">
+        <span class="bar-row-label">${row.label}</span>
+        <div class="bar-row-track">
+          <div class="bar-row-fill" style="width:${widthPercent}%; background:${row.color};"></div>
+        </div>
+        <span class="bar-row-count">${row.count}</span>
+      </div>
+    `;
+  }).join('');
 }
 
 function toggleSection(sectionId, show) {
