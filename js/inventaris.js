@@ -26,6 +26,11 @@ let EDITING_ITEM_ID = null; // product id dari card yang sedang dalam mode edit,
 // diedit dalam satu waktu, terpisah dari EDITING_ITEM_ID (edit data barang).
 let EDITING_LOT_ID = null;
 
+// Percakapan [Open Date & PAO] - lot_id dari baris lot yang sedang dalam mode
+// "Buka Kemasan" (isi opened_at + pao_days opsional), atau null. Terpisah dari
+// EDITING_LOT_ID (form-nya beda: batch/expiry vs tanggal buka/PAO).
+let OPENING_LOT_ID = null;
+
 // ---- State untuk fitur Gabungkan Barang ----
 let SELECTION_MODE = false;
 let SELECTED_IDS = new Set(); // maksimal 2 product id
@@ -140,7 +145,7 @@ async function loadInventaris() {
     ...p,
     status: getStockStatus(p.current_stock, p.minimum_stock),
     recentHistory: null, // diisi on-demand saat card di-expand pertama kali (cache)
-    activeLots: null // diisi on-demand saat card di-expand pertama kali (cache) — daftar lot aktif (batch_number + expiry_date)
+    activeLots: null // diisi on-demand saat card di-expand pertama kali (cache) — daftar lot aktif (batch_number + expiry_date + status/opened_at/pao_days/effective_expiry_date)
   }));
 
   renderInventaris('');
@@ -314,7 +319,24 @@ function buildItemCard(p) {
           handleCancelEditLot(p.id);
         } else if (action === 'save-edit-lot') {
           handleSaveEditLot(btn.dataset.lotId, p.id, item);
+        } else if (action === 'open-lot') {
+          handleStartOpenLot(btn.dataset.lotId, p.id);
+        } else if (action === 'cancel-open-lot') {
+          handleCancelOpenLot(p.id);
+        } else if (action === 'save-open-lot') {
+          handleSaveOpenLot(btn.dataset.lotId, p.id, item);
         }
+      });
+    });
+
+    // Tombol shortcut PAO (30/90/180 hari) — isi field angka PAO tanpa submit,
+    // tidak lewat data-action karena bukan aksi yang perlu re-render seluruh card.
+    item.querySelectorAll('.btn-pao-shortcut').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const row = btn.closest('.lot-edit-form');
+        const paoInput = row ? row.querySelector('.lot-open-pao') : null;
+        if (paoInput) paoInput.value = btn.dataset.paoValue;
       });
     });
   }
@@ -362,6 +384,13 @@ function buildExpandContent(p) {
     // edit sendiri (bisa banyak lot per barang). Kalau lot.id sedang di-edit
     // (EDITING_LOT_ID), baris itu diganti mini-form batch_number + expiry_date.
     // Quantity TIDAK bisa diedit di sini (tetap lewat Stok Fisik/opname).
+    //
+    // Percakapan [Open Date & PAO] - tiap baris lot juga punya badge status
+    // (Tersegel/Dibuka/Habis). Lot berstatus 'sealed' dapat tombol "Buka Kemasan"
+    // tambahan di samping tombol edit (✏️) yang sudah ada. Kalau lot.id sedang
+    // dalam mode buka kemasan (OPENING_LOT_ID), baris diganti mini-form
+    // opened_at + pao_days (opsional). Lot 'opened' menampilkan tanggal buka
+    // + expiry efektif (kalau PAO diisi). Lot 'empty' hanya badge, tanpa aksi.
     lotsHtml = '<ul class="lots-list">' + p.activeLots.map(lot => {
       if (EDITING_LOT_ID === lot.id) {
         return `
@@ -384,11 +413,59 @@ function buildExpandContent(p) {
           </li>
         `;
       }
+
+      if (OPENING_LOT_ID === lot.id) {
+        const todayDDMMYYYY = formatToDDMMYYYY(new Date().toISOString().slice(0, 10));
+        return `
+          <li class="lot-edit-row" data-lot-id="${lot.id}">
+            <div class="lot-edit-form">
+              <div class="edit-form-group">
+                <label>Tanggal Buka Kemasan (DDMMYYYY, 8 digit)</label>
+                <input type="text" class="edit-input lot-open-date" inputmode="numeric" maxlength="8" value="${todayDDMMYYYY}" placeholder="Contoh: 22082026">
+              </div>
+              <div class="edit-form-group">
+                <label>Masa Simpan Setelah Dibuka / PAO (opsional, dalam hari)</label>
+                <input type="number" class="edit-input lot-open-pao" min="1" placeholder="Contoh: 30">
+                <div class="lot-pao-shortcuts">
+                  <button type="button" class="btn-secondary btn-pao-shortcut" data-pao-value="30">30 hari</button>
+                  <button type="button" class="btn-secondary btn-pao-shortcut" data-pao-value="90">90 hari</button>
+                  <button type="button" class="btn-secondary btn-pao-shortcut" data-pao-value="180">180 hari</button>
+                </div>
+                <p class="edit-form-hint">Kosongkan kalau bahan ini tidak punya batas pakai setelah dibuka (BUD) di labelnya.</p>
+              </div>
+              <div class="edit-form-actions">
+                <button type="button" class="btn-secondary" data-action="cancel-open-lot">Batal</button>
+                <button type="button" class="btn-primary" data-action="save-open-lot" data-lot-id="${lot.id}">Simpan</button>
+              </div>
+              <div class="edit-status-message" data-role="lot-open-status"></div>
+            </div>
+          </li>
+        `;
+      }
+
+      const statusBadge = lot.status === 'opened'
+        ? '<span class="lot-status-badge lot-status-opened">🔓 Dibuka</span>'
+        : lot.status === 'empty'
+          ? '<span class="lot-status-badge lot-status-empty">⬛ Habis</span>'
+          : '<span class="lot-status-badge lot-status-sealed">🔒 Tersegel</span>';
+
+      let openInfoHtml = '';
+      if (lot.status === 'opened') {
+        openInfoHtml = `<span class="lot-open-info">Dibuka: ${formatTanggal(lot.opened_at)}${lot.pao_days ? ` (PAO ${lot.pao_days} hari, exp efektif: ${formatTanggal(lot.effective_expiry_date)})` : ''}</span>`;
+      }
+
+      const openBtnHtml = lot.status === 'sealed'
+        ? `<button type="button" class="btn-open-lot" data-action="open-lot" data-lot-id="${lot.id}" aria-label="Buka kemasan">🔓 Buka Kemasan</button>`
+        : '';
+
       return `
         <li>
           <span class="lot-batch">${escapeHtml(lot.batch_number || '(tanpa no. batch)')}</span>
           <span class="lot-expiry">Exp: ${formatTanggal(lot.expiry_date)}</span>
           <span class="lot-qty">${lot.quantity}</span>
+          ${statusBadge}
+          ${openInfoHtml}
+          ${openBtnHtml}
           <button type="button" class="btn-edit-lot" data-action="edit-lot" data-lot-id="${lot.id}" aria-label="Edit lot">✏️</button>
         </li>
       `;
@@ -511,7 +588,7 @@ async function handleCardToggle(productId) {
   const fetchLots = product.activeLots === null
     ? supabaseClient
         .from('product_lots')
-        .select('id, batch_number, expiry_date, quantity')
+        .select('id, batch_number, expiry_date, quantity, status, opened_at, pao_days, effective_expiry_date')
         .eq('product_id', productId)
         .eq('is_active', true)
         .order('expiry_date', { ascending: true }) // FEFO: paling dekat kadaluarsa duluan
@@ -631,6 +708,101 @@ async function handleSaveEditLot(lotId, productId, cardEl) {
   }
 
   EDITING_LOT_ID = null;
+  renderInventaris(inventarisSearchInput.value);
+}
+
+// ============================================
+// Percakapan [Open Date & PAO] - BUKA KEMASAN: mulai, batal, simpan.
+// Terpisah dari EDITING_LOT_ID (form berbeda: tanggal buka + PAO opsional,
+// bukan batch/expiry). Hanya lot berstatus 'sealed' yang punya tombol ini
+// (lihat buildExpandContent). Setelah simpan, lot langsung berstatus 'opened'
+// dan tidak bisa dibuka ulang (RPC open_lot menolak lot yang bukan 'sealed').
+// ============================================
+function handleStartOpenLot(lotId, productId) {
+  OPENING_LOT_ID = lotId;
+  renderInventaris(inventarisSearchInput.value);
+}
+
+function handleCancelOpenLot(productId) {
+  OPENING_LOT_ID = null;
+  renderInventaris(inventarisSearchInput.value);
+}
+
+async function handleSaveOpenLot(lotId, productId, cardEl) {
+  const row = cardEl.querySelector(`.lot-edit-row[data-lot-id="${lotId}"]`);
+  if (!row) return;
+
+  const saveBtn = row.querySelector('[data-action="save-open-lot"]');
+  const statusEl = row.querySelector('[data-role="lot-open-status"]');
+  const dateInput = row.querySelector('.lot-open-date');
+  const paoInput = row.querySelector('.lot-open-pao');
+
+  const dateRaw = dateInput.value.trim();
+  const paoRaw = paoInput.value.trim();
+
+  // Tanggal buka WAJIB diisi (beda dengan expiry_date di edit-lot yang boleh
+  // kosong) — buka kemasan tanpa tanggal tidak ada gunanya untuk pelacakan PAO.
+  const parsed = parseDDMMYYYY(dateRaw);
+  if (!parsed.valid || !parsed.isoDate) {
+    showEditStatus(statusEl, parsed.error || 'Tanggal buka kemasan wajib diisi.', 'error');
+    return;
+  }
+  const openedAtIso = parsed.isoDate;
+
+  // PAO opsional. Kalau diisi, harus angka bulat positif.
+  let paoDays = null;
+  if (paoRaw !== '') {
+    const paoNum = parseInt(paoRaw, 10);
+    if (isNaN(paoNum) || paoNum <= 0) {
+      showEditStatus(statusEl, 'Masa simpan (PAO) harus berupa angka hari lebih dari 0, atau kosongkan saja.', 'error');
+      return;
+    }
+    paoDays = paoNum;
+  }
+
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'Menyimpan...';
+
+  const { error } = await supabaseClient.rpc('open_lot', {
+    p_lot_id: lotId,
+    p_opened_at: openedAtIso,
+    p_pao_days: paoDays
+  });
+
+  saveBtn.disabled = false;
+  saveBtn.textContent = 'Simpan';
+
+  if (error) {
+    console.error('Gagal buka kemasan lot:', error);
+    showEditStatus(statusEl, 'Gagal menyimpan. Lot mungkin sudah dibuka/habis, atau coba lagi.', 'error');
+    return;
+  }
+
+  // Update state lokal langsung (tidak perlu fetch ulang semua lot).
+  // effective_expiry_date dihitung ulang di sini secara sederhana (LEAST antara
+  // expiry pabrik & opened_at+PAO) supaya tampilan langsung sinkron tanpa
+  // fetch ulang — perhitungan sebenarnya tetap dilakukan trigger di database.
+  const product = ALL_INVENTARIS_ITEMS.find(p => p.id === productId);
+  if (product && product.activeLots) {
+    const lot = product.activeLots.find(l => l.id === lotId);
+    if (lot) {
+      lot.status = 'opened';
+      lot.opened_at = openedAtIso;
+      lot.pao_days = paoDays;
+      if (paoDays) {
+        const paoExpiry = new Date(openedAtIso + 'T00:00:00');
+        paoExpiry.setDate(paoExpiry.getDate() + paoDays);
+        const paoExpiryIso = paoExpiry.toISOString().slice(0, 10);
+        lot.effective_expiry_date = (lot.expiry_date && lot.expiry_date < paoExpiryIso)
+          ? lot.expiry_date
+          : paoExpiryIso;
+      } else {
+        lot.effective_expiry_date = lot.expiry_date;
+      }
+    }
+  }
+
+  OPENING_LOT_ID = null;
   renderInventaris(inventarisSearchInput.value);
 }
 
