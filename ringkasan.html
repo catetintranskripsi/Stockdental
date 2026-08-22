@@ -7,10 +7,13 @@
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="css/floating-cs-button.css">
   <!-- Percakapan [Ringkasan Lebih Visual] - Chart.js untuk donut Status Stok.
-       Dari CDN, tidak ada build step. Kalau CDN gagal load total, JS punya
-       fallback (polling singkat lalu cek typeof Chart) supaya angka teks
-       yang sudah ada tetap tampil normal walau chart tidak muncul. -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+       Self-hosted di js/chart.umd.js (bukan CDN eksternal) karena CDN
+       cdnjs.cloudflare.com terbukti gagal/lambat diakses di sebagian
+       jaringan seluler pengguna -- file lokal dari domain Vercel sendiri
+       jauh lebih reliable. Kalau file ini somehow tetap gagal load, JS
+       tetap punya fallback (polling lalu cek typeof Chart) supaya angka
+       teks yang sudah ada tetap tampil normal. -->
+  <script src="js/chart.umd.js"></script>
   <style>
     /* ============================================
        Percakapan [Status Langganan di Ringkasan]
