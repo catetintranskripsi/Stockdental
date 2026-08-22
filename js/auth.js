@@ -225,9 +225,9 @@ async function loadPublicTestimonials() {
   testimonialData = data;
   wrapEl.style.display = 'block';
 
-  // Bangun struktur: 1 slide + dot indicator (dot cuma muncul kalau >1 testimoni)
+  // Bangun struktur: 1 slide (fade-able) + dot indicator (dot cuma muncul kalau >1 testimoni)
   wrapEl.innerHTML = `
-    <div class="testimonial-slide">
+    <div class="testimonial-slide" id="testimonialSlide">
       <div class="testimonial-slide-stars" id="testimonialSlideStars"></div>
       <p class="testimonial-slide-text" id="testimonialSlideText"></p>
       <p class="testimonial-slide-clinic" id="testimonialSlideClinic"></p>
@@ -257,16 +257,23 @@ async function loadPublicTestimonials() {
 }
 
 function renderTestimonialSlide(index) {
+  const slideEl = document.getElementById('testimonialSlide');
   const starsEl = document.getElementById('testimonialSlideStars');
   const textEl = document.getElementById('testimonialSlideText');
   const clinicEl = document.getElementById('testimonialSlideClinic');
   const dotsEl = document.getElementById('testimonialDots');
-  if (!starsEl || !textEl || !clinicEl) return;
+  if (!slideEl || !starsEl || !textEl || !clinicEl) return;
 
   const t = testimonialData[index];
-  starsEl.textContent = '★'.repeat(t.rating) + '☆'.repeat(5 - t.rating);
-  textEl.textContent = `"${t.comment}"`;
-  clinicEl.textContent = t.clinic_name;
+
+  // Fade out -> ganti isi -> fade in (sama seperti kartu Tips di ringkasan.js)
+  slideEl.classList.add('fading');
+  setTimeout(() => {
+    starsEl.textContent = '★'.repeat(t.rating) + '☆'.repeat(5 - t.rating);
+    textEl.textContent = `"${t.comment}"`;
+    clinicEl.textContent = t.clinic_name;
+    slideEl.classList.remove('fading');
+  }, 300);
 
   if (dotsEl) {
     Array.from(dotsEl.children).forEach((dot, i) => {
