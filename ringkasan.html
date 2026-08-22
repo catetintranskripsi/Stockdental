@@ -6,6 +6,11 @@
   <title>StockDental - Ringkasan</title>
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="css/floating-cs-button.css">
+  <!-- Percakapan [Ringkasan Lebih Visual] - Chart.js untuk donut Status Stok.
+       Dari CDN, tidak ada build step. Kalau CDN gagal load, JS punya fallback
+       cek `typeof Chart === 'undefined'` sebelum pakai, supaya angka teks yang
+       sudah ada tetap tampil normal walau chart tidak muncul. -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
   <style>
     /* ============================================
        Percakapan [Status Langganan di Ringkasan]
@@ -239,6 +244,150 @@
       background: #FEE2E2;
       color: #991B1B;
     }
+
+    /* ============================================
+       Percakapan [Ringkasan Lebih Visual]
+       Elemen grafis tambahan di card yang sudah ada — tidak mengubah
+       struktur/logic data, cuma render visual di atas data yang sudah
+       di-fetch. Warna diambil dari CSS variable global yang sudah ada
+       (--color-primary, --color-accent) atau dari warna computed elemen
+       .status-kritis/.status-menipis yang sudah dipakai di tempat lain
+       di halaman ini, supaya konsisten tanpa perlu tahu isi style.css.
+       ============================================ */
+
+    /* ---- Donut Status Stok ---- */
+    .status-stok-visual {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 12px;
+    }
+    .status-stok-donut-wrap {
+      position: relative;
+      width: 84px;
+      height: 84px;
+      flex-shrink: 0;
+    }
+    .status-stok-donut-wrap canvas {
+      width: 84px !important;
+      height: 84px !important;
+    }
+    .status-stok-donut-center {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 11px;
+      color: var(--color-text-muted);
+      text-align: center;
+      line-height: 1.2;
+      pointer-events: none;
+    }
+    .status-stok-donut-center strong {
+      display: block;
+      font-size: 16px;
+      color: var(--color-text);
+    }
+
+    /* ---- Bar horizontal: dipakai Kedaluwarsa & Top Produk ---- */
+    .bar-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .bar-row:last-child {
+      margin-bottom: 0;
+    }
+    .bar-row-label {
+      flex-shrink: 0;
+      font-size: 12px;
+      color: var(--color-text-muted);
+      min-width: 82px;
+    }
+    .bar-row-track {
+      flex: 1;
+      background: var(--color-surface, #f0f0f0);
+      border-radius: 999px;
+      height: 10px;
+      overflow: hidden;
+    }
+    .bar-row-fill {
+      height: 100%;
+      border-radius: 999px;
+      transition: width 0.3s ease;
+    }
+    .bar-row-count {
+      flex-shrink: 0;
+      font-size: 12px;
+      font-weight: 600;
+      min-width: 20px;
+      text-align: right;
+    }
+
+    /* ---- Top 5 Barang: bar per-item ---- */
+    .top-produk-bar-item {
+      margin-bottom: 10px;
+    }
+    .top-produk-bar-item:last-child {
+      margin-bottom: 0;
+    }
+    .top-produk-bar-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      margin-bottom: 4px;
+    }
+    .top-produk-bar-name {
+      color: var(--color-text);
+    }
+    .top-produk-bar-value {
+      color: var(--color-text-muted);
+      flex-shrink: 0;
+      margin-left: 8px;
+    }
+    .top-produk-bar-track {
+      background: var(--color-surface, #f0f0f0);
+      border-radius: 999px;
+      height: 8px;
+      overflow: hidden;
+    }
+    .top-produk-bar-fill {
+      height: 100%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--color-primary), #14876f);
+      transition: width 0.3s ease;
+    }
+
+    /* ---- Transaksi Hari Ini: ikon panah ---- */
+    .transaksi-visual-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .transaksi-visual-item {
+      flex: 1;
+      text-align: center;
+      background: var(--color-surface, #f8f9f9);
+      border-radius: 10px;
+      padding: 10px 6px;
+    }
+    .transaksi-visual-icon {
+      font-size: 20px;
+      display: block;
+      margin-bottom: 2px;
+    }
+    .transaksi-visual-count {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--color-text);
+      display: block;
+    }
+    .transaksi-visual-label {
+      font-size: 11px;
+      color: var(--color-text-muted);
+    }
   </style>
 </head>
 <body>
@@ -369,6 +518,18 @@
       <!-- Status Stok -->
       <div class="ringkasan-card">
         <h3>Status Stok</h3>
+
+        <!-- Percakapan [Ringkasan Lebih Visual] - donut kecil, dirender via
+             Chart.js di JS (renderStatusStokDonut). Kalau Chart.js gagal load
+             dari CDN, wrapper ini otomatis disembunyikan oleh JS, angka teks
+             di bawah tetap tampil normal. -->
+        <div class="status-stok-visual" id="statusStokVisual" style="display:none;">
+          <div class="status-stok-donut-wrap">
+            <canvas id="statusStokDonut"></canvas>
+            <div class="status-stok-donut-center" id="statusStokDonutCenter"></div>
+          </div>
+        </div>
+
         <div class="ringkasan-status-row">
           <div class="ringkasan-status-box status-kritis">
             <span class="ringkasan-status-count" id="countKritis">0</span>
@@ -401,6 +562,10 @@
 
         <div id="kedaluwarsaListsWrap" style="display:none;">
 
+          <!-- Percakapan [Ringkasan Lebih Visual] - overview 3 bar sebelum
+               list detail, diisi via renderKedaluwarsaBars() di JS. -->
+          <div id="kedaluwarsaBars" style="margin-bottom: 14px;"></div>
+
           <div class="ringkasan-alert-section" id="sectionExpired" style="display:none; margin-top: 12px;">
             <p class="ringkasan-alert-subheading">🔴 Sudah Kedaluwarsa</p>
             <div id="listExpired"></div>
@@ -428,6 +593,27 @@
           <span id="countOut">0</span> keluar ·
           <span id="countOpname">0</span> opname
         </p>
+
+        <!-- Percakapan [Ringkasan Lebih Visual] - ikon panah, angka di sini
+             DIISI ULANG oleh JS memakai elemen sama (bukan elemen baru),
+             jadi span teks di atas ("countIn" dkk) tetap sumber data tunggal. -->
+        <div class="transaksi-visual-row">
+          <div class="transaksi-visual-item">
+            <span class="transaksi-visual-icon">↗️</span>
+            <span class="transaksi-visual-count" id="countInVisual">0</span>
+            <span class="transaksi-visual-label">Masuk</span>
+          </div>
+          <div class="transaksi-visual-item">
+            <span class="transaksi-visual-icon">↘️</span>
+            <span class="transaksi-visual-count" id="countOutVisual">0</span>
+            <span class="transaksi-visual-label">Keluar</span>
+          </div>
+          <div class="transaksi-visual-item">
+            <span class="transaksi-visual-icon">🔄</span>
+            <span class="transaksi-visual-count" id="countOpnameVisual">0</span>
+            <span class="transaksi-visual-label">Opname</span>
+          </div>
+        </div>
       </div>
 
       <!-- Top 5 Barang -->
