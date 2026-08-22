@@ -405,7 +405,8 @@ function initAiTipsCard() {
   const textEl = document.getElementById('aiTipsText');
   const btnEl = document.getElementById('aiTipsBtn');
   const dotsEl = document.getElementById('aiTipsDots');
-  if (!textEl || !btnEl || !dotsEl) return; // guard kalau elemen belum ada
+  const cardEl = document.getElementById('aiTipsCard');
+  if (!textEl || !btnEl || !dotsEl || !cardEl) return; // guard kalau elemen belum ada
 
   // Buat dot indicator sejumlah AI_TIPS
   dotsEl.innerHTML = '';
@@ -416,12 +417,66 @@ function initAiTipsCard() {
   });
 
   renderAiTip(0);
+  startAiTipsAutoRotate();
+  setupAiTipsSwipe(cardEl);
+}
 
+function startAiTipsAutoRotate() {
   if (aiTipsInterval) clearInterval(aiTipsInterval);
   aiTipsInterval = setInterval(() => {
     aiTipsIndex = (aiTipsIndex + 1) % AI_TIPS.length;
     renderAiTip(aiTipsIndex);
   }, AI_TIPS_ROTATE_MS);
+}
+
+// ---------- Swipe kiri/kanan (ganti tips manual) + tahan jari (pause) ----------
+// - Sentuh & tahan tanpa geser -> auto-rotate berhenti sementara, lanjut lagi
+//   otomatis setelah jari dilepas.
+// - Geser kiri/kanan melewati ambang batas -> pindah ke tips berikutnya/
+//   sebelumnya, lalu auto-rotate restart dari awal (5 detik) dari posisi baru.
+const AI_TIPS_SWIPE_THRESHOLD_PX = 40;
+
+function setupAiTipsSwipe(cardEl) {
+  let touchStartX = 0;
+  let touchStartY = 0;
+  let isSwipeGesture = false;
+
+  cardEl.addEventListener('touchstart', (e) => {
+    if (aiTipsInterval) clearInterval(aiTipsInterval); // pause selama disentuh
+    const touch = e.touches[0];
+    touchStartX = touch.clientX;
+    touchStartY = touch.clientY;
+    isSwipeGesture = false;
+  }, { passive: true });
+
+  cardEl.addEventListener('touchmove', (e) => {
+    const touch = e.touches[0];
+    const dx = touch.clientX - touchStartX;
+    const dy = touch.clientY - touchStartY;
+    // Tandai sebagai swipe horizontal kalau gerakan X jelas lebih besar dari Y
+    if (Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)) {
+      isSwipeGesture = true;
+    }
+  }, { passive: true });
+
+  cardEl.addEventListener('touchend', (e) => {
+    const touch = e.changedTouches[0];
+    const dx = touch.clientX - touchStartX;
+
+    if (isSwipeGesture && Math.abs(dx) >= AI_TIPS_SWIPE_THRESHOLD_PX) {
+      if (dx < 0) {
+        // geser ke kiri -> tips berikutnya
+        aiTipsIndex = (aiTipsIndex + 1) % AI_TIPS.length;
+      } else {
+        // geser ke kanan -> tips sebelumnya
+        aiTipsIndex = (aiTipsIndex - 1 + AI_TIPS.length) % AI_TIPS.length;
+      }
+      renderAiTip(aiTipsIndex);
+    }
+
+    // Baik habis swipe maupun cuma tahan tanpa geser -> lanjutkan auto-rotate
+    startAiTipsAutoRotate();
+  });
 }
 
 function renderAiTip(index) {

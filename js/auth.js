@@ -200,6 +200,17 @@ function showAuth() {
 // Ambil testimoni yang sudah di-approve (RPC get_public_testimonials,
 // aman dipanggil tanpa login karena RLS hanya izinkan baca status
 // 'approved'). Kalau kosong/gagal, section disembunyikan saja.
+//
+// Dulu semua testimoni ditumpuk sekaligus (block per testimoni) sehingga
+// halaman makin panjang ke bawah seiring jumlah testimoni approved
+// bertambah. Sekarang jadi carousel auto-rotate (1 slide tampil di satu
+// waktu + dot indicator), sama seperti pola kartu "Tips StockDental" di
+// ringkasan.html.
+const TESTIMONIAL_ROTATE_MS = 6000;
+let testimonialData = [];
+let testimonialIndex = 0;
+let testimonialInterval = null;
+
 async function loadPublicTestimonials() {
   const wrapEl = document.getElementById('testimonialCarousel');
   if (!wrapEl) return;
@@ -211,14 +222,57 @@ async function loadPublicTestimonials() {
     return;
   }
 
+  testimonialData = data;
   wrapEl.style.display = 'block';
-  wrapEl.innerHTML = data.map(t => `
+
+  // Bangun struktur: 1 slide + dot indicator (dot cuma muncul kalau >1 testimoni)
+  wrapEl.innerHTML = `
     <div class="testimonial-slide">
-      <div class="testimonial-slide-stars">${'★'.repeat(t.rating)}${'☆'.repeat(5 - t.rating)}</div>
-      <p class="testimonial-slide-text">"${escapeAuthHtml(t.comment)}"</p>
-      <p class="testimonial-slide-clinic">${escapeAuthHtml(t.clinic_name)}</p>
+      <div class="testimonial-slide-stars" id="testimonialSlideStars"></div>
+      <p class="testimonial-slide-text" id="testimonialSlideText"></p>
+      <p class="testimonial-slide-clinic" id="testimonialSlideClinic"></p>
     </div>
-  `).join('');
+    <div class="testimonial-dots" id="testimonialDots"></div>
+  `;
+
+  const dotsEl = document.getElementById('testimonialDots');
+  if (testimonialData.length > 1) {
+    testimonialData.forEach((_, i) => {
+      const dot = document.createElement('span');
+      dot.className = 'testimonial-dot' + (i === 0 ? ' active' : '');
+      dotsEl.appendChild(dot);
+    });
+  }
+
+  testimonialIndex = 0;
+  renderTestimonialSlide(0);
+
+  if (testimonialData.length > 1) {
+    if (testimonialInterval) clearInterval(testimonialInterval);
+    testimonialInterval = setInterval(() => {
+      testimonialIndex = (testimonialIndex + 1) % testimonialData.length;
+      renderTestimonialSlide(testimonialIndex);
+    }, TESTIMONIAL_ROTATE_MS);
+  }
+}
+
+function renderTestimonialSlide(index) {
+  const starsEl = document.getElementById('testimonialSlideStars');
+  const textEl = document.getElementById('testimonialSlideText');
+  const clinicEl = document.getElementById('testimonialSlideClinic');
+  const dotsEl = document.getElementById('testimonialDots');
+  if (!starsEl || !textEl || !clinicEl) return;
+
+  const t = testimonialData[index];
+  starsEl.textContent = '★'.repeat(t.rating) + '☆'.repeat(5 - t.rating);
+  textEl.textContent = `"${t.comment}"`;
+  clinicEl.textContent = t.clinic_name;
+
+  if (dotsEl) {
+    Array.from(dotsEl.children).forEach((dot, i) => {
+      dot.classList.toggle('active', i === index);
+    });
+  }
 }
 
 // Escape sederhana untuk cegah HTML injection dari komentar/nama klinik
