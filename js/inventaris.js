@@ -416,9 +416,20 @@ function buildExpandContent(p) {
 
       if (OPENING_LOT_ID === lot.id) {
         const todayDDMMYYYY = formatToDDMMYYYY(new Date().toISOString().slice(0, 10));
+        // Percakapan [Split Lot saat Buka Kemasan] - field jumlah cuma perlu
+        // ditanya kalau lot ini punya lebih dari 1 unit (quantity > 1).
+        // Kalau cuma 1 unit, buka langsung semua tanpa nanya (tidak ada
+        // ambiguitas -- 1 lot = 1 unit fisik, ini kasus paling umum).
+        const qtyFieldHtml = lot.quantity > 1 ? `
+              <div class="edit-form-group">
+                <label>Jumlah yang Dibuka (dari ${lot.quantity} unit di lot ini)</label>
+                <input type="number" class="edit-input lot-open-qty" min="1" max="${lot.quantity}" placeholder="Contoh: 1">
+                <p class="edit-form-hint">Lot ini berisi ${lot.quantity} unit. Isi berapa yang benar-benar dibuka sekarang — sisanya tetap tersegel.</p>
+              </div>` : '';
         return `
           <li class="lot-edit-row" data-lot-id="${lot.id}">
             <div class="lot-edit-form">
+              ${qtyFieldHtml}
               <div class="edit-form-group">
                 <label>Tanggal Buka Kemasan (DDMMYYYY, 8 digit)</label>
                 <input type="text" class="edit-input lot-open-date" inputmode="numeric" maxlength="8" value="${todayDDMMYYYY}" placeholder="Contoh: 22082026">
@@ -732,10 +743,15 @@ async function handleSaveOpenLot(lotId, productId, cardEl) {
   const row = cardEl.querySelector(`.lot-edit-row[data-lot-id="${lotId}"]`);
   if (!row) return;
 
+  const product = ALL_INVENTARIS_ITEMS.find(p => p.id === productId);
+  const lot = product && product.activeLots ? product.activeLots.find(l => l.id === lotId) : null;
+  if (!lot) return;
+
   const saveBtn = row.querySelector('[data-action="save-open-lot"]');
   const statusEl = row.querySelector('[data-role="lot-open-status"]');
   const dateInput = row.querySelector('.lot-open-date');
   const paoInput = row.querySelector('.lot-open-pao');
+  const qtyInput = row.querySelector('.lot-open-qty'); // ada hanya kalau lot.quantity > 1
 
   const dateRaw = dateInput.value.trim();
   const paoRaw = paoInput.value.trim();
@@ -760,13 +776,32 @@ async function handleSaveOpenLot(lotId, productId, cardEl) {
     paoDays = paoNum;
   }
 
+  // Percakapan [Split Lot saat Buka Kemasan] - jumlah dibuka. Kalau lot cuma
+  // 1 unit, field tidak ada di form (qtyInput null) -> anggap buka semua (=
+  // lot.quantity). Kalau lot > 1 unit, field WAJIB diisi & divalidasi antara
+  // 1 s.d. quantity lot -- tidak boleh dikosongkan supaya tidak salah asumsi
+  // "buka semua" padahal cuma sebagian yang benar-benar dibuka.
+  let qtyToOpen;
+  if (qtyInput) {
+    const qtyRaw = qtyInput.value.trim();
+    const qtyNum = parseInt(qtyRaw, 10);
+    if (qtyRaw === '' || isNaN(qtyNum) || qtyNum <= 0 || qtyNum > lot.quantity) {
+      showEditStatus(statusEl, `Jumlah yang dibuka wajib diisi, angka 1 sampai ${lot.quantity}.`, 'error');
+      return;
+    }
+    qtyToOpen = qtyNum;
+  } else {
+    qtyToOpen = lot.quantity;
+  }
+
   saveBtn.disabled = true;
   saveBtn.textContent = 'Menyimpan...';
 
-  const { error } = await supabaseClient.rpc('open_lot', {
+  const { data: newLotId, error } = await supabaseClient.rpc('open_lot', {
     p_lot_id: lotId,
     p_opened_at: openedAtIso,
-    p_pao_days: paoDays
+    p_pao_days: paoDays,
+    p_qty_to_open: qtyToOpen
   });
 
   saveBtn.disabled = false;
@@ -778,28 +813,39 @@ async function handleSaveOpenLot(lotId, productId, cardEl) {
     return;
   }
 
+  // Hitung effective_expiry_date lokal (LEAST antara expiry pabrik &
+  // opened_at+PAO) supaya tampilan langsung sinkron tanpa fetch ulang —
+  // perhitungan sebenarnya tetap dilakukan trigger di database.
+  const computeEffectiveExpiry = (expiryDate) => {
+    if (!paoDays) return expiryDate;
+    const paoExpiry = new Date(openedAtIso + 'T00:00:00');
+    paoExpiry.setDate(paoExpiry.getDate() + paoDays);
+    const paoExpiryIso = paoExpiry.toISOString().slice(0, 10);
+    return (expiryDate && expiryDate < paoExpiryIso) ? expiryDate : paoExpiryIso;
+  };
+
   // Update state lokal langsung (tidak perlu fetch ulang semua lot).
-  // effective_expiry_date dihitung ulang di sini secara sederhana (LEAST antara
-  // expiry pabrik & opened_at+PAO) supaya tampilan langsung sinkron tanpa
-  // fetch ulang — perhitungan sebenarnya tetap dilakukan trigger di database.
-  const product = ALL_INVENTARIS_ITEMS.find(p => p.id === productId);
-  if (product && product.activeLots) {
-    const lot = product.activeLots.find(l => l.id === lotId);
-    if (lot) {
-      lot.status = 'opened';
-      lot.opened_at = openedAtIso;
-      lot.pao_days = paoDays;
-      if (paoDays) {
-        const paoExpiry = new Date(openedAtIso + 'T00:00:00');
-        paoExpiry.setDate(paoExpiry.getDate() + paoDays);
-        const paoExpiryIso = paoExpiry.toISOString().slice(0, 10);
-        lot.effective_expiry_date = (lot.expiry_date && lot.expiry_date < paoExpiryIso)
-          ? lot.expiry_date
-          : paoExpiryIso;
-      } else {
-        lot.effective_expiry_date = lot.expiry_date;
-      }
-    }
+  if (qtyToOpen === lot.quantity) {
+    // Tidak split: lot asli langsung jadi 'opened' seutuhnya (newLotId === lotId)
+    lot.status = 'opened';
+    lot.opened_at = openedAtIso;
+    lot.pao_days = paoDays;
+    lot.effective_expiry_date = computeEffectiveExpiry(lot.expiry_date);
+  } else {
+    // Split: lot asli tetap sealed dengan quantity dikurangi, lot baru
+    // (opened) ditambahkan ke cache activeLots supaya langsung tampil
+    // tanpa fetch ulang.
+    lot.quantity = lot.quantity - qtyToOpen;
+    product.activeLots.push({
+      id: newLotId,
+      batch_number: lot.batch_number,
+      expiry_date: lot.expiry_date,
+      quantity: qtyToOpen,
+      status: 'opened',
+      opened_at: openedAtIso,
+      pao_days: paoDays,
+      effective_expiry_date: computeEffectiveExpiry(lot.expiry_date)
+    });
   }
 
   OPENING_LOT_ID = null;

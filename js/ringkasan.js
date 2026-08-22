@@ -110,6 +110,13 @@ function renderStatusStokDonut(kritisCount, menipisCount, normalCount) {
   const wrap = document.getElementById('statusStokVisual');
   const canvas = document.getElementById('statusStokDonut');
   const centerEl = document.getElementById('statusStokDonutCenter');
+
+  // === DEBUG SEMENTARA — hapus setelah root cause ketemu ===
+  alert('DEBUG donut:\nwrap=' + !!wrap + '\ncanvas=' + !!canvas + '\ncenterEl=' + !!centerEl +
+    '\nChart terdefinisi=' + (typeof Chart !== 'undefined') +
+    '\nkritis=' + kritisCount + ' menipis=' + menipisCount + ' normal=' + normalCount);
+  // === akhir debug ===
+
   if (!wrap || !canvas || !centerEl) return;
 
   const total = kritisCount + menipisCount + normalCount;
