@@ -80,6 +80,10 @@
       box-shadow: var(--shadow-card);
       position: relative;
       overflow: hidden;
+      /* Izinkan scroll vertikal halaman seperti biasa, tapi biarkan JS
+         (touchstart/touchmove/touchend) menangani gesture geser
+         horizontal untuk swipe ganti tips -- lihat setupAiTipsSwipe() */
+      touch-action: pan-y;
     }
     .ai-tips-eyebrow {
       display: flex;
