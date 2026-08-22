@@ -103,6 +103,13 @@ function getStockStatus(currentStock, minimumStock) {
 // -- tidak ada fitur yang hilang, cuma visual tambahan yang tidak muncul.
 // Instance chart disimpan supaya bisa di-destroy sebelum re-render (kalau
 // loadStatusStok dipanggil ulang, misal habis refresh data).
+//
+// PENTING soal timing: script Chart.js CDN dan ringkasan.js sama-sama
+// dimuat tanpa async/defer, jadi urutan eksekusi normalnya sudah benar
+// (Chart.js di <head> duluan). Tapi di koneksi lambat, request CDN bisa
+// belum selesai saat baris ini jalan meski urutan tag sudah benar --
+// makanya dipakai polling singkat (bukan cek sekali langsung nyerah)
+// sebelum benar-benar menyembunyikan donut.
 // ============================================
 let statusStokChartInstance = null;
 
@@ -110,20 +117,36 @@ function renderStatusStokDonut(kritisCount, menipisCount, normalCount) {
   const wrap = document.getElementById('statusStokVisual');
   const canvas = document.getElementById('statusStokDonut');
   const centerEl = document.getElementById('statusStokDonutCenter');
-
-  // === DEBUG SEMENTARA — hapus setelah root cause ketemu ===
-  alert('DEBUG donut:\nwrap=' + !!wrap + '\ncanvas=' + !!canvas + '\ncenterEl=' + !!centerEl +
-    '\nChart terdefinisi=' + (typeof Chart !== 'undefined') +
-    '\nkritis=' + kritisCount + ' menipis=' + menipisCount + ' normal=' + normalCount);
-  // === akhir debug ===
-
   if (!wrap || !canvas || !centerEl) return;
 
   const total = kritisCount + menipisCount + normalCount;
-  if (typeof Chart === 'undefined' || total === 0) {
+  if (total === 0) {
     wrap.style.display = 'none';
     return;
   }
+
+  // Polling: cek typeof Chart tiap 100ms, maksimal 20x (2 detik). Di koneksi
+  // normal biasanya sudah tersedia di percobaan pertama (0ms delay terasa).
+  let attempts = 0;
+  const maxAttempts = 20;
+  const tryRender = () => {
+    if (typeof Chart !== 'undefined') {
+      drawStatusStokDonut(wrap, canvas, centerEl, kritisCount, menipisCount, normalCount, total);
+      return;
+    }
+    attempts++;
+    if (attempts >= maxAttempts) {
+      // CDN benar-benar gagal load (bukan cuma lambat) -- sembunyikan donut,
+      // angka teks yang sudah ada tetap jadi sumber info utama.
+      wrap.style.display = 'none';
+      return;
+    }
+    setTimeout(tryRender, 100);
+  };
+  tryRender();
+}
+
+function drawStatusStokDonut(wrap, canvas, centerEl, kritisCount, menipisCount, normalCount, total) {
   wrap.style.display = 'flex';
 
   // Ambil warna asli dari elemen .status-kritis/.status-menipis yang sudah
