@@ -161,33 +161,49 @@ function drawStatusStokDonut(wrap, canvas, centerEl, kritisCount, menipisCount, 
 
   centerEl.innerHTML = `<strong>${total}</strong>jenis barang`;
 
+  // === DEBUG SEMENTARA — hapus setelah root cause ketemu ===
+  try {
+    alert('DEBUG draw:\ncanvas.offsetWidth=' + canvas.offsetWidth + '\ncanvas.offsetHeight=' + canvas.offsetHeight +
+      '\ncolorKritis=' + colorKritis + '\ncolorMenipis=' + colorMenipis +
+      '\nChart.version=' + (Chart.version || 'unknown'));
+  } catch (e) {
+    alert('DEBUG error saat baca canvas/Chart: ' + e.message);
+  }
+  // === akhir debug ===
+
   if (statusStokChartInstance) {
     statusStokChartInstance.destroy();
   }
 
-  statusStokChartInstance = new Chart(canvas, {
-    type: 'doughnut',
-    data: {
-      labels: ['Kritis', 'Menipis', 'Normal'],
-      datasets: [{
-        data: [kritisCount, menipisCount, normalCount],
-        backgroundColor: [colorKritis, colorMenipis, colorNormal],
-        borderWidth: 0
-      }]
-    },
-    options: {
-      cutout: '70%',
-      responsive: false,
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          callbacks: {
-            label: (ctx) => `${ctx.label}: ${ctx.parsed} jenis barang`
+  try {
+    statusStokChartInstance = new Chart(canvas, {
+      type: 'doughnut',
+      data: {
+        labels: ['Kritis', 'Menipis', 'Normal'],
+        datasets: [{
+          data: [kritisCount, menipisCount, normalCount],
+          backgroundColor: [colorKritis, colorMenipis, colorNormal],
+          borderWidth: 0
+        }]
+      },
+      options: {
+        cutout: '70%',
+        responsive: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => `${ctx.label}: ${ctx.parsed} jenis barang`
+            }
           }
         }
       }
-    }
-  });
+    });
+  } catch (e) {
+    // === DEBUG SEMENTARA — hapus setelah root cause ketemu ===
+    alert('DEBUG error saat new Chart(): ' + e.message);
+    // === akhir debug ===
+  }
 }
 
 // ============================================
