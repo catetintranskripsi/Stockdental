@@ -315,6 +315,71 @@
       margin: 0;
     }
 
+    /* ---- Open Date & PAO (Buka Kemasan) ---- */
+    .lots-list li {
+      flex-wrap: wrap;
+    }
+
+    .lot-status-badge {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 999px;
+      white-space: nowrap;
+    }
+
+    .lot-status-sealed {
+      background: #eef0f0;
+      color: var(--color-text-muted, #888);
+    }
+
+    .lot-status-opened {
+      background: var(--color-primary-light, #e6f2ef);
+      color: var(--color-primary, #0F6B5C);
+    }
+
+    .lot-status-empty {
+      background: #f0f0f0;
+      color: #aaa;
+    }
+
+    .lot-open-info {
+      flex-basis: 100%;
+      font-size: 12px;
+      color: #888;
+      order: 5;
+    }
+
+    .btn-open-lot {
+      flex-shrink: 0;
+      background: none;
+      border: 1px solid var(--color-accent, #D97706);
+      color: var(--color-accent, #D97706);
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      padding: 3px 8px;
+      line-height: 1.4;
+    }
+
+    .lot-pao-shortcuts {
+      display: flex;
+      gap: 6px;
+      margin-top: 6px;
+    }
+
+    .btn-pao-shortcut {
+      padding: 4px 10px;
+      font-size: 12px;
+      border-radius: 6px;
+    }
+
+    .edit-form-hint {
+      font-size: 12px;
+      color: #888;
+      margin: 6px 0 0;
+    }
+
     /* ---- Edit Data Barang (P-Edit) ---- */
     .expand-fields-view {
       font-size: 14px;
