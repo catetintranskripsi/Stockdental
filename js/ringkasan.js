@@ -10,6 +10,10 @@
 // Batas tampil default sebelum "Lihat semua" (expand di tempat)
 const RINGKASAN_MAX_ITEMS = 5;
 
+// === DEBUG SEMENTARA — hapus setelah root cause ketemu ===
+alert('DEBUG: ringkasan.js VERSI DEBUG dimuat. Chart terdefinisi saat file dimuat=' + (typeof Chart !== 'undefined'));
+// === akhir debug ===
+
 // Dipanggil oleh auth-check.js setelah user terverifikasi login
 async function onPageReady() {
   await loadRingkasan();
@@ -114,6 +118,10 @@ function getStockStatus(currentStock, minimumStock) {
 let statusStokChartInstance = null;
 
 function renderStatusStokDonut(kritisCount, menipisCount, normalCount) {
+  // === DEBUG SEMENTARA — hapus setelah root cause ketemu ===
+  alert('DEBUG: renderStatusStokDonut TERPANGGIL. kritis=' + kritisCount + ' menipis=' + menipisCount + ' normal=' + normalCount);
+  // === akhir debug ===
+
   const wrap = document.getElementById('statusStokVisual');
   const canvas = document.getElementById('statusStokDonut');
   const centerEl = document.getElementById('statusStokDonutCenter');
