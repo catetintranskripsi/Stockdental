@@ -10,10 +10,6 @@
 // Batas tampil default sebelum "Lihat semua" (expand di tempat)
 const RINGKASAN_MAX_ITEMS = 5;
 
-// === DEBUG SEMENTARA — hapus setelah root cause ketemu ===
-alert('DEBUG: ringkasan.js VERSI DEBUG dimuat. Chart terdefinisi saat file dimuat=' + (typeof Chart !== 'undefined'));
-// === akhir debug ===
-
 // Dipanggil oleh auth-check.js setelah user terverifikasi login
 async function onPageReady() {
   await loadRingkasan();
@@ -118,10 +114,6 @@ function getStockStatus(currentStock, minimumStock) {
 let statusStokChartInstance = null;
 
 function renderStatusStokDonut(kritisCount, menipisCount, normalCount) {
-  // === DEBUG SEMENTARA — hapus setelah root cause ketemu ===
-  alert('DEBUG: renderStatusStokDonut TERPANGGIL. kritis=' + kritisCount + ' menipis=' + menipisCount + ' normal=' + normalCount);
-  // === akhir debug ===
-
   const wrap = document.getElementById('statusStokVisual');
   const canvas = document.getElementById('statusStokDonut');
   const centerEl = document.getElementById('statusStokDonutCenter');
@@ -169,49 +161,33 @@ function drawStatusStokDonut(wrap, canvas, centerEl, kritisCount, menipisCount, 
 
   centerEl.innerHTML = `<strong>${total}</strong>jenis barang`;
 
-  // === DEBUG SEMENTARA — hapus setelah root cause ketemu ===
-  try {
-    alert('DEBUG draw:\ncanvas.offsetWidth=' + canvas.offsetWidth + '\ncanvas.offsetHeight=' + canvas.offsetHeight +
-      '\ncolorKritis=' + colorKritis + '\ncolorMenipis=' + colorMenipis +
-      '\nChart.version=' + (Chart.version || 'unknown'));
-  } catch (e) {
-    alert('DEBUG error saat baca canvas/Chart: ' + e.message);
-  }
-  // === akhir debug ===
-
   if (statusStokChartInstance) {
     statusStokChartInstance.destroy();
   }
 
-  try {
-    statusStokChartInstance = new Chart(canvas, {
-      type: 'doughnut',
-      data: {
-        labels: ['Kritis', 'Menipis', 'Normal'],
-        datasets: [{
-          data: [kritisCount, menipisCount, normalCount],
-          backgroundColor: [colorKritis, colorMenipis, colorNormal],
-          borderWidth: 0
-        }]
-      },
-      options: {
-        cutout: '70%',
-        responsive: false,
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: (ctx) => `${ctx.label}: ${ctx.parsed} jenis barang`
-            }
+  statusStokChartInstance = new Chart(canvas, {
+    type: 'doughnut',
+    data: {
+      labels: ['Kritis', 'Menipis', 'Normal'],
+      datasets: [{
+        data: [kritisCount, menipisCount, normalCount],
+        backgroundColor: [colorKritis, colorMenipis, colorNormal],
+        borderWidth: 0
+      }]
+    },
+    options: {
+      cutout: '70%',
+      responsive: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => `${ctx.label}: ${ctx.parsed} jenis barang`
           }
         }
       }
-    });
-  } catch (e) {
-    // === DEBUG SEMENTARA — hapus setelah root cause ketemu ===
-    alert('DEBUG error saat new Chart(): ' + e.message);
-    // === akhir debug ===
-  }
+    }
+  });
 }
 
 // ============================================
