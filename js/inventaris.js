@@ -145,7 +145,13 @@ async function loadInventaris() {
     ...p,
     status: getStockStatus(p.current_stock, p.minimum_stock),
     recentHistory: null, // diisi on-demand saat card di-expand pertama kali (cache)
-    activeLots: null // diisi on-demand saat card di-expand pertama kali (cache) — daftar lot aktif (batch_number + expiry_date + status/opened_at/pao_days/effective_expiry_date)
+    activeLots: null, // diisi on-demand saat card di-expand pertama kali (cache) — daftar lot aktif (batch_number + expiry_date + status/opened_at/pao_days/effective_expiry_date)
+    // Percakapan [Riwayat Pemakaian - Durasi Lot] - diisi on-demand saat card
+    // di-expand pertama kali (cache) — daftar lot yang SUDAH HABIS (status='empty')
+    // dan pernah resmi dibuka (opened_at & closed_at terisi), buat tampilkan
+    // durasi pemakaian per lot + rata-rata. Beda sumber dari activeLots
+    // (activeLots hanya lot yang masih is_active=true).
+    usageDurations: null
   }));
 
   renderInventaris('');
@@ -483,6 +489,33 @@ function buildExpandContent(p) {
     }).join('') + '</ul>';
   }
 
+  // Percakapan [Riwayat Pemakaian - Durasi Lot] - section baru: durasi
+  // pemakaian lot-lot yang sudah habis (dari dibuka sampai habis) + rata-rata,
+  // ditaruh di antara "Lot Aktif" dan "Riwayat Transaksi Terakhir".
+  let usageHtml;
+
+  if (p.usageDurations === null) {
+    usageHtml = '<p class="history-loading">Memuat riwayat pemakaian...</p>';
+  } else if (p.usageDurations.length === 0) {
+    usageHtml = '<p class="history-empty">Belum ada lot yang selesai dipakai (data durasi akan muncul setelah lot yang dibuka habis).</p>';
+  } else {
+    const totalDurasi = p.usageDurations.reduce((sum, lot) => sum + (lot.durasiHari || 0), 0);
+    const rataRata = Math.round(totalDurasi / p.usageDurations.length);
+
+    usageHtml = `
+      <p class="usage-average">Rata-rata: ~${rataRata} hari (dari ${p.usageDurations.length} lot terakhir)</p>
+      <ul class="usage-list">
+        ${p.usageDurations.map(lot => `
+          <li>
+            <span class="usage-batch">${escapeHtml(lot.batch_number || '(tanpa no. batch)')}</span>
+            <span class="usage-detail">Dibuka ${formatTanggal(lot.opened_at)} → Habis ${formatTanggal(lot.closed_at)}</span>
+            <span class="usage-days">${lot.durasiHari} hari</span>
+          </li>
+        `).join('')}
+      </ul>
+    `;
+  }
+
   const isEditing = EDITING_ITEM_ID === p.id;
 
   return `
@@ -497,11 +530,15 @@ function buildExpandContent(p) {
       ${buildEditForm(p)}
     </div>
     <div class="expand-lots">
-      <strong>Lot aktif (batch & kadaluarsa)</strong>
+      <strong>🧪 Lot Aktif (Batch & Kadaluarsa)</strong>
       ${lotsHtml}
     </div>
+    <div class="expand-usage">
+      <strong>⏱️ Riwayat Pemakaian</strong>
+      ${usageHtml}
+    </div>
     <div class="expand-history">
-      <strong>Riwayat terakhir</strong>
+      <strong>📜 Riwayat Transaksi Terakhir</strong>
       ${historyHtml}
     </div>
   `;
@@ -565,6 +602,16 @@ function movementTypeLabel(type) {
   return labels[type] || escapeHtml(type || '-');
 }
 
+// Percakapan [Riwayat Pemakaian - Durasi Lot] - hitung selisih hari antara
+// tanggal dibuka & tanggal habis (keduanya kolom `date`, tanpa jam), dibulatkan
+// ke bilangan bulat terdekat supaya aman dari selisih jam akibat timezone.
+function computeDurasiHari(openedAt, closedAt) {
+  if (!openedAt || !closedAt) return null;
+  const opened = new Date(openedAt);
+  const closed = new Date(closedAt);
+  return Math.round((closed - opened) / 86400000);
+}
+
 function formatTanggal(isoString) {
   if (!isoString) return '-';
   const d = new Date(isoString);
@@ -605,11 +652,29 @@ async function handleCardToggle(productId) {
         .order('expiry_date', { ascending: true }) // FEFO: paling dekat kadaluarsa duluan
     : null;
 
-  if (!fetchHistory && !fetchLots) return; // keduanya sudah di-cache, tidak perlu query ulang
+  // Percakapan [Riwayat Pemakaian - Durasi Lot] - lot yang SUDAH HABIS
+  // (status='empty') dan pernah resmi dibuka (opened_at & closed_at terisi).
+  // Sengaja TIDAK filter is_active (lot yang habis otomatis is_active=false),
+  // filter status+tanggal ini sudah cukup presisi. Diambil 5 terbaru saja,
+  // konsisten dengan limit riwayat transaksi.
+  const fetchUsage = product.usageDurations === null
+    ? supabaseClient
+        .from('product_lots')
+        .select('id, batch_number, opened_at, closed_at')
+        .eq('product_id', productId)
+        .eq('status', 'empty')
+        .not('opened_at', 'is', null)
+        .not('closed_at', 'is', null)
+        .order('closed_at', { ascending: false })
+        .limit(5)
+    : null;
 
-  const [historyResult, lotsResult] = await Promise.all([
+  if (!fetchHistory && !fetchLots && !fetchUsage) return; // semua sudah di-cache, tidak perlu query ulang
+
+  const [historyResult, lotsResult, usageResult] = await Promise.all([
     fetchHistory || Promise.resolve(null),
-    fetchLots || Promise.resolve(null)
+    fetchLots || Promise.resolve(null),
+    fetchUsage || Promise.resolve(null)
   ]);
 
   if (historyResult) {
@@ -627,6 +692,18 @@ async function handleCardToggle(productId) {
       product.activeLots = [];
     } else {
       product.activeLots = lotsResult.data || [];
+    }
+  }
+
+  if (usageResult) {
+    if (usageResult.error) {
+      console.error('Gagal load riwayat pemakaian:', usageResult.error);
+      product.usageDurations = [];
+    } else {
+      product.usageDurations = (usageResult.data || []).map(lot => ({
+        ...lot,
+        durasiHari: computeDurasiHari(lot.opened_at, lot.closed_at)
+      }));
     }
   }
 

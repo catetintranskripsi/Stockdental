@@ -165,15 +165,27 @@ function renderHistory(movements) {
     const dateStr = formatDateTime(m.created_at);
 
     // merge_marker adalah jejak audit "produk lama digabung ke produk ini",
-    // bukan transaksi stok biasa - jadi tidak relevan menampilkan jumlah/stok before-after
+    // bukan transaksi stok biasa - jadi tidak relevan menampilkan jumlah/stok before-after.
+    // Percakapan [Riwayat Pemakaian - Durasi Lot] - lot_closed sama sifatnya:
+    // jejak informasi durasi pemakaian, quantity selalu 0, jadi diperlakukan sama.
     const detailHtml = (m.movement_type === 'merge_marker')
       ? `<div class="history-item-detail history-item-detail-merge">${escapeHtml(m.notes || 'Digabung dari produk lain')}</div>`
-      : `
+      : (m.movement_type === 'lot_closed')
+        ? `<div class="history-item-detail history-item-detail-merge">${escapeHtml(m.notes || 'Lot habis')}</div>`
+        : `
         <div class="history-item-detail">
           <span>Jumlah: ${m.quantity} ${escapeHtml(unit)}</span>
           <span>Stok: ${m.stock_before} → ${m.stock_after}</span>
         </div>
       `;
+
+    // Percakapan [Riwayat Pemakaian - Durasi Lot] - warna badge untuk tipe baru
+    // ini ditulis inline (bukan nambah class CSS baru di style.css/pages-override.css)
+    // supaya tidak perlu sentuh file CSS yang belum di-review dalam sesi ini.
+    // Abu-abu netral, konsisten dengan kesan "informasi", bukan transaksi stok.
+    const badgeStyleAttr = (m.movement_type === 'lot_closed')
+      ? ' style="background:#eef0f0;color:#888;"'
+      : '';
 
     // Percakapan [Hapus Transaksi Masuk yang Salah Input] - tombol hapus
     // HANYA untuk movement_type 'in'. Validasi final (apakah lot masih
@@ -187,7 +199,7 @@ function renderHistory(movements) {
 
     item.innerHTML = `
       <div class="history-item-main">
-        <span class="history-badge badge-${m.movement_type}">${typeLabel}</span>
+        <span class="history-badge badge-${m.movement_type}"${badgeStyleAttr}>${typeLabel}</span>
         <span class="history-date">${dateStr}</span>
       </div>
       <div class="history-item-name">${escapeHtml(productName)}</div>
@@ -263,6 +275,9 @@ function getTypeLabel(type) {
   if (type === 'out') return 'Keluar';
   if (type === 'opname_adjustment') return 'Stok Fisik';
   if (type === 'merge_marker') return '🔗 Digabung';
+  // Percakapan [Riwayat Pemakaian - Durasi Lot] - baris jejak informasi
+  // saat sebuah lot habis (bukan transaksi stok, quantity selalu 0)
+  if (type === 'lot_closed') return '⏱️ Lot Habis';
   return type;
 }
 
