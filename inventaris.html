@@ -224,8 +224,61 @@
       margin-bottom: 6px;
     }
 
-    .expand-lots {
+    /* Percakapan [Riwayat Pemakaian - Durasi Lot] - pemisah visual antar
+       section supaya card yang makin panjang (Lot Aktif + Riwayat Pemakaian +
+       Riwayat Transaksi) tidak terasa nyambung jadi satu blok teks panjang. */
+    .expand-lots, .expand-usage, .expand-history {
       margin-bottom: 10px;
+      padding-top: 10px;
+      border-top: 1px dashed #eee;
+    }
+
+    .expand-fields-view + .expand-fields-edit + .expand-lots {
+      border-top: none;
+      padding-top: 0;
+    }
+
+    .usage-average {
+      font-size: 13px;
+      color: var(--color-primary, #0F6B5C);
+      font-weight: 600;
+      margin: 0 0 6px;
+    }
+
+    .usage-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    .usage-list li {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      padding: 4px 0;
+      border-bottom: 1px solid #f0f0f0;
+    }
+
+    .usage-list li:last-child {
+      border-bottom: none;
+    }
+
+    .usage-batch {
+      min-width: 90px;
+      color: #444;
+    }
+
+    .usage-detail {
+      flex: 1;
+      color: #888;
+    }
+
+    .usage-days {
+      font-weight: 600;
+      color: var(--color-primary, #0F6B5C);
+      white-space: nowrap;
     }
 
     .history-list, .lots-list {
@@ -316,8 +369,15 @@
     }
 
     /* ---- Open Date & PAO (Buka Kemasan) ---- */
+    /* Percakapan [Perbaikan Visual Badge Lot] - sebelumnya pakai default
+       align-items:stretch, jadi kalau salah satu item (misal tanggal exp)
+       wrap ke beberapa baris dan bikin baris itu jadi tinggi, badge status
+       ikut "diregangkan" mengikuti tinggi baris (jadi oval besar). Diganti
+       flex-start supaya tiap item tetap ukuran aslinya (pil kecil rapi)
+       walau item lain di baris yang sama lebih tinggi. */
     .lots-list li {
       flex-wrap: wrap;
+      align-items: flex-start;
     }
 
     .lot-status-badge {
