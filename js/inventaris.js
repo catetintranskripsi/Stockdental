@@ -691,7 +691,19 @@ async function handleCardToggle(productId) {
       console.error('Gagal load data lot:', lotsResult.error);
       product.activeLots = [];
     } else {
-      product.activeLots = lotsResult.data || [];
+      // Percakapan [Urutan Tampilan Lot Aktif] - lot berstatus 'opened'
+      // (sedang dipakai) ditampilkan lebih dulu daripada 'sealed' (cadangan),
+      // supaya staf langsung lihat lot yang relevan sekarang. Dalam grup
+      // status yang sama, tetap urut FEFO (expiry_date terdekat duluan).
+      // Ini HANYA urutan tampilan - tidak mengubah logic FEFO potong stok
+      // di RPC deduct_stock_fefo (itu query sendiri, terpisah dari sini).
+      const lotDisplayPriority = { opened: 0, sealed: 1 };
+      product.activeLots = (lotsResult.data || []).sort((a, b) => {
+        const pa = lotDisplayPriority[a.status] !== undefined ? lotDisplayPriority[a.status] : 2;
+        const pb = lotDisplayPriority[b.status] !== undefined ? lotDisplayPriority[b.status] : 2;
+        if (pa !== pb) return pa - pb;
+        return new Date(a.expiry_date) - new Date(b.expiry_date);
+      });
     }
   }
 
