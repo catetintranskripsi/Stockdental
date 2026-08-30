@@ -18,6 +18,21 @@
     Kalau urutan/nama file beda dari yang kamu pakai di halaman lain,
     sesuaikan dulu -- kalau tidak, supabaseClient dan
     LAST_KNOWN_CLINIC_ACCESS di script bawah tidak akan terdefinisi.
+
+    ============================================
+    REVISI (migrasi ke Midtrans SNAP):
+    Sebelumnya halaman ini render gambar QR + countdown 15 menit +
+    polling manual ke payment_transactions setiap 3 detik.
+    Sekarang memakai popup resmi Midtrans Snap (snap.pay()) yang sudah
+    menangani sendiri semua metode pembayaran (QRIS, VA bank, kartu,
+    e-wallet, dll), UI-nya, dan timer kedaluwarsanya. Kode di halaman
+    ini HANYA perlu: (1) minta snap_token dari create-payment, (2)
+    panggil snap.pay(token, {...}), (3) setelah callback onSuccess/
+    onPending, poll SINGKAT (maks ~10 detik) ke payment_transactions
+    sebagai safety-net supaya halaman "Pembayaran Berhasil" yang
+    ditampilkan benar-benar mencerminkan status resmi dari webhook,
+    bukan cuma asumsi dari sisi popup.
+    ============================================
   -->
   <style>
     /* ============================================
@@ -101,46 +116,36 @@
       color: var(--color-text-muted);
     }
 
-    /* Kotak QR pembayaran */
-    .qr-box {
+    /* Kotak status pembayaran (menggantikan qr-box lama).
+       Ditampilkan singkat: saat menunggu popup Snap terbuka, dan saat
+       safety-net poll berjalan setelah user selesai di popup. */
+    .payment-status-box {
       background: #fff;
       border-radius: 16px;
       padding: 28px 20px;
       text-align: center;
       border: 2px solid #e5e7eb;
     }
-    .qr-title {
+    .payment-status-title {
       font-family: 'Poppins', sans-serif;
       font-weight: 600;
       font-size: 16px;
       color: var(--color-text);
       margin: 0 0 16px;
     }
-    .qr-loading {
-      padding: 40px 0;
-      color: var(--color-text-muted);
-      font-size: 14px;
-    }
-    .qr-image {
-      width: 220px;
-      height: 220px;
-      max-width: 100%;
-      border: 1px solid #eee;
-      border-radius: 8px;
+    .payment-status-spinner {
+      width: 32px;
+      height: 32px;
+      border: 3px solid #e5e7eb;
+      border-top-color: var(--color-primary);
+      border-radius: 50%;
       margin: 0 auto 16px;
-      display: block;
+      animation: spin 0.8s linear infinite;
     }
-    .qr-countdown {
-      font-family: 'Poppins', sans-serif;
-      font-size: 15px;
-      font-weight: 600;
-      color: var(--color-primary);
-      margin: 0 0 8px;
+    @keyframes spin {
+      to { transform: rotate(360deg); }
     }
-    .qr-countdown.expired {
-      color: #dc2626;
-    }
-    .qr-status {
+    .payment-status-text {
       font-size: 13px;
       color: var(--color-text-muted);
       margin: 0 0 20px;
@@ -332,22 +337,19 @@
 
     </div>
 
-    <!-- Ditampilkan setelah user pilih paket. Berisi QR + countdown + polling. -->
-    <div id="qrSection" style="display: none;">
-      <div class="qr-box">
-        <p class="qr-title" id="qrPaketLabel">Paket 30 Hari — Rp29.000</p>
-        <div id="qrLoading" class="qr-loading">Membuat QR pembayaran...</div>
-        <img id="qrImage" class="qr-image" style="display: none;" alt="QR Code Pembayaran">
-        <p class="qr-countdown" id="qrCountdown"></p>
-        <p class="qr-status" id="qrStatusText">Menunggu pembayaran...</p>
-        <button type="button" class="btn-secondary" id="btnQrExpired" style="display: none;" onclick="generateQrUlang()">
-          Generate QR Baru
-        </button>
-        <button type="button" class="btn-text" onclick="batalkanQr()">Batal, pilih paket lain</button>
+    <!-- Ditampilkan singkat: saat menyiapkan transaksi Snap, dan saat
+         safety-net poll berjalan setelah popup Snap ditutup dengan
+         status sukses/pending. Menggantikan qrSection lama (QR+countdown). -->
+    <div id="paymentStatusSection" style="display: none;">
+      <div class="payment-status-box">
+        <p class="payment-status-title" id="paymentStatusLabel">Paket 30 Hari — Rp29.000</p>
+        <div class="payment-status-spinner"></div>
+        <p class="payment-status-text" id="paymentStatusText">Menyiapkan pembayaran...</p>
+        <button type="button" class="btn-text" id="btnBatalkanPembayaran" onclick="batalkanPembayaran()">Batal, pilih paket lain</button>
       </div>
     </div>
 
-    <!-- Ditampilkan setelah polling mendeteksi pembayaran sukses. -->
+    <!-- Ditampilkan setelah safety-net poll mengonfirmasi pembayaran sukses. -->
     <div id="successSection" style="display: none;">
       <div class="success-box">
         <div class="success-icon">✓</div>
@@ -373,19 +375,37 @@
 
   </div>
 
+  <!-- Midtrans Snap.js -- WAJIB dimuat sebelum script khusus halaman ini
+       supaya window.snap tersedia saat dipanggil.
+       CLIENT KEY (bukan Server Key -- ini memang publik/aman ditaruh
+       di frontend). Kalau nanti pindah ke Sandbox untuk testing, ganti
+       src ke https://app.sandbox.midtrans.com/snap/snap.js DAN
+       data-client-key ke Client Key SANDBOX (beda dari production). -->
+  <script
+    src="https://app.midtrans.com/snap/snap.js"
+    data-client-key="Mid-client-eiLEtvlvuGE3AEjy">
+  </script>
+
   <!-- Script khusus halaman ini. Bergantung pada:
        - supabaseClient (dari js/supabase-client.js, sudah dimuat sebelum ini)
        - LAST_KNOWN_CLINIC_ACCESS (diisi js/clinic-access.js via auth-check.js,
          sudah selesai (awaited) sebelum konten halaman dimuat -- lihat
          Peta Struktur Aplikasi: auth-check.js jalan di SETIAP halaman)
+       - window.snap (dari Midtrans Snap.js di atas)
   -->
   <script>
     const HARGA = { monthly: 29000, yearly: 290000 };
     const LABEL_PAKET = { monthly: 'Paket 30 Hari — Rp29.000', yearly: 'Paket 360 Hari — Rp290.000' };
 
-    let pollInterval = null;
-    let countdownInterval = null;
-    let qrExpiryTime = null;
+    // Safety-net poll: dipakai setelah popup Snap kasih callback
+    // onSuccess/onPending, untuk pastikan payment_transactions.status
+    // BENAR-BENAR sudah settlement (dari payment-webhook) sebelum
+    // menampilkan halaman sukses. Maksimal 10 detik (10x @1 detik) --
+    // kalau lewat itu, webhook kemungkinan masih diproses Midtrans,
+    // jadi kita kasih pesan "sedang diproses" alih-alih diam menggantung.
+    let safetyPollInterval = null;
+    let safetyPollAttempts = 0;
+    const SAFETY_POLL_MAX_ATTEMPTS = 10;
 
     // ============================================
     // LANGKAH 1: Cek status premium klinik saat halaman dibuka.
@@ -429,7 +449,8 @@
     // akhir) sempat mengisi datanya.
 
     // ============================================
-    // LANGKAH 2: User pilih paket -> panggil create-payment
+    // LANGKAH 2: User pilih paket -> panggil create-payment -> buka
+    // popup Snap.
     // ============================================
     async function pilihPaket(billingPeriod) {
       // Disable kedua tombol supaya tidak diklik dobel selagi loading
@@ -437,25 +458,18 @@
       document.getElementById('btnPilihYearly').disabled = true;
 
       document.getElementById('upgradeOfferSection').style.display = 'none';
-      document.getElementById('qrSection').style.display = 'block';
-      document.getElementById('qrLoading').style.display = 'block';
-      document.getElementById('qrImage').style.display = 'none';
-      document.getElementById('qrPaketLabel').textContent = LABEL_PAKET[billingPeriod];
-      document.getElementById('qrStatusText').textContent = 'Menunggu pembayaran...';
-      document.getElementById('btnQrExpired').style.display = 'none';
+      document.getElementById('paymentStatusSection').style.display = 'block';
+      document.getElementById('paymentStatusLabel').textContent = LABEL_PAKET[billingPeriod];
+      document.getElementById('paymentStatusText').textContent = 'Menyiapkan pembayaran...';
+      document.getElementById('btnBatalkanPembayaran').style.display = 'block';
 
-      // Simpan billingPeriod terakhir dipilih, untuk tombol "Generate QR Baru"
+      // Simpan billingPeriod terakhir dipilih (dipakai di successSection).
       window._billingPeriodTerakhir = billingPeriod;
 
-      await buatQr(billingPeriod);
+      await mulaiPembayaranSnap(billingPeriod);
     }
 
-    async function buatQr(billingPeriod) {
-      document.getElementById('qrLoading').style.display = 'block';
-      document.getElementById('qrImage').style.display = 'none';
-      document.getElementById('qrCountdown').classList.remove('expired');
-      document.getElementById('btnQrExpired').style.display = 'none';
-
+    async function mulaiPembayaranSnap(billingPeriod) {
       try {
         const { data: { session } } = await supabaseClient.auth.getSession();
 
@@ -480,86 +494,81 @@
 
         const result = await response.json();
 
-        if (!response.ok || !result.qr_image_url) {
+        if (!response.ok || !result.snap_token) {
           console.error('create-payment gagal:', result);
-          document.getElementById('qrLoading').textContent =
-            'Gagal membuat QR pembayaran. Coba lagi dalam beberapa saat.';
+          document.getElementById('paymentStatusText').textContent =
+            'Gagal membuat transaksi pembayaran. Coba lagi dalam beberapa saat.';
+          document.getElementById('btnBatalkanPembayaran').textContent = 'Kembali';
           return;
         }
 
-        // Tampilkan QR
-        document.getElementById('qrLoading').style.display = 'none';
-        const qrImg = document.getElementById('qrImage');
-        qrImg.src = result.qr_image_url;
-        qrImg.style.display = 'block';
+        window._orderIdTerakhir = result.order_id;
 
-        // Mulai countdown (default 15 menit kalau server tidak kasih nilai)
-        const expiryMinutes = result.expiry_minutes || 15;
-        qrExpiryTime = Date.now() + expiryMinutes * 60 * 1000;
-        mulaiCountdown();
-
-        // Mulai polling status pembayaran
-        mulaiPolling(result.order_id);
+        // Buka popup Snap. Callback di sini HANYA sinyal dari sisi
+        // popup/Midtrans -- status RESMI tetap ditentukan dari
+        // payment_transactions.status yang diupdate payment-webhook,
+        // makanya onSuccess & onPending sama-sama lanjut ke safety-net
+        // poll, bukan langsung tampilkan sukses.
+        snap.pay(result.snap_token, {
+          onSuccess: function () {
+            document.getElementById('paymentStatusText').textContent =
+              'Pembayaran diterima, mengonfirmasi...';
+            document.getElementById('btnBatalkanPembayaran').style.display = 'none';
+            mulaiSafetyPoll(result.order_id);
+          },
+          onPending: function () {
+            document.getElementById('paymentStatusText').textContent =
+              'Menunggu konfirmasi pembayaran...';
+            document.getElementById('btnBatalkanPembayaran').style.display = 'none';
+            mulaiSafetyPoll(result.order_id);
+          },
+          onError: function () {
+            document.getElementById('paymentStatusText').textContent =
+              'Pembayaran gagal. Silakan coba lagi.';
+            document.getElementById('btnBatalkanPembayaran').textContent = 'Kembali';
+          },
+          onClose: function () {
+            // User menutup popup TANPA menyelesaikan pembayaran.
+            // Balik ke daftar paket -- transaksi 'pending' di database
+            // dibiarkan saja (tidak menghalangi percobaan baru).
+            batalkanPembayaran();
+          }
+        });
 
       } catch (err) {
-        console.error('Error buat QR:', err);
-        document.getElementById('qrLoading').textContent =
+        console.error('Error mulai pembayaran:', err);
+        document.getElementById('paymentStatusText').textContent =
           'Terjadi kesalahan jaringan. Coba lagi.';
+        document.getElementById('btnBatalkanPembayaran').textContent = 'Kembali';
       }
     }
 
-    // ============================================
-    // LANGKAH 3: Countdown visual QR (15 menit, TIDAK auto-refresh --
-    // sesuai keputusan awal: begitu habis, munculkan tombol manual
-    // "Generate QR Baru", bukan auto-generate diam-diam)
-    // ============================================
-    function mulaiCountdown() {
-      if (countdownInterval) clearInterval(countdownInterval);
-
-      countdownInterval = setInterval(() => {
-        const sisaMs = qrExpiryTime - Date.now();
-
-        if (sisaMs <= 0) {
-          clearInterval(countdownInterval);
-          document.getElementById('qrCountdown').textContent = 'QR sudah kedaluwarsa';
-          document.getElementById('qrCountdown').classList.add('expired');
-          document.getElementById('qrImage').style.opacity = '0.3';
-          document.getElementById('btnQrExpired').style.display = 'block';
-          document.getElementById('qrStatusText').textContent = '';
-          if (pollInterval) clearInterval(pollInterval);
-          return;
-        }
-
-        const menit = Math.floor(sisaMs / 60000);
-        const detik = Math.floor((sisaMs % 60000) / 1000);
-        document.getElementById('qrCountdown').textContent =
-          `QR berlaku ${menit}:${detik.toString().padStart(2, '0')} lagi`;
-      }, 1000);
-    }
-
-    function generateQrUlang() {
-      document.getElementById('qrImage').style.opacity = '1';
-      buatQr(window._billingPeriodTerakhir);
-    }
-
-    function batalkanQr() {
-      if (pollInterval) clearInterval(pollInterval);
-      if (countdownInterval) clearInterval(countdownInterval);
-      document.getElementById('qrSection').style.display = 'none';
+    function batalkanPembayaran() {
+      if (safetyPollInterval) clearInterval(safetyPollInterval);
+      document.getElementById('paymentStatusSection').style.display = 'none';
       document.getElementById('upgradeOfferSection').style.display = 'block';
       document.getElementById('btnPilihMonthly').disabled = false;
       document.getElementById('btnPilihYearly').disabled = false;
+      document.getElementById('btnBatalkanPembayaran').textContent = 'Batal, pilih paket lain';
+      document.getElementById('btnBatalkanPembayaran').style.display = 'block';
     }
 
     // ============================================
-    // LANGKAH 4: Polling status pembayaran ke Supabase (BUKAN ke
-    // Midtrans langsung -- cukup baca payment_transactions.status
-    // yang sudah diupdate payment-webhook). Tiap 3 detik.
+    // LANGKAH 3: Safety-net poll ke Supabase (BUKAN ke Midtrans
+    // langsung -- cukup baca payment_transactions.status yang sudah
+    // diupdate payment-webhook). Tiap 1 detik, maksimal 10 kali (~10
+    // detik total) -- jauh lebih singkat dari polling lama (yang bisa
+    // berjalan sampai 15 menit) karena di sini kita sudah tahu dari
+    // popup Snap bahwa user sudah menyelesaikan pembayaran; ini cuma
+    // menunggu webhook selesai diproses di belakang layar.
     // ============================================
-    function mulaiPolling(orderId) {
-      if (pollInterval) clearInterval(pollInterval);
+    function mulaiSafetyPoll(orderId) {
+      if (safetyPollInterval) clearInterval(safetyPollInterval);
+      safetyPollAttempts = 0;
 
-      pollInterval = setInterval(async () => {
+      safetyPollInterval = setInterval(async () => {
+        safetyPollAttempts++;
+
         try {
           const { data, error } = await supabaseClient
             .from('payment_transactions')
@@ -568,27 +577,34 @@
             .single();
 
           if (error) {
-            console.error('polling error:', error);
+            console.error('safety-net poll error:', error);
+          } else if (data.status === 'settlement') {
+            clearInterval(safetyPollInterval);
+            tampilkanSukses();
             return;
           }
 
-          if (data.status === 'settlement') {
-            clearInterval(pollInterval);
-            clearInterval(countdownInterval);
-            tampilkanSukses();
+          if (safetyPollAttempts >= SAFETY_POLL_MAX_ATTEMPTS) {
+            clearInterval(safetyPollInterval);
+            // Webhook belum juga selesai setelah ~10 detik -- ini
+            // jarang terjadi, tapi bukan berarti gagal. Kasih tahu
+            // user apa adanya, jangan tampilkan sukses palsu.
+            document.getElementById('paymentStatusText').textContent =
+              'Pembayaran sedang diproses. Silakan cek lagi dalam beberapa saat, atau buka halaman ini ulang.';
+            document.getElementById('btnBatalkanPembayaran').textContent = 'Kembali ke Dashboard';
+            document.getElementById('btnBatalkanPembayaran').style.display = 'block';
+            document.getElementById('btnBatalkanPembayaran').setAttribute(
+              'onclick', "window.location.href='ringkasan.html'"
+            );
           }
-          // status expired/failed dari sisi Midtrans TIDAK kita
-          // handle otomatis di sini -- QR di layar tetap sampai
-          // countdown 15 menit kita sendiri habis, supaya tidak ada
-          // dua sumber "kedaluwarsa" yang bisa beda waktu.
         } catch (err) {
-          console.error('polling exception:', err);
+          console.error('safety-net poll exception:', err);
         }
-      }, 3000);
+      }, 1000);
     }
 
     function tampilkanSukses() {
-      document.getElementById('qrSection').style.display = 'none';
+      document.getElementById('paymentStatusSection').style.display = 'none';
       document.getElementById('successSection').style.display = 'block';
       const billingPeriod = window._billingPeriodTerakhir;
       const durasiText = billingPeriod === 'yearly' ? '360 hari' : '30 hari';
