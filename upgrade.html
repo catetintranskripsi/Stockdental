@@ -408,6 +408,127 @@
     const SAFETY_POLL_MAX_ATTEMPTS = 10;
 
     // ============================================
+    // FIX: transaksi pending yang "hilang" setelah reload (khusus PWA).
+    // Saat StockDental di-install sebagai PWA dan user pindah ke app
+    // lain (mis. app bank buat scan QRIS) lalu balik lagi, Android
+    // kadang me-reload halaman ini dari nol -- popup Snap yang sedang
+    // terbuka & safetyPollInterval yang sedang jalan (keduanya cuma
+    // ada di memori JS) ikut hilang. Transaksinya sendiri TETAP
+    // berhasil di server (webhook jalan independen dari browser),
+    // cuma UI tidak sempat menampilkan halaman sukses.
+    //
+    // Solusi: sebelum buka popup Snap, simpan order_id yang sedang
+    // diproses ke localStorage. Saat halaman baru dimuat (termasuk
+    // akibat reload tadi), cek dulu apakah ada order_id "menggantung"
+    // ini SEBELUM menjalankan cekStatusAwal() yang lama -- supaya
+    // transaksi yang baru saja settle tetap ditampilkan sebagai
+    // sukses, bukan malah balik ke daftar paket.
+    const PENDING_ORDER_KEY = 'stockdental_pending_order_id';
+    const PENDING_ORDER_MAX_AGE_MS = 30 * 60 * 1000; // 30 menit
+
+    function simpanPendingOrder(orderId, billingPeriod) {
+      try {
+        localStorage.setItem(PENDING_ORDER_KEY, JSON.stringify({
+          order_id: orderId,
+          billing_period: billingPeriod,
+          saved_at: Date.now(),
+        }));
+      } catch (e) {
+        // localStorage bisa gagal (mode private/quota) -- tidak fatal,
+        // cuma berarti fallback reload ini tidak aktif untuk kasus ini.
+        console.error('gagal simpan pending order ke localStorage:', e);
+      }
+    }
+
+    function hapusPendingOrder() {
+      try {
+        localStorage.removeItem(PENDING_ORDER_KEY);
+      } catch (e) {
+        console.error('gagal hapus pending order dari localStorage:', e);
+      }
+    }
+
+    function ambilPendingOrder() {
+      try {
+        const raw = localStorage.getItem(PENDING_ORDER_KEY);
+        if (!raw) return null;
+
+        const parsed = JSON.parse(raw);
+        const umur = Date.now() - (parsed.saved_at || 0);
+
+        // Kalau sudah terlalu lama (>30 menit), anggap basi -- jangan
+        // dipakai lagi supaya tidak menampilkan status transaksi lama
+        // yang tidak relevan lagi. Bersihkan sekalian.
+        if (umur > PENDING_ORDER_MAX_AGE_MS) {
+          hapusPendingOrder();
+          return null;
+        }
+
+        return parsed;
+      } catch (e) {
+        console.error('gagal baca pending order dari localStorage:', e);
+        return null;
+      }
+    }
+
+    // Cek status transaksi pending yang tersimpan (kalau ada) saat
+    // halaman baru dimuat. Return true kalau berhasil menampilkan
+    // sesuatu terkait transaksi tsb (sukses ATAU masih diproses),
+    // supaya pemanggil tahu tidak perlu lanjut ke cekStatusAwal() biasa.
+    async function cekPendingOrderSetelahReload() {
+      const pending = ambilPendingOrder();
+      if (!pending) return false;
+
+      try {
+        const { data, error } = await supabaseClient
+          .from('payment_transactions')
+          .select('status')
+          .eq('order_id', pending.order_id)
+          .single();
+
+        if (error || !data) {
+          // Tidak ketemu / error baca -- jangan blokir halaman, biarkan
+          // fallback ke cekStatusAwal() biasa.
+          hapusPendingOrder();
+          return false;
+        }
+
+        if (data.status === 'settlement') {
+          hapusPendingOrder();
+          window._billingPeriodTerakhir = pending.billing_period;
+          document.getElementById('upgradeOfferSection').style.display = 'none';
+          tampilkanSukses();
+          return true;
+        }
+
+        if (data.status === 'pending') {
+          // Transaksi masih diproses -- kemungkinan reload terjadi
+          // pas webhook belum selesai. Tampilkan status "diproses" +
+          // lanjutkan safety-net poll singkat, JANGAN hapus dulu dari
+          // localStorage supaya kalau user reload lagi sebelum settle,
+          // tetap bisa dicek ulang.
+          document.getElementById('upgradeOfferSection').style.display = 'none';
+          document.getElementById('paymentStatusSection').style.display = 'block';
+          document.getElementById('paymentStatusLabel').textContent =
+            LABEL_PAKET[pending.billing_period] || '';
+          document.getElementById('paymentStatusText').textContent =
+            'Mengecek status pembayaran...';
+          document.getElementById('btnBatalkanPembayaran').style.display = 'none';
+          mulaiSafetyPoll(pending.order_id);
+          return true;
+        }
+
+        // Status lain (failed, expire, dll) -- bukan kasus yang perlu
+        // ditampilkan khusus, bersihkan saja dan lanjut normal.
+        hapusPendingOrder();
+        return false;
+      } catch (err) {
+        console.error('error cek pending order setelah reload:', err);
+        return false;
+      }
+    }
+
+    // ============================================
     // LANGKAH 1: Cek status premium klinik saat halaman dibuka.
     // Kalau sudah premium (aktif ATAU permanen), sembunyikan
     // penawaran upgrade, tampilkan pesan "Sudah Premium" saja.
@@ -504,6 +625,13 @@
 
         window._orderIdTerakhir = result.order_id;
 
+        // Simpan order_id ini SEBELUM popup Snap dibuka -- supaya
+        // kalau halaman ke-reload di tengah proses (mis. PWA di-
+        // background lama saat user pindah ke app bank buat bayar),
+        // status transaksi ini tetap bisa dicek ulang saat halaman
+        // dimuat lagi (lihat cekPendingOrderSetelahReload()).
+        simpanPendingOrder(result.order_id, billingPeriod);
+
         // Buka popup Snap. Callback di sini HANYA sinyal dari sisi
         // popup/Midtrans -- status RESMI tetap ditentukan dari
         // payment_transactions.status yang diupdate payment-webhook,
@@ -523,6 +651,7 @@
             mulaiSafetyPoll(result.order_id);
           },
           onError: function () {
+            hapusPendingOrder();
             document.getElementById('paymentStatusText').textContent =
               'Pembayaran gagal. Silakan coba lagi.';
             document.getElementById('btnBatalkanPembayaran').textContent = 'Kembali';
@@ -531,6 +660,11 @@
             // User menutup popup TANPA menyelesaikan pembayaran.
             // Balik ke daftar paket -- transaksi 'pending' di database
             // dibiarkan saja (tidak menghalangi percobaan baru).
+            // TETAP simpan pending order-nya (jangan dihapus) --
+            // kemungkinan user sebenarnya SUDAH bayar di app bank dan
+            // onClose ini terpicu gara-gara reload, bukan pembatalan
+            // sungguhan. Biar cekPendingOrderSetelahReload() yang
+            // pastikan lewat status database, bukan asumsi dari sini.
             batalkanPembayaran();
           }
         });
@@ -580,6 +714,7 @@
             console.error('safety-net poll error:', error);
           } else if (data.status === 'settlement') {
             clearInterval(safetyPollInterval);
+            hapusPendingOrder();
             tampilkanSukses();
             return;
           }
@@ -589,6 +724,10 @@
             // Webhook belum juga selesai setelah ~10 detik -- ini
             // jarang terjadi, tapi bukan berarti gagal. Kasih tahu
             // user apa adanya, jangan tampilkan sukses palsu.
+            // Pending order SENGAJA tidak dihapus di sini -- transaksi
+            // mungkin masih settle beberapa saat lagi, dan kalau user
+            // reload/buka lagi halaman ini, cekPendingOrderSetelahReload()
+            // masih perlu bisa mengeceknya.
             document.getElementById('paymentStatusText').textContent =
               'Pembayaran sedang diproses. Silakan cek lagi dalam beberapa saat, atau buka halaman ini ulang.';
             document.getElementById('btnBatalkanPembayaran').textContent = 'Kembali ke Dashboard';
@@ -617,9 +756,18 @@
     // (pola sama seperti onPageReady() di ringkasan.js). Baru di
     // sinilah cekStatusAwal() dipanggil -- setelah
     // LAST_KNOWN_CLINIC_ACCESS dipastikan sudah terisi.
+    //
+    // FIX reload PWA: cek dulu apakah ada transaksi pending yang
+    // "menggantung" dari sebelum reload (lihat cekPendingOrderSetelahReload).
+    // Kalau ada dan berhasil ditampilkan (sukses/diproses), JANGAN
+    // lanjut ke cekStatusAwal() biasa -- supaya tidak menimpa tampilan
+    // yang barusan di-set dengan daftar paket.
     // ============================================
-    function onPageReady() {
-      cekStatusAwal();
+    async function onPageReady() {
+      const sudahDitangani = await cekPendingOrderSetelahReload();
+      if (!sudahDitangani) {
+        cekStatusAwal();
+      }
     }
   </script>
 
