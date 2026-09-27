@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StockDental - Rekap SKP</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/pages-override.css">
+  <link rel="stylesheet" href="css/floating-cs-button.css">
+  <style>
+    /* ============================================
+       REKAP SKP - Fitur bonus Premium, terpisah dari sistem stok.
+       Class dan pola visual sengaja meniru inventaris.html (card,
+       modal, edit-form, btn-primary/secondary) supaya konsisten
+       secara tampilan dengan halaman lain di aplikasi.
+       ============================================ */
+
+    .skp-disclaimer {
+      background: #FEF3C7;
+      border: 1px solid #F59E0B;
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 12.5px;
+      line-height: 1.5;
+      color: #92400E;
+      margin-bottom: 16px;
+    }
+
+    .skp-disclaimer strong {
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .skp-dentist-select-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    #skpDentistSelect {
+      flex: 1;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      background: #fff;
+      font-size: 14px;
+    }
+
+    #skpManageDentistBtn {
+      flex-shrink: 0;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .skp-empty-state {
+      text-align: center;
+      padding: 32px 16px;
+      color: var(--color-text-muted);
+    }
+
+    .skp-empty-state p {
+      font-size: 14px;
+      margin-bottom: 16px;
+    }
+
+    /* ---- Section input kegiatan ---- */
+    .skp-input-section {
+      background: var(--color-surface, #f8f9f9);
+      border-radius: 12px;
+      padding: 14px;
+      margin: 16px 0;
+    }
+
+    .skp-input-section h3 {
+      font-size: 15px;
+      margin: 0 0 12px;
+    }
+
+    .skp-month-patient-row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .skp-month-patient-row .form-group {
+      flex: 1;
+      margin-bottom: 0;
+    }
+
+    .skp-upload-box {
+      border: 2px dashed #ccc;
+      border-radius: 10px;
+      padding: 20px 14px;
+      text-align: center;
+      margin-bottom: 10px;
+      background: #fff;
+    }
+
+    .skp-upload-box input[type="file"] {
+      display: none;
+    }
+
+    .skp-upload-label {
+      display: inline-block;
+      padding: 10px 18px;
+      border-radius: 8px;
+      background: var(--color-primary);
+      color: #fff;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .skp-upload-filename {
+      margin-top: 8px;
+      font-size: 13px;
+      color: var(--color-text-muted);
+    }
+
+    .skp-manual-toggle {
+      background: none;
+      border: none;
+      color: var(--color-primary);
+      font-size: 13px;
+      text-decoration: underline;
+      cursor: pointer;
+      padding: 6px 0;
+      display: block;
+      margin: 0 auto;
+    }
+
+    .skp-manual-textarea {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      font-size: 13px;
+      resize: vertical;
+      margin-bottom: 10px;
+    }
+
+    #skpAnalyzeBtn {
+      width: 100%;
+      padding: 12px;
+      font-size: 15px;
+      border-radius: 8px;
+    }
+
+    #skpAnalyzeBtn:disabled {
+      opacity: 0.6;
+    }
+
+    /* ---- Preview editable hasil AI ---- */
+    .skp-preview-section {
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px dashed #ddd;
+    }
+
+    .skp-preview-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 8px;
+      background: #fff;
+      border-radius: 8px;
+      padding: 8px;
+      border: 1px solid #eee;
+    }
+
+    .skp-preview-row select {
+      flex: 1;
+      padding: 8px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      font-size: 13px;
+    }
+
+    .skp-preview-row input[type="number"] {
+      width: 64px;
+      padding: 8px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      font-size: 13px;
+      text-align: center;
+    }
+
+    .skp-preview-remove {
+      flex-shrink: 0;
+      background: none;
+      border: none;
+      color: var(--color-kritis, #DC2626);
+      font-size: 18px;
+      cursor: pointer;
+      padding: 0 4px;
+    }
+
+    .skp-preview-add {
+      width: 100%;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px dashed var(--color-primary);
+      background: #fff;
+      color: var(--color-primary);
+      font-size: 13px;
+      cursor: pointer;
+      margin-bottom: 12px;
+    }
+
+    #skpSaveBtn {
+      width: 100%;
+      padding: 12px;
+      font-size: 15px;
+      border-radius: 8px;
+    }
+
+    /* ---- Header ringkasan dokter ---- */
+    .skp-dentist-header {
+      background: linear-gradient(135deg, var(--color-primary), #14876f);
+      border-radius: 12px;
+      padding: 16px;
+      color: #fff;
+      margin-bottom: 16px;
+    }
+
+    .skp-dentist-header h3 {
+      margin: 0 0 4px;
+      font-size: 17px;
+    }
+
+    .skp-dentist-header .skp-dentist-meta {
+      font-size: 12.5px;
+      opacity: 0.85;
+      margin-bottom: 12px;
+    }
+
+    .skp-dentist-stats {
+      display: flex;
+      gap: 10px;
+    }
+
+    .skp-dentist-stat {
+      flex: 1;
+      background: rgba(255,255,255,0.15);
+      border-radius: 8px;
+      padding: 8px 6px;
+      text-align: center;
+    }
+
+    .skp-dentist-stat-value {
+      display: block;
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .skp-dentist-stat-label {
+      font-size: 10.5px;
+      opacity: 0.85;
+    }
+
+    /* ---- Filter periode ---- */
+    .skp-period-filter {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 14px;
+      align-items: center;
+    }
+
+    #skpPeriodSelect {
+      flex: 1;
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      font-size: 13px;
+    }
+
+    #skpExportPdfBtn {
+      flex-shrink: 0;
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    /* ---- Card tindakan (mirip .inventaris-item) ---- */
+    .skp-activity-card {
+      background: #fff;
+      border: 1px solid #eee;
+      border-radius: 10px;
+      padding: 12px 14px;
+      margin-bottom: 10px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+
+    .skp-activity-name {
+      font-size: 14.5px;
+      font-weight: 600;
+      color: var(--color-text);
+      margin: 0 0 2px;
+    }
+
+    .skp-activity-unit-value {
+      font-size: 12px;
+      color: var(--color-text-muted);
+      margin: 0 0 10px;
+    }
+
+    .skp-activity-totals {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 10px;
+    }
+
+    .skp-activity-total-item strong {
+      display: block;
+      font-size: 16px;
+      color: var(--color-primary);
+    }
+
+    .skp-activity-total-item span {
+      font-size: 11px;
+      color: var(--color-text-muted);
+    }
+
+    .skp-activity-monthly-toggle {
+      background: none;
+      border: none;
+      color: var(--color-primary);
+      font-size: 12.5px;
+      cursor: pointer;
+      padding: 0;
+      text-decoration: underline;
+    }
+
+    .skp-monthly-breakdown {
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px dashed #eee;
+      display: none;
+    }
+
+    .skp-monthly-breakdown.show {
+      display: block;
+    }
+
+    .skp-monthly-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12.5px;
+      padding: 4px 0;
+      color: #555;
+    }
+
+    .skp-monthly-row-edit-btn {
+      background: none;
+      border: none;
+      color: var(--color-primary);
+      font-size: 12px;
+      cursor: pointer;
+      padding: 0 4px;
+    }
+
+    /* ---- Modal Kelola Dokter ---- */
+    #skpDentistModal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+
+    #skpDentistModal .modal-box {
+      background: #fff;
+      border-radius: 12px;
+      padding: 20px;
+      max-width: 420px;
+      width: 100%;
+      max-height: 85vh;
+      overflow-y: auto;
+    }
+
+    .skp-dentist-list-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid #f0f0f0;
+      font-size: 14px;
+    }
+
+    .skp-dentist-list-item:last-child {
+      border-bottom: none;
+    }
+
+    .skp-dentist-list-actions button {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 14px;
+      padding: 4px 6px;
+    }
+
+    /* ---- Modal Konflik Bulan Sudah Ada Data ---- */
+    #skpConflictModal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 1001;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+
+    #skpConflictModal .modal-box {
+      background: #fff;
+      border-radius: 12px;
+      padding: 20px;
+      max-width: 400px;
+      width: 100%;
+    }
+
+    .skp-conflict-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 16px;
+    }
+
+    .skp-conflict-actions button {
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+
+    /* ---- Modal Export PDF (toggle mode) ---- */
+    #skpExportModal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+
+    #skpExportModal .modal-box {
+      background: #fff;
+      border-radius: 12px;
+      padding: 20px;
+      max-width: 400px;
+      width: 100%;
+    }
+
+    .skp-export-mode-row {
+      display: flex;
+      gap: 8px;
+      margin: 12px 0 18px;
+    }
+
+    .skp-export-mode-option {
+      flex: 1;
+      padding: 12px 8px;
+      border-radius: 8px;
+      border: 2px solid #ddd;
+      text-align: center;
+      cursor: pointer;
+      font-size: 13px;
+    }
+
+    .skp-export-mode-option.selected {
+      border-color: var(--color-primary);
+      background: var(--color-primary-light);
+      color: var(--color-primary);
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ============ AUTH CHECK SECTION ============ -->
+  <div class="container" id="authContainer">
+    <div id="loginRequiredView">
+      <h1>StockDental</h1>
+      <h2>Silakan login terlebih dahulu</h2>
+      <p><a href="index.html">Kembali ke halaman login</a></p>
+    </div>
+  </div>
+
+  <!-- ============ APP SECTION (tampil setelah login) ============ -->
+  <div class="container" id="appContainer" style="display:none; padding-bottom: 80px;">
+
+    <div class="app-header">
+      <div>
+        <h1>StockDental</h1>
+        <h2>Rekap SKP</h2>
+      </div>
+      <button id="logoutBtn" class="btn-secondary">Logout</button>
+    </div>
+
+    <!-- Disclaimer: fitur bonus sementara + privasi pasien -->
+    <div class="skp-disclaimer">
+      <strong>ℹ️ Fitur Bonus Premium (Sementara)</strong>
+      Fitur ini membantu menghitung SKP Ranah Pelayanan dari laporan tindakan harian. Disediakan selama SatuSehat belum terintegrasi otomatis dengan Rekam Medis Elektronik klinik.
+      <br><br>
+      <strong>⚠️ Jangan sertakan nama atau identitas pasien</strong> pada foto/PDF yang diupload. Sistem hanya mencatat jenis tindakan dan jumlahnya. Nama dokter dan jumlah pasien diisi manual oleh admin.
+    </div>
+
+    <!-- PILIH DOKTER -->
+    <div class="skp-dentist-select-row">
+      <select id="skpDentistSelect">
+        <option value="">-- Pilih Dokter Gigi --</option>
+      </select>
+      <button id="skpManageDentistBtn" class="btn-secondary">⚙️ Kelola Dokter</button>
+    </div>
+    <div id="skpDentistStatus" class="status-message" style="display:none;"></div>
+
+    <!-- EMPTY STATE: belum ada dokter -->
+    <div id="skpEmptyState" class="skp-empty-state" style="display:none;">
+      <p>Belum ada dokter gigi terdaftar di klinik ini.</p>
+      <button id="skpEmptyAddDentistBtn" class="btn-primary">+ Tambah Dokter Gigi</button>
+    </div>
+
+    <!-- KONTEN SETELAH DOKTER DIPILIH -->
+    <div id="skpDentistContent" style="display:none;">
+
+      <!-- SECTION INPUT KEGIATAN -->
+      <div class="skp-input-section">
+        <h3>Input Kegiatan Bulanan</h3>
+
+        <div class="skp-month-patient-row">
+          <div class="form-group">
+            <label for="skpPeriodMonth">Periode Bulan</label>
+            <input type="month" id="skpPeriodMonth">
+          </div>
+          <div class="form-group">
+            <label for="skpPatientCount">Jumlah Pasien</label>
+            <input type="number" id="skpPatientCount" min="0" placeholder="0">
+          </div>
+        </div>
+
+        <div class="skp-upload-box">
+          <label for="skpFileInput" class="skp-upload-label">📷 Pilih Foto / PDF Laporan</label>
+          <input type="file" id="skpFileInput" accept="image/*,application/pdf">
+          <p class="skp-upload-filename" id="skpUploadFilename">Belum ada file dipilih</p>
+        </div>
+
+        <button type="button" class="skp-manual-toggle" id="skpManualToggle">Atau ketik/tempel teks manual</button>
+        <textarea id="skpManualText" class="skp-manual-textarea" rows="4" placeholder="Contoh: tumpatan kelas 1 sebanyak 5, scaling 3, cabut gigi sulung 2" style="display:none;"></textarea>
+
+        <button type="button" id="skpAnalyzeBtn" class="btn-primary">🤖 Analisis dengan AI</button>
+        <div id="skpAnalyzeStatus" class="status-message" style="display:none;"></div>
+
+        <!-- PREVIEW EDITABLE -->
+        <div id="skpPreviewSection" class="skp-preview-section" style="display:none;">
+          <label class="db-result-label">Hasil (bisa diedit sebelum disimpan):</label>
+          <div id="skpPreviewRows"></div>
+          <button type="button" id="skpPreviewAddRow" class="skp-preview-add">+ Tambah Baris Tindakan</button>
+          <button type="button" id="skpSaveBtn" class="btn-primary">💾 Simpan ke Rekap</button>
+          <div id="skpSaveStatus" class="status-message" style="display:none;"></div>
+        </div>
+      </div>
+
+      <!-- HEADER RINGKASAN DOKTER -->
+      <div class="skp-dentist-header" id="skpDentistHeader" style="display:none;">
+        <h3 id="skpHeaderName">-</h3>
+        <p class="skp-dentist-meta" id="skpHeaderMeta">-</p>
+        <div class="skp-dentist-stats">
+          <div class="skp-dentist-stat">
+            <span class="skp-dentist-stat-value" id="skpHeaderPatients">0</span>
+            <span class="skp-dentist-stat-label">Total Pasien</span>
+          </div>
+          <div class="skp-dentist-stat">
+            <span class="skp-dentist-stat-value" id="skpHeaderActivities">0</span>
+            <span class="skp-dentist-stat-label">Total Tindakan</span>
+          </div>
+          <div class="skp-dentist-stat">
+            <span class="skp-dentist-stat-value" id="skpHeaderTotalSkp">0</span>
+            <span class="skp-dentist-stat-label">Total SKP</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- FILTER PERIODE + EXPORT -->
+      <div class="skp-period-filter">
+        <select id="skpPeriodSelect">
+          <option value="1">Bulan Ini</option>
+          <option value="6" selected>6 Bulan Terakhir</option>
+          <option value="12">1 Tahun Terakhir</option>
+        </select>
+        <button id="skpExportPdfBtn" class="btn-secondary">📄 Export PDF</button>
+      </div>
+
+      <!-- LIST CARD TINDAKAN -->
+      <div id="skpActivityList">
+        <p class="loading-text">Pilih dokter untuk melihat rekap...</p>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- ============ MODAL: Kelola Dokter ============ -->
+  <div id="skpDentistModal">
+    <div class="modal-box">
+      <h3>Kelola Dokter Gigi</h3>
+      <div id="skpDentistListWrap"></div>
+
+      <hr style="margin:16px 0; border:none; border-top:1px dashed #ddd;">
+
+      <h4 style="font-size:14px; margin-bottom:10px;" id="skpDentistFormTitle">Tambah Dokter Baru</h4>
+      <input type="hidden" id="skpDentistFormId">
+      <div class="form-group">
+        <label for="skpDentistFormName">Nama Dokter Gigi</label>
+        <input type="text" id="skpDentistFormName" placeholder="drg. Nama Lengkap">
+      </div>
+      <div class="form-group">
+        <label for="skpDentistFormStr">No. STR</label>
+        <input type="text" id="skpDentistFormStr" placeholder="Opsional">
+      </div>
+      <div class="form-group">
+        <label for="skpDentistFormSip">No. SIP</label>
+        <input type="text" id="skpDentistFormSip" placeholder="Opsional">
+      </div>
+      <div class="skp-month-patient-row">
+        <div class="form-group">
+          <label for="skpDentistFormSipStart">SIP Mulai</label>
+          <input type="date" id="skpDentistFormSipStart">
+        </div>
+        <div class="form-group">
+          <label for="skpDentistFormSipEnd">SIP Berakhir</label>
+          <input type="date" id="skpDentistFormSipEnd">
+        </div>
+      </div>
+      <div id="skpDentistFormStatus" class="status-message" style="display:none;"></div>
+
+      <div class="modal-actions">
+        <button type="button" id="skpDentistFormCancelBtn" class="btn-secondary">Batal</button>
+        <button type="button" id="skpDentistFormSaveBtn" class="btn-primary">Simpan</button>
+      </div>
+
+      <button type="button" id="skpDentistModalCloseBtn" class="btn-secondary" style="width:100%; margin-top:10px;">Tutup</button>
+    </div>
+  </div>
+
+  <!-- ============ MODAL: Konflik Bulan Sudah Ada Data ============ -->
+  <div id="skpConflictModal">
+    <div class="modal-box">
+      <h3>Data Bulan Ini Sudah Ada</h3>
+      <p id="skpConflictMessage" style="font-size:14px; line-height:1.5;"></p>
+      <div class="skp-conflict-actions">
+        <button type="button" id="skpConflictReplaceBtn" class="btn-primary">Ganti dengan Data Baru</button>
+        <button type="button" id="skpConflictEditBtn" class="btn-secondary">Edit Manual Data Lama</button>
+        <button type="button" id="skpConflictCancelBtn" class="btn-secondary">Batal</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ MODAL: Export PDF (pilih mode kop surat) ============ -->
+  <div id="skpExportModal">
+    <div class="modal-box">
+      <h3>Export Logbook PDF</h3>
+      <p style="font-size:13px; color:var(--color-text-muted);">Pilih format kop surat sesuai tempat praktik:</p>
+      <div class="skp-export-mode-row">
+        <div class="skp-export-mode-option selected" data-mode="faskes" id="skpExportModeFaskes">🏥<br>Faskes/Klinik</div>
+        <div class="skp-export-mode-option" data-mode="mandiri" id="skpExportModeMandiri">👤<br>Praktik Mandiri</div>
+      </div>
+      <div id="skpExportStatus" class="status-message" style="display:none;"></div>
+      <div class="modal-actions">
+        <button type="button" id="skpExportCancelBtn" class="btn-secondary">Batal</button>
+        <button type="button" id="skpExportConfirmBtn" class="btn-primary">Generate PDF</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ BOTTOM NAVIGATION (sama seperti halaman lain) ============ -->
+  <nav class="bottom-nav" id="bottomNav" style="display:none;">
+    <a href="ringkasan.html" class="nav-item">
+      <span class="nav-icon">📊</span>
+      <span class="nav-label">Ringkasan</span>
+    </a>
+    <a href="index.html" class="nav-item">
+      <span class="nav-icon">📝</span>
+      <span class="nav-label">Input</span>
+    </a>
+    <a href="inventaris.html" class="nav-item">
+      <span class="nav-icon">📦</span>
+      <span class="nav-label">Inventaris</span>
+    </a>
+    <a href="history.html" class="nav-item">
+      <span class="nav-icon">📈</span>
+      <span class="nav-label">Riwayat</span>
+    </a>
+  </nav>
+
+  <!-- Supabase library dari CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- pdf-lib untuk generate PDF logbook, sama seperti dipakai inventaris.html -->
+  <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+  <script src="js/supabase-client.js"></script>
+  <script src="js/clinic-access.js"></script>
+  <script src="js/skp-categories.js"></script>
+  <script src="js/skp.js"></script>
+  <script src="js/auth-check.js"></script>
+</body>
+</html>
