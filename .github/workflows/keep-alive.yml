@@ -32,6 +32,6 @@ jobs:
       - name: Ping IC Digital
         run: |
           curl -sf -o /dev/null -w "%{http_code}\n" \
-            "${{ secrets.SUPABASE_URL_ICDIGITAL }}/rest/v1/NAMA_TABEL?select=*&limit=1" \
+            "${{ secrets.SUPABASE_URL_ICDIGITAL }}/rest/v1/heartbeat?select=*&limit=1" \
             -H "apikey: ${{ secrets.SUPABASE_ANON_KEY_ICDIGITAL }}" \
             -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY_ICDIGITAL }}"
