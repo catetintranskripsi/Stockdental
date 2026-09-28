@@ -14,6 +14,7 @@ const RINGKASAN_MAX_ITEMS = 5;
 async function onPageReady() {
   await loadRingkasan();
   initSubscriptionStatus();
+  initSkpBanner();
   initInfoAkun();
   initAiTipsCard();
   initTestimonial();
@@ -767,6 +768,22 @@ function initSubscriptionStatus() {
 }
 
 // ============================================
+// BANNER FITUR BONUS: REKAP SKP DOKTER GIGI
+// Tampil ke SEMUA user sebagai etalase fitur Premium. Yang berbeda
+// hanya teks tombol: Premium "Coba Sekarang", Free "Lihat Fitur"
+// (user Free tetap boleh buka skp.html, tapi di sana fitur terkunci
+// dan diarahkan ke upgrade -- lihat gate di skp.js).
+// Tier dibaca dari LAST_KNOWN_CLINIC_ACCESS (diisi clinic-access.js).
+// ============================================
+function initSkpBanner() {
+  const btn = document.getElementById('skpBannerBtn');
+  if (!btn) return;
+
+  const isPremium = LAST_KNOWN_CLINIC_ACCESS && LAST_KNOWN_CLINIC_ACCESS.tier === 'premium';
+  btn.textContent = isPremium ? 'Coba Sekarang →' : 'Lihat Fitur →';
+}
+
+// ============================================
 // INFO AKUN (nama klinik, email, ganti password)
 // Nama klinik diambil dari tabel `clinics` (sumber utama, via
 // CURRENT_CLINIC_ID) dengan fallback ke user_metadata.clinic_name
@@ -789,12 +806,16 @@ async function initInfoAkun() {
     try {
       const { data: clinic, error } = await supabaseClient
         .from('clinics')
-        .select('name')
+        .select('name, address')
         .eq('id', CURRENT_CLINIC_ID)
         .single();
 
       if (!error && clinic && clinic.name) {
         clinicName = clinic.name;
+      }
+      // Alamat klinik (kop surat PDF Rekap SKP) -- diambil dari query yang sama
+      if (!error && clinic) {
+        currentClinicAddress = clinic.address || '';
       }
     } catch (e) {
       console.warn('Gagal ambil nama klinik dari tabel clinics, coba fallback:', e);
@@ -808,7 +829,80 @@ async function initInfoAkun() {
     clinicNameEl.textContent = clinicName || '-';
   }
 
+  renderClinicAddress();
+  setupAddressHandlers();
   setupGantiPasswordHandlers();
+}
+
+// ============================================
+// ALAMAT KLINIK (dipakai sebagai kop surat PDF Rekap SKP)
+// Disimpan di clinics.address. Edit inline di card Info Akun.
+// ============================================
+let currentClinicAddress = '';
+
+function renderClinicAddress() {
+  const el = document.getElementById('infoAkunAddress');
+  if (!el) return;
+  el.textContent = currentClinicAddress || 'Belum diisi';
+}
+
+function setupAddressHandlers() {
+  const editBtn = document.getElementById('editAddressBtn');
+  const form = document.getElementById('addressEditForm');
+  const input = document.getElementById('akunAddressInput');
+  const saveBtn = document.getElementById('saveAddressBtn');
+  const cancelBtn = document.getElementById('cancelAddressBtn');
+  const statusEl = document.getElementById('addressStatus');
+
+  if (!editBtn || !form) return; // guard kalau elemen belum ada
+
+  const showStatus = (message, type) => {
+    statusEl.textContent = message;
+    statusEl.className = 'status-message ' + (type === 'success' ? 'status-success' : 'status-error');
+    statusEl.style.display = 'block';
+  };
+
+  editBtn.addEventListener('click', () => {
+    input.value = currentClinicAddress;
+    form.style.display = 'block';
+    editBtn.style.display = 'none';
+    statusEl.style.display = 'none';
+  });
+
+  cancelBtn.addEventListener('click', () => {
+    form.style.display = 'none';
+    editBtn.style.display = 'inline';
+    statusEl.style.display = 'none';
+  });
+
+  saveBtn.addEventListener('click', async () => {
+    const newAddress = input.value.trim();
+
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Menyimpan...';
+
+    const { error } = await supabaseClient
+      .from('clinics')
+      .update({ address: newAddress || null })
+      .eq('id', CURRENT_CLINIC_ID);
+
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'Simpan Alamat';
+
+    if (error) {
+      showStatus('Gagal menyimpan alamat: ' + error.message, 'error');
+      return;
+    }
+
+    currentClinicAddress = newAddress;
+    renderClinicAddress();
+    showStatus('Alamat berhasil disimpan!', 'success');
+    setTimeout(() => {
+      form.style.display = 'none';
+      editBtn.style.display = 'inline';
+      statusEl.style.display = 'none';
+    }, 1000);
+  });
 }
 
 // ---------- TOGGLE & SUBMIT GANTI PASSWORD ----------

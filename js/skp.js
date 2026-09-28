@@ -12,9 +12,30 @@ let skpPendingSaveData = null; // dipakai saat conflict modal (ganti/edit/batal)
 
 // Dipanggil oleh auth-check.js setelah user terverifikasi login
 async function onPageReady() {
+  // GATE PREMIUM: fitur ini khusus Premium. User Free tetap boleh membuka
+  // halaman (penjelasan fitur tampil sebagai etalase), tapi seluruh form
+  // dan rekap disembunyikan diganti kartu "upgrade" -- pola sama seperti
+  // banner locked di clinic-access.js untuk over-limit 70 barang.
+  // Catatan: ini gate tampilan saja. Proteksi sebenarnya untuk AI ada di
+  // Edge Function skp-ai-extract (cek tier di sisi server).
+  // Kalau tier tidak diketahui (RPC gagal), dianggap Free -- lebih aman
+  // menutup fitur daripada membukanya.
+  const isPremium = LAST_KNOWN_CLINIC_ACCESS && LAST_KNOWN_CLINIC_ACCESS.tier === 'premium';
+  if (!isPremium) {
+    showSkpLockedState();
+    return;
+  }
+
   await loadDentistDropdown();
   setDefaultPeriodMonth();
   setupSkpEventListeners();
+}
+
+function showSkpLockedState() {
+  const lockedCard = document.getElementById('skpLockedCard');
+  const featureWrap = document.getElementById('skpFeatureWrap');
+  if (lockedCard) lockedCard.style.display = 'block';
+  if (featureWrap) featureWrap.style.display = 'none';
 }
 
 // ============================================
