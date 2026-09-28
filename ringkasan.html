@@ -391,6 +391,87 @@
       font-size: 11px;
       color: var(--color-text-muted);
     }
+
+    /* ============================================
+       Banner Fitur Bonus: Rekap SKP Dokter Gigi.
+       Tampil ke SEMUA user (Free & Premium) sebagai etalase fitur
+       Premium. Warna krem + garis tepi amber: sengaja beda dari kartu
+       Tips (teal pekat) supaya tidak terlihat kembar, tapi tetap satu
+       keluarga palet (#fff7ed dipakai juga oleh kartu status Free).
+       ============================================ */
+    .skp-banner {
+      background: #FFF7ED;
+      border: 1.5px solid var(--color-accent);
+      border-radius: var(--radius-md);
+      padding: 16px 16px 14px;
+      margin-bottom: var(--space-md);
+      box-shadow: var(--shadow-card);
+    }
+    .skp-banner-eyebrow {
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--color-accent);
+      margin: 0 0 6px;
+    }
+    .skp-banner-title {
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: 0.95rem;
+      color: var(--color-text);
+      margin: 0 0 4px;
+    }
+    .skp-banner-desc {
+      font-size: 0.82rem;
+      line-height: 1.5;
+      color: var(--color-text-muted);
+      margin: 0 0 12px;
+    }
+    .skp-banner-btn {
+      display: inline-block;
+      background: var(--color-accent);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius-pill);
+      padding: 9px 16px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      font-family: var(--font-body);
+      text-decoration: none;
+      cursor: pointer;
+      transition: background 0.15s ease, transform 0.05s ease;
+    }
+    .skp-banner-btn:hover { background: #b95f04; }
+    .skp-banner-btn:active { transform: scale(0.97); }
+
+    /* Baris alamat klinik di Info Akun (edit inline) */
+    .info-akun-address-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      margin: 0 0 8px;
+      font-size: 14px;
+    }
+    .info-akun-address-row .info-akun-label { flex-shrink: 0; }
+    .info-akun-address-value {
+      font-weight: 600;
+      color: var(--color-text);
+      text-align: right;
+      word-break: break-word;
+    }
+    .info-akun-address-edit-btn {
+      background: none;
+      border: none;
+      color: var(--color-primary);
+      font-size: 12.5px;
+      font-weight: 600;
+      cursor: pointer;
+      padding: 0;
+      margin-left: 6px;
+      text-decoration: underline;
+    }
   </style>
 </head>
 <body>
@@ -445,6 +526,16 @@
         </div>
       </div>
 
+      <!-- Banner fitur bonus Rekap SKP Dokter Gigi. Tampil ke semua user
+           (etalase Premium). Teks tombol menyesuaikan tier via
+           initSkpBanner() di ringkasan.js. Tanpa tombol tutup (sengaja). -->
+      <div class="skp-banner" id="skpBanner">
+        <p class="skp-banner-eyebrow">🎁 Bonus Premium</p>
+        <p class="skp-banner-title">Rekap SKP Pelayanan Dokter Gigi</p>
+        <p class="skp-banner-desc">Foto/PDF laporan pasien, AI hitungkan SKP-nya. Export PDF siap unggah ke SatuSehat SDMK.</p>
+        <a href="skp.html" class="skp-banner-btn" id="skpBannerBtn">Lihat Fitur →</a>
+      </div>
+
       <!-- Kartu bantuan: CS AI (Gem Gemini) + Tutorial YouTube -->
       <div class="help-cards-row">
         <a href="https://gemini.google.com/gem/1mCMToMf3yuB-s34GACXkmktKla1JQWz9?usp=sharing"
@@ -465,6 +556,25 @@
         <h3>Info Akun</h3>
         <p class="info-akun-row"><span class="info-akun-label">Nama Klinik</span><span id="infoAkunClinicName">-</span></p>
         <p class="info-akun-row"><span class="info-akun-label">Email</span><span id="infoAkunEmail">-</span></p>
+
+        <!-- Alamat klinik: dipakai sebagai kop surat saat export PDF Rekap SKP.
+             Kolom clinics.address sudah ada di database. -->
+        <div class="info-akun-address-row">
+          <span class="info-akun-label">Alamat Klinik</span>
+          <span>
+            <span class="info-akun-address-value" id="infoAkunAddress">-</span>
+            <button type="button" class="info-akun-address-edit-btn" id="editAddressBtn">Edit</button>
+          </span>
+        </div>
+        <div id="addressEditForm" style="display:none; margin-bottom:8px;">
+          <div class="form-group">
+            <label for="akunAddressInput">Alamat Klinik (untuk kop surat PDF)</label>
+            <textarea id="akunAddressInput" rows="2" maxlength="200" placeholder="Contoh: Jl. Melati No. 5, Kota Bandung"></textarea>
+          </div>
+          <button type="button" id="saveAddressBtn">Simpan Alamat</button>
+          <button type="button" id="cancelAddressBtn" class="btn-secondary" style="margin-top:8px;">Batal</button>
+          <div id="addressStatus" class="status-message" style="display:none;"></div>
+        </div>
 
         <button type="button" id="showGantiPassword" class="btn-secondary" style="margin-top:12px;">Ganti Password</button>
 

@@ -482,6 +482,88 @@
       color: var(--color-primary);
       font-weight: 600;
     }
+
+    /* ---- Penjelasan fitur (tampil ke semua user, di atas halaman) ---- */
+    .skp-feature-intro {
+      background: #FFF7ED;
+      border: 1.5px solid var(--color-accent);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+    .skp-feature-intro h3 {
+      font-size: 15px;
+      margin: 0 0 6px;
+    }
+    .skp-feature-intro > p {
+      font-size: 13px;
+      line-height: 1.5;
+      color: var(--color-text-muted);
+      margin: 0 0 12px;
+    }
+    .skp-feature-list {
+      list-style: none;
+      padding: 0;
+      margin: 0 0 12px;
+    }
+    .skp-feature-list li {
+      font-size: 13px;
+      line-height: 1.5;
+      padding: 6px 0 6px 24px;
+      position: relative;
+      color: var(--color-text);
+    }
+    .skp-feature-list li::before {
+      content: '✓';
+      position: absolute;
+      left: 0;
+      color: var(--color-primary);
+      font-weight: 700;
+    }
+    .skp-feature-example {
+      background: #fff;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 12.5px;
+      color: var(--color-text-muted);
+      line-height: 1.5;
+    }
+    .skp-feature-example strong { color: var(--color-text); }
+
+    /* ---- Kartu terkunci untuk user Free ---- */
+    .skp-locked-card {
+      background: #fff;
+      border: 2px solid var(--color-accent);
+      border-radius: 12px;
+      padding: 20px 16px;
+      text-align: center;
+      margin-bottom: 16px;
+    }
+    .skp-locked-card .skp-locked-icon {
+      font-size: 32px;
+      display: block;
+      margin-bottom: 8px;
+    }
+    .skp-locked-card h3 {
+      font-size: 16px;
+      margin: 0 0 6px;
+    }
+    .skp-locked-card p {
+      font-size: 13px;
+      line-height: 1.5;
+      color: var(--color-text-muted);
+      margin: 0 0 14px;
+    }
+    .skp-locked-card a {
+      display: inline-block;
+      background: var(--color-accent);
+      color: #fff;
+      text-decoration: none;
+      border-radius: 999px;
+      padding: 11px 22px;
+      font-size: 14px;
+      font-weight: 600;
+    }
   </style>
 </head>
 <body>
@@ -506,13 +588,40 @@
       <button id="logoutBtn" class="btn-secondary">Logout</button>
     </div>
 
+    <!-- PENJELASAN FITUR (tampil ke semua user, termasuk Free) -->
+    <div class="skp-feature-intro">
+      <h3>🎁 Rekap SKP Pelayanan Dokter Gigi</h3>
+      <p>Menghitung SKP Ranah Pelayanan secara manual itu repot. Di sini, cukup foto atau upload PDF laporan tindakan pasien, lalu AI yang mengelompokkan dan menghitungnya sesuai panduan Kolegium Dokter Gigi.</p>
+      <ul class="skp-feature-list">
+        <li>Istilah di laporan otomatis dicocokkan ke nama tindakan resmi KDG, dan hasilnya bisa Anda edit sebelum disimpan</li>
+        <li>Nilai SKP per tindakan dan total SKP dihitung otomatis</li>
+        <li>Satu akun klinik bisa dipakai untuk semua dokter gigi yang praktik di klinik ini</li>
+        <li>Input per bulan supaya hasil lebih akurat, dengan rincian per bulan di setiap tindakan</li>
+        <li>Export PDF rekap (dengan kop surat faskes atau format praktik mandiri), siap diunggah ke SatuSehat SDMK</li>
+      </ul>
+      <div class="skp-feature-example">
+        <strong>Contoh:</strong> tulisan "composite filling" di laporan otomatis menjadi "Tumpatan Kelas I" (0,5 SKP per tindakan).
+      </div>
+    </div>
+
     <!-- Disclaimer: fitur bonus sementara + privasi pasien -->
     <div class="skp-disclaimer">
       <strong>ℹ️ Fitur Bonus Premium (Sementara)</strong>
-      Fitur ini membantu menghitung SKP Ranah Pelayanan dari laporan tindakan harian. Disediakan selama SatuSehat belum terintegrasi otomatis dengan Rekam Medis Elektronik klinik.
+      Fitur ini disediakan selama SatuSehat belum terintegrasi otomatis dengan Rekam Medis Elektronik klinik. Ke depan, pencatatan SKP pelayanan kemungkinan berjalan otomatis lewat SatuSehat.
       <br><br>
       <strong>⚠️ Jangan sertakan nama atau identitas pasien</strong> pada foto/PDF yang diupload. Sistem hanya mencatat jenis tindakan dan jumlahnya. Nama dokter dan jumlah pasien diisi manual oleh admin.
     </div>
+
+    <!-- KARTU TERKUNCI (hanya tampil untuk user Free, diatur skp.js) -->
+    <div class="skp-locked-card" id="skpLockedCard" style="display:none;">
+      <span class="skp-locked-icon">🔒</span>
+      <h3>Fitur Khusus Premium</h3>
+      <p>Rekap SKP ini bonus untuk pengguna Premium. Upgrade untuk mulai memakainya.</p>
+      <a href="upgrade.html">Upgrade ke Premium</a>
+    </div>
+
+    <!-- SELURUH FITUR (disembunyikan skp.js untuk user Free) -->
+    <div id="skpFeatureWrap">
 
     <!-- PILIH DOKTER -->
     <div class="skp-dentist-select-row">
@@ -605,6 +714,8 @@
       </div>
 
     </div>
+
+    </div><!-- /skpFeatureWrap -->
 
   </div>
 
