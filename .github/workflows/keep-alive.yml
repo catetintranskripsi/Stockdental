@@ -1,37 +1,9 @@
-name: Supabase Keep Alive
-
-on:
-  schedule:
-    - cron: '0 3 */3 * *'
-  workflow_dispatch:
-
-jobs:
-  ping-midtrans:
+ping-midtrans:
     runs-on: ubuntu-latest
     steps:
       - name: Ping midtrans-router
         run: |
-          curl -s -o /dev/null -w "%{http_code}" \
-            "${{ secrets.SUPABASE_URL_MIDTRANS }}/rest/v1/" \
+          curl -sf -o /dev/null -w "%{http_code}\n" \
+            "${{ secrets.SUPABASE_URL_MIDTRANS }}/rest/v1/heartbeat?select=*&limit=1" \
             -H "apikey: ${{ secrets.SUPABASE_ANON_KEY_MIDTRANS }}" \
             -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY_MIDTRANS }}"
-
-  ping-stockdental:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Ping Stockdental
-        run: |
-          curl -s -o /dev/null -w "%{http_code}" \
-            "${{ secrets.SUPABASE_URL_STOCKDENTAL }}/rest/v1/" \
-            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY_STOCKDENTAL }}" \
-            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY_STOCKDENTAL }}"
-
-  ping-icdigital:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Ping IC Digital
-        run: |
-          curl -s -o /dev/null -w "%{http_code}" \
-            "${{ secrets.SUPABASE_URL_ICDIGITAL }}/rest/v1/" \
-            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY_ICDIGITAL }}" \
-            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY_ICDIGITAL }}"
