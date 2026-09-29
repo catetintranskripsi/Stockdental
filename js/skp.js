@@ -67,6 +67,7 @@ async function loadDentistDropdown() {
   }
 
   emptyStateEl.style.display = 'none';
+  contentEl.style.display = 'block';
 
   dentists.forEach(d => {
     const opt = document.createElement('option');
