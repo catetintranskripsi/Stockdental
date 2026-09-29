@@ -7,7 +7,10 @@
 // ============================================
 
 let skpCurrentDentistId = null;
-let skpPreviewItems = []; // hasil AI sebelum disimpan: [{category_code, quantity}]
+// Catatan: state preview kini disimpan langsung di DOM (baris-baris
+// #skpPreviewRows), bukan di variabel array terpisah, supaya proses
+// menggabungkan hasil analisis berkali-kali (multi-foto per bulan)
+// lebih sederhana -- lihat showPreview()/findPreviewRowByCategory().
 let skpPendingSaveData = null; // dipakai saat conflict modal (ganti/edit/batal)
 
 // Dipanggil oleh auth-check.js setelah user terverifikasi login
@@ -86,6 +89,11 @@ function setDefaultPeriodMonth() {
   const yyyy = now.getFullYear();
   const mm = String(now.getMonth() + 1).padStart(2, '0');
   input.value = `${yyyy}-${mm}`;
+
+  // Filter rekap: default "bulan pertama" = bulan ini, durasi 6 bulan
+  // (jadi tampilan awal langsung menampilkan sesuatu, bukan kosong).
+  const startInput = document.getElementById('skpPeriodStartMonth');
+  if (startInput) startInput.value = `${yyyy}-${mm}`;
 }
 
 // ============================================
@@ -123,7 +131,8 @@ function setupSkpEventListeners() {
   document.getElementById('skpPreviewAddRow').addEventListener('click', () => addPreviewRow('', 1));
   document.getElementById('skpSaveBtn').addEventListener('click', handleSaveClick);
 
-  document.getElementById('skpPeriodSelect').addEventListener('change', () => loadRecap());
+  document.getElementById('skpPeriodStartMonth').addEventListener('change', () => loadRecap());
+  document.getElementById('skpPeriodDuration').addEventListener('change', () => loadRecap());
   document.getElementById('skpExportPdfBtn').addEventListener('click', openExportModal);
 
   // Modal konflik
@@ -141,8 +150,7 @@ function setupSkpEventListeners() {
 async function onDentistSelected() {
   document.getElementById('skpDentistHeader').style.display = 'block';
   document.getElementById('skpAnalyzeStatus').style.display = 'none';
-  document.getElementById('skpPreviewSection').style.display = 'none';
-  skpPreviewItems = [];
+  resetPreview(); // penting: kosongkan baris preview dokter sebelumnya, kalau ada
   await loadRecap();
 }
 
@@ -305,8 +313,14 @@ async function handleAnalyze() {
       return;
     }
 
-    showSkpStatus(statusEl, `Berhasil! Ditemukan ${items.length} jenis tindakan. Silakan cek/edit sebelum simpan.`, 'success');
-    showPreview(items);
+    showSkpStatus(statusEl, `Berhasil! Ditemukan ${items.length} jenis tindakan dari file ini. Digabung ke preview di bawah -- upload file lain kalau masih ada, atau langsung Simpan kalau sudah lengkap.`, 'success');
+    showPreview(items); // menggabungkan ke preview yang sudah ada, bukan mereset
+
+    // Kosongkan file input & teks manual supaya jelas siap dipakai lagi
+    // untuk foto/PDF berikutnya (satu bulan bisa terdiri dari beberapa file).
+    fileInput.value = '';
+    document.getElementById('skpUploadFilename').textContent = 'Belum ada file dipilih';
+    document.getElementById('skpManualText').value = '';
 
   } catch (err) {
     console.error('Analyze error:', err);
@@ -387,14 +401,42 @@ function parseManualText(text) {
 // ============================================
 // PREVIEW EDITABLE
 // ============================================
-function showPreview(items) {
-  skpPreviewItems = items;
+// Menggabungkan hasil analisis baru ke preview yang SUDAH ADA (bukan
+// mereset), supaya user bisa upload beberapa foto/PDF untuk melengkapi
+// data satu bulan sebelum klik Simpan. Kalau kategori yang sama sudah
+// ada baris-nya di preview, quantity-nya DIJUMLAHKAN ke baris itu;
+// kalau belum ada, baris baru ditambahkan.
+function showPreview(newItems) {
   const container = document.getElementById('skpPreviewRows');
-  container.innerHTML = '';
 
-  items.forEach(item => addPreviewRow(item.category_code, item.quantity));
+  newItems.forEach(newItem => {
+    const existingRow = findPreviewRowByCategory(newItem.category_code);
+    if (existingRow) {
+      const qtyInput = existingRow.querySelector('.skp-preview-quantity');
+      const currentQty = parseInt(qtyInput.value, 10) || 0;
+      qtyInput.value = currentQty + newItem.quantity;
+    } else {
+      addPreviewRow(newItem.category_code, newItem.quantity);
+    }
+  });
 
   document.getElementById('skpPreviewSection').style.display = 'block';
+}
+
+// Cari baris preview yang kategorinya sudah dipilih sama dengan categoryCode
+function findPreviewRowByCategory(categoryCode) {
+  const rows = document.querySelectorAll('#skpPreviewRows .skp-preview-row');
+  for (const row of rows) {
+    const select = row.querySelector('.skp-preview-category');
+    if (select.value === categoryCode) return row;
+  }
+  return null;
+}
+
+// Kosongkan seluruh preview (dipakai saat ganti dokter atau setelah simpan sukses)
+function resetPreview() {
+  document.getElementById('skpPreviewRows').innerHTML = '';
+  document.getElementById('skpPreviewSection').style.display = 'none';
 }
 
 function addPreviewRow(selectedCode, quantity) {
@@ -536,11 +578,13 @@ async function executeSave() {
   showSkpStatus(statusEl, 'Berhasil disimpan ke rekap!', 'success');
   skpPendingSaveData = null;
 
-  // Reset form input setelah sukses
+  // Reset form input setelah sukses -- termasuk KOSONGKAN baris preview
+  // (bukan cuma disembunyikan), supaya sesi input bulan berikutnya mulai
+  // dari nol, tidak ikut menjumlahkan sisa baris dari bulan sebelumnya.
   document.getElementById('skpFileInput').value = '';
   document.getElementById('skpUploadFilename').textContent = 'Belum ada file dipilih';
   document.getElementById('skpManualText').value = '';
-  document.getElementById('skpPreviewSection').style.display = 'none';
+  resetPreview();
 
   await loadRecap();
 }
@@ -551,8 +595,8 @@ async function executeSave() {
 async function loadRecap() {
   if (!skpCurrentDentistId) return;
 
-  const periodMonths = parseInt(document.getElementById('skpPeriodSelect').value, 10);
-  const { startMonth, endMonth } = getMonthRange(periodMonths);
+  const { startMonth, endMonth } = getMonthRange();
+  renderPeriodSummary(startMonth, endMonth);
 
   const dentist = (window._skpDentistCache || []).find(d => d.id === skpCurrentDentistId);
   if (dentist) {
@@ -707,8 +751,7 @@ async function handleExportPdf() {
   showSkpStatus(statusEl, 'Membuat PDF...', 'info');
 
   try {
-    const periodMonths = parseInt(document.getElementById('skpPeriodSelect').value, 10);
-    const { startMonth, endMonth } = getMonthRange(periodMonths);
+    const { startMonth, endMonth } = getMonthRange();
 
     const [recapResult, patientResult, clinicResult] = await Promise.all([
       supabaseClient.rpc('get_skp_recap', { p_dentist_id: skpCurrentDentistId, p_start_month: startMonth, p_end_month: endMonth }),
@@ -838,14 +881,33 @@ async function generateSkpPdf({ dentist, clinic, activities, patientCount, mode,
 // ============================================
 // HELPERS
 // ============================================
-function getMonthRange(monthsBack) {
-  const now = new Date();
-  const endMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+// Filter periode berbasis "bulan awal yang dipilih user + durasi", BUKAN
+// "mundur N bulan dari hari ini" -- supaya user bisa jangkau periode lama
+// (misal data 3 tahun lalu), tidak terbatas cuma yang baru-baru ini.
+function getMonthRange() {
+  const startInput = document.getElementById('skpPeriodStartMonth').value; // 'YYYY-MM'
+  const durationMonths = parseInt(document.getElementById('skpPeriodDuration').value, 10);
 
-  const startDate = new Date(now.getFullYear(), now.getMonth() - (monthsBack - 1), 1);
-  const startMonth = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-01`;
+  if (!startInput) {
+    // Guard: kalau somehow kosong, fallback ke bulan ini saja
+    const now = new Date();
+    const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    return { startMonth: `${ym}-01`, endMonth: `${ym}-01` };
+  }
+
+  const [y, m] = startInput.split('-').map(Number);
+  const startMonth = `${y}-${String(m).padStart(2, '0')}-01`;
+
+  const endDate = new Date(y, (m - 1) + (durationMonths - 1), 1);
+  const endMonth = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-01`;
 
   return { startMonth, endMonth };
+}
+
+function renderPeriodSummary(startMonth, endMonth) {
+  const el = document.getElementById('skpPeriodSummary');
+  if (!el) return;
+  el.textContent = `Menampilkan: ${formatMonthLabel(startMonth)} - ${formatMonthLabel(endMonth)}`;
 }
 
 function formatMonthLabel(dateStr) {
