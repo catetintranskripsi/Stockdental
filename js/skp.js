@@ -299,13 +299,13 @@ async function handleAnalyze() {
   showSkpStatus(statusEl, 'AI sedang membaca laporan...', 'info');
 
   try {
-    let items;
-
-    if (fileInput.files[0]) {
-      items = await analyzeWithAI(fileInput.files[0]);
-    } else {
-      items = parseManualText(manualText);
-    }
+    // Baik file (foto/PDF) maupun teks manual, KEDUANYA dikirim ke Gemini
+    // lewat Edge Function yang sama -- supaya konsisten kualitasnya, dan
+    // supaya penghitungan quantity dari teks copy-paste (berapa kali baris
+    // sejenis muncul) ditangani AI, bukan regex kasar yang mudah salah.
+    const items = fileInput.files[0]
+      ? await analyzeWithAI({ file: fileInput.files[0] })
+      : await analyzeWithAI({ manualText });
 
     if (!items || items.length === 0) {
       showSkpStatus(statusEl, 'Tidak ada tindakan yang bisa dikenali. Coba foto/teks lain, atau tambah manual di preview.', 'error');
@@ -313,11 +313,12 @@ async function handleAnalyze() {
       return;
     }
 
-    showSkpStatus(statusEl, `Berhasil! Ditemukan ${items.length} jenis tindakan dari file ini. Digabung ke preview di bawah -- upload file lain kalau masih ada, atau langsung Simpan kalau sudah lengkap.`, 'success');
+    showSkpStatus(statusEl, `Berhasil! Ditemukan ${items.length} jenis tindakan dari input ini. Digabung ke preview di bawah -- upload/tempel data lain kalau masih ada, atau langsung Simpan kalau sudah lengkap.`, 'success');
     showPreview(items); // menggabungkan ke preview yang sudah ada, bukan mereset
 
     // Kosongkan file input & teks manual supaya jelas siap dipakai lagi
-    // untuk foto/PDF berikutnya (satu bulan bisa terdiri dari beberapa file).
+    // untuk foto/PDF/teks berikutnya (satu bulan bisa terdiri dari
+    // beberapa file/potongan teks).
     fileInput.value = '';
     document.getElementById('skpUploadFilename').textContent = 'Belum ada file dipilih';
     document.getElementById('skpManualText').value = '';
@@ -331,9 +332,15 @@ async function handleAnalyze() {
   }
 }
 
-async function analyzeWithAI(file) {
-  const base64 = await fileToBase64(file);
+// Terima salah satu: { file } untuk foto/PDF, atau { manualText } untuk
+// teks hasil copy-paste. Keduanya dikirim ke Edge Function yang sama
+// (skp-ai-extract), yang menentukan sendiri cara memprosesnya.
+async function analyzeWithAI({ file, manualText }) {
   const { data: { session } } = await supabaseClient.auth.getSession();
+
+  const payload = file
+    ? { file_base64: await fileToBase64(file), mime_type: file.type }
+    : { manual_text: manualText };
 
   const response = await fetch(`${SUPABASE_URL}/functions/v1/skp-ai-extract`, {
     method: 'POST',
@@ -342,10 +349,7 @@ async function analyzeWithAI(file) {
       'Authorization': `Bearer ${session.access_token}`,
       'apikey': SUPABASE_ANON_KEY
     },
-    body: JSON.stringify({
-      file_base64: base64,
-      mime_type: file.type
-    })
+    body: JSON.stringify(payload)
   });
 
   const result = await response.json();
@@ -364,38 +368,6 @@ function fileToBase64(file) {
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
-}
-
-// Parsing teks manual sederhana: cocokkan kata kunci label kategori
-// (case-insensitive, partial match) dengan angka terdekat di kalimat yang sama.
-// Ini BUKAN AI -- pencarian teks biasa, jadi hasilnya kasar. User tetap
-// diarahkan ke preview editable untuk koreksi.
-function parseManualText(text) {
-  const lines = text.split(/[\n,;]+/).map(l => l.trim()).filter(Boolean);
-  const found = [];
-
-  lines.forEach(line => {
-    const lower = line.toLowerCase();
-    const numberMatch = line.match(/\d+/);
-    const quantity = numberMatch ? parseInt(numberMatch[0], 10) : 1;
-
-    let bestMatch = null;
-    SKP_CATEGORIES.forEach(cat => {
-      const labelLower = cat.label.toLowerCase();
-      // Cek kecocokan kata kunci sederhana (bukan fuzzy matching)
-      const keywords = labelLower.split(/[\s/]+/).filter(w => w.length > 3);
-      const matchCount = keywords.filter(kw => lower.includes(kw)).length;
-      if (matchCount > 0 && (!bestMatch || matchCount > bestMatch.score)) {
-        bestMatch = { code: cat.code, score: matchCount };
-      }
-    });
-
-    if (bestMatch) {
-      found.push({ category_code: bestMatch.code, quantity });
-    }
-  });
-
-  return found;
 }
 
 // ============================================
