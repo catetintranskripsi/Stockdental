@@ -444,7 +444,14 @@ function addPreviewRow(selectedCode, quantity) {
   const row = document.createElement('div');
   row.className = 'skp-preview-row';
 
-  const optionsHtml = SKP_CATEGORIES.map(cat =>
+  // Diurutkan alfabetis berdasarkan nama tindakan (bukan per-tier seperti
+  // urutan asli di SKP_CATEGORIES) supaya mudah dicari user di dropdown.
+  // Urutan asli SKP_CATEGORIES di skp-categories.js sengaja tidak diubah
+  // (dipakai juga sebagai referensi di prompt AI), pengurutan hanya
+  // dilakukan di sini saat membangun opsi dropdown.
+  const sortedCategories = [...SKP_CATEGORIES].sort((a, b) => a.label.localeCompare(b.label));
+
+  const optionsHtml = sortedCategories.map(cat =>
     `<option value="${cat.code}" ${cat.code === selectedCode ? 'selected' : ''}>${escapeSkpHtml(cat.label)} (${SKP_TIER_VALUE[cat.tier]} SKP)</option>`
   ).join('');
 
