@@ -881,16 +881,27 @@ function setupAddressHandlers() {
     saveBtn.disabled = true;
     saveBtn.textContent = 'Menyimpan...';
 
-    const { error } = await supabaseClient
+    // .select() penting di sini: tanpa ini, RLS yang menolak update (misal
+    // policy UPDATE belum ada/tidak cocok) tidak menghasilkan error eksplisit
+    // dari Supabase -- hanya 0 baris yang berubah, dan kode lama salah
+    // mengira itu sukses. Dengan .select(), kita bisa cek data.length untuk
+    // memastikan baris benar-benar ter-update sebelum bilang "berhasil".
+    const { data, error } = await supabaseClient
       .from('clinics')
       .update({ address: newAddress || null })
-      .eq('id', CURRENT_CLINIC_ID);
+      .eq('id', CURRENT_CLINIC_ID)
+      .select();
 
     saveBtn.disabled = false;
     saveBtn.textContent = 'Simpan Alamat';
 
     if (error) {
       showStatus('Gagal menyimpan alamat: ' + error.message, 'error');
+      return;
+    }
+
+    if (!data || data.length === 0) {
+      showStatus('Alamat tidak tersimpan (tidak ada izin akses). Hubungi admin aplikasi.', 'error');
       return;
     }
 
