@@ -765,14 +765,30 @@ async function handleExportPdf() {
 async function generateSkpPdf({ dentist, clinic, activities, patientCount, mode, startMonth, endMonth }) {
   const { PDFDocument, StandardFonts, rgb } = PDFLib;
   const pdfDoc = await PDFDocument.create();
-  const page = pdfDoc.addPage([595.28, 841.89]); // A4
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
-  let y = 800;
+  const PAGE_WIDTH = 595.28, PAGE_HEIGHT = 841.89; // A4
   const marginLeft = 50;
+  const BOTTOM_LIMIT = 100; // batas aman sebelum pindah halaman baru
 
-  // Kop surat (mode faskes) atau tanpa kop (mode mandiri)
+  let page = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
+  let y = 800;
+
+  // Pindah ke halaman baru kalau y akan melewati batas bawah. Dipanggil
+  // SEBELUM menulis baris apa pun yang butuh `neededSpace` piksel ke bawah --
+  // mencegah konten (termasuk baris tanda tangan di akhir) terpotong keluar
+  // kertas seperti yang terjadi sebelumnya pada tabel kategori panjang.
+  function ensureSpace(neededSpace) {
+    if (y - neededSpace < BOTTOM_LIMIT) {
+      page = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
+      y = 800;
+      return true; // halaman baru dibuat
+    }
+    return false;
+  }
+
+  // Kop surat (mode faskes) atau tanpa kop (mode mandiri) -- hanya di halaman pertama
   if (mode === 'faskes') {
     page.drawText(clinic.name || 'Nama Klinik', { x: marginLeft, y, size: 14, font: fontBold });
     y -= 18;
@@ -800,13 +816,16 @@ async function generateSkpPdf({ dentist, clinic, activities, patientCount, mode,
 
   // Tabel header
   const col1 = marginLeft, col2 = 320, col3 = 420, col4 = 490;
-  page.drawText('Kegiatan', { x: col1, y, size: 10, font: fontBold });
-  page.drawText('Nilai SKP/tindakan', { x: col2, y, size: 10, font: fontBold });
-  page.drawText('Jumlah', { x: col3, y, size: 10, font: fontBold });
-  page.drawText('Total SKP', { x: col4, y, size: 10, font: fontBold });
-  y -= 6;
-  page.drawLine({ start: { x: marginLeft, y }, end: { x: 545, y }, thickness: 0.5, color: rgb(0.5, 0.5, 0.5) });
-  y -= 16;
+  function drawTableHeader() {
+    page.drawText('Kegiatan', { x: col1, y, size: 10, font: fontBold });
+    page.drawText('Nilai SKP/tindakan', { x: col2, y, size: 10, font: fontBold });
+    page.drawText('Jumlah', { x: col3, y, size: 10, font: fontBold });
+    page.drawText('Total SKP', { x: col4, y, size: 10, font: fontBold });
+    y -= 6;
+    page.drawLine({ start: { x: marginLeft, y }, end: { x: 545, y }, thickness: 0.5, color: rgb(0.5, 0.5, 0.5) });
+    y -= 16;
+  }
+  drawTableHeader();
 
   // Baris Pemeriksaan/Diagnosis
   if (patientCount > 0) {
@@ -821,7 +840,12 @@ async function generateSkpPdf({ dentist, clinic, activities, patientCount, mode,
   let grandTotalSkp = patientCount > 0 ? hitungSkpPemeriksaan(patientCount) : 0;
 
   activities.forEach(act => {
-    if (y < 80) return; // guard sederhana, versi awal tidak handle multi-page
+    // Kalau baris ini akan melewati batas bawah, pindah halaman baru DULU,
+    // lalu gambar ulang header tabel di halaman baru supaya tetap jelas
+    // kolom mana yang mana.
+    if (ensureSpace(16)) {
+      drawTableHeader();
+    }
     page.drawText(act.category_label, { x: col1, y, size: 9, font });
     page.drawText(String(act.skp_value_per_unit), { x: col2, y, size: 9, font });
     page.drawText(String(act.total_quantity), { x: col3, y, size: 9, font });
@@ -829,6 +853,11 @@ async function generateSkpPdf({ dentist, clinic, activities, patientCount, mode,
     y -= 16;
     grandTotalSkp += Number(act.total_skp);
   });
+
+  // Pastikan baris "TOTAL SKP" + blok tanda tangan (perkiraan butuh ~110px)
+  // selalu utuh di satu halaman -- kalau tidak cukup ruang, pindah halaman
+  // baru alih-alih membiarkan tanda tangan terpotong seperti bug sebelumnya.
+  ensureSpace(110);
 
   y -= 10;
   page.drawLine({ start: { x: marginLeft, y }, end: { x: 545, y }, thickness: 0.5, color: rgb(0.5, 0.5, 0.5) });
