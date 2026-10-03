@@ -612,6 +612,45 @@
       font-size: 14px;
       font-weight: 600;
     }
+
+    /* ---- Pengaturan Kop Surat (alamat + penanggung jawab) ---- */
+    .skp-kop-section {
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      background: #fff;
+      margin-bottom: 14px;
+      overflow: hidden;
+    }
+    .skp-kop-toggle {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 14px;
+      background: none;
+      border: none;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--color-text);
+      cursor: pointer;
+      text-align: left;
+    }
+    .skp-kop-arrow { transition: transform 0.2s; }
+    .skp-kop-arrow.open { transform: rotate(180deg); }
+    .skp-kop-body { padding: 0 14px 14px; }
+    .skp-kop-hint {
+      font-size: 12.5px;
+      color: var(--color-text-muted);
+      margin: 0 0 10px;
+    }
+    .skp-export-warning {
+      font-size: 12.5px;
+      background: #FEF3C7;
+      color: #92400E;
+      border-radius: 8px;
+      padding: 8px 10px;
+      margin: 0 0 12px;
+    }
   </style>
 </head>
 <body>
@@ -678,6 +717,27 @@
 
     <!-- SELURUH FITUR (disembunyikan skp.js untuk user Free) -->
     <div id="skpFeatureWrap">
+
+    <!-- PENGATURAN KOP SURAT (dipakai di PDF mode Faskes/Klinik) -->
+    <div class="skp-kop-section" id="skpKopSection">
+      <button type="button" class="skp-kop-toggle" id="skpKopToggle" aria-expanded="false">
+        <span>🏥 Pengaturan Kop Surat</span>
+        <span class="skp-kop-arrow" id="skpKopArrow">▾</span>
+      </button>
+      <div class="skp-kop-body" id="skpKopBody" style="display:none;">
+        <p class="skp-kop-hint">Dipakai di kop surat dan kolom tanda tangan PDF mode Faskes/Klinik. Cukup diisi sekali.</p>
+        <div class="form-group">
+          <label for="skpKopAddress">Alamat Klinik</label>
+          <textarea id="skpKopAddress" rows="2" maxlength="200" placeholder="Contoh: Jl. Melati No. 5, Kota Bandung"></textarea>
+        </div>
+        <div class="form-group">
+          <label for="skpKopPicName">Nama Penanggung Jawab</label>
+          <input type="text" id="skpKopPicName" maxlength="100" placeholder="Contoh: drg. Siti Rahma">
+        </div>
+        <button type="button" id="skpKopSaveBtn" class="btn-primary">Simpan</button>
+        <div id="skpKopStatus" class="status-message" style="display:none;"></div>
+      </div>
+    </div>
 
     <!-- PILIH DOKTER -->
     <div class="skp-dentist-select-row">
@@ -852,6 +912,7 @@
         <div class="skp-export-mode-option selected" data-mode="faskes" id="skpExportModeFaskes">🏥<br>Faskes/Klinik</div>
         <div class="skp-export-mode-option" data-mode="mandiri" id="skpExportModeMandiri">👤<br>Praktik Mandiri</div>
       </div>
+      <p id="skpExportPicWarning" class="skp-export-warning" style="display:none;">⚠️ Nama penanggung jawab belum diisi. Isi di "Pengaturan Kop Surat" atau lanjutkan saja (kolom nama dikosongkan untuk ditulis tangan).</p>
       <div id="skpExportStatus" class="status-message" style="display:none;"></div>
       <div class="modal-actions">
         <button type="button" id="skpExportCancelBtn" class="btn-secondary">Batal</button>
