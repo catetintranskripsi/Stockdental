@@ -806,16 +806,12 @@ async function initInfoAkun() {
     try {
       const { data: clinic, error } = await supabaseClient
         .from('clinics')
-        .select('name, address')
+        .select('name')
         .eq('id', CURRENT_CLINIC_ID)
         .single();
 
       if (!error && clinic && clinic.name) {
         clinicName = clinic.name;
-      }
-      // Alamat klinik (kop surat PDF Rekap SKP) -- diambil dari query yang sama
-      if (!error && clinic) {
-        currentClinicAddress = clinic.address || '';
       }
     } catch (e) {
       console.warn('Gagal ambil nama klinik dari tabel clinics, coba fallback:', e);
@@ -829,91 +825,7 @@ async function initInfoAkun() {
     clinicNameEl.textContent = clinicName || '-';
   }
 
-  renderClinicAddress();
-  setupAddressHandlers();
   setupGantiPasswordHandlers();
-}
-
-// ============================================
-// ALAMAT KLINIK (dipakai sebagai kop surat PDF Rekap SKP)
-// Disimpan di clinics.address. Edit inline di card Info Akun.
-// ============================================
-let currentClinicAddress = '';
-
-function renderClinicAddress() {
-  const el = document.getElementById('infoAkunAddress');
-  if (!el) return;
-  el.textContent = currentClinicAddress || 'Belum diisi';
-}
-
-function setupAddressHandlers() {
-  const editBtn = document.getElementById('editAddressBtn');
-  const form = document.getElementById('addressEditForm');
-  const input = document.getElementById('akunAddressInput');
-  const saveBtn = document.getElementById('saveAddressBtn');
-  const cancelBtn = document.getElementById('cancelAddressBtn');
-  const statusEl = document.getElementById('addressStatus');
-
-  if (!editBtn || !form) return; // guard kalau elemen belum ada
-
-  const showStatus = (message, type) => {
-    statusEl.textContent = message;
-    statusEl.className = 'status-message ' + (type === 'success' ? 'status-success' : 'status-error');
-    statusEl.style.display = 'block';
-  };
-
-  editBtn.addEventListener('click', () => {
-    input.value = currentClinicAddress;
-    form.style.display = 'block';
-    editBtn.style.display = 'none';
-    statusEl.style.display = 'none';
-  });
-
-  cancelBtn.addEventListener('click', () => {
-    form.style.display = 'none';
-    editBtn.style.display = 'inline';
-    statusEl.style.display = 'none';
-  });
-
-  saveBtn.addEventListener('click', async () => {
-    const newAddress = input.value.trim();
-
-    saveBtn.disabled = true;
-    saveBtn.textContent = 'Menyimpan...';
-
-    // .select() penting di sini: tanpa ini, RLS yang menolak update (misal
-    // policy UPDATE belum ada/tidak cocok) tidak menghasilkan error eksplisit
-    // dari Supabase -- hanya 0 baris yang berubah, dan kode lama salah
-    // mengira itu sukses. Dengan .select(), kita bisa cek data.length untuk
-    // memastikan baris benar-benar ter-update sebelum bilang "berhasil".
-    const { data, error } = await supabaseClient
-      .from('clinics')
-      .update({ address: newAddress || null })
-      .eq('id', CURRENT_CLINIC_ID)
-      .select();
-
-    saveBtn.disabled = false;
-    saveBtn.textContent = 'Simpan Alamat';
-
-    if (error) {
-      showStatus('Gagal menyimpan alamat: ' + error.message, 'error');
-      return;
-    }
-
-    if (!data || data.length === 0) {
-      showStatus('Alamat tidak tersimpan (tidak ada izin akses). Hubungi admin aplikasi.', 'error');
-      return;
-    }
-
-    currentClinicAddress = newAddress;
-    renderClinicAddress();
-    showStatus('Alamat berhasil disimpan!', 'success');
-    setTimeout(() => {
-      form.style.display = 'none';
-      editBtn.style.display = 'inline';
-      statusEl.style.display = 'none';
-    }, 1000);
-  });
 }
 
 // ---------- TOGGLE & SUBMIT GANTI PASSWORD ----------

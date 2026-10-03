@@ -30,6 +30,7 @@ async function onPageReady() {
   }
 
   await loadDentistDropdown();
+  await loadKopSuratSettings();
   setDefaultPeriodMonth();
   setupSkpEventListeners();
 }
@@ -100,6 +101,8 @@ function setDefaultPeriodMonth() {
 // EVENT LISTENERS
 // ============================================
 function setupSkpEventListeners() {
+  setupKopSuratHandlers();
+
   document.getElementById('skpDentistSelect').addEventListener('change', async (e) => {
     skpCurrentDentistId = e.target.value || null;
     if (skpCurrentDentistId) {
@@ -707,12 +710,102 @@ function attachMonthlyToggle(cardEl) {
 }
 
 // ============================================
+// PENGATURAN KOP SURAT (alamat klinik + nama penanggung jawab)
+// Disimpan di clinics.address dan clinics.pic_name. Dipakai di PDF
+// mode Faskes/Klinik saja (mode Praktik Mandiri tanpa kop).
+// ============================================
+let skpClinicInfo = { address: '', pic_name: '' };
+
+async function loadKopSuratSettings() {
+  try {
+    const { data, error } = await supabaseClient
+      .from('clinics')
+      .select('address, pic_name')
+      .eq('id', CURRENT_CLINIC_ID)
+      .single();
+
+    if (!error && data) {
+      skpClinicInfo.address = data.address || '';
+      skpClinicInfo.pic_name = data.pic_name || '';
+    }
+  } catch (e) {
+    console.warn('Gagal memuat pengaturan kop surat:', e);
+  }
+
+  const addrEl = document.getElementById('skpKopAddress');
+  const picEl = document.getElementById('skpKopPicName');
+  if (addrEl) addrEl.value = skpClinicInfo.address;
+  if (picEl) picEl.value = skpClinicInfo.pic_name;
+}
+
+function setupKopSuratHandlers() {
+  const toggleBtn = document.getElementById('skpKopToggle');
+  const bodyEl = document.getElementById('skpKopBody');
+  const arrowEl = document.getElementById('skpKopArrow');
+  const saveBtn = document.getElementById('skpKopSaveBtn');
+  const statusEl = document.getElementById('skpKopStatus');
+  if (!toggleBtn || !bodyEl || !saveBtn) return; // guard kalau elemen belum ada
+
+  toggleBtn.addEventListener('click', () => {
+    const willOpen = bodyEl.style.display === 'none';
+    bodyEl.style.display = willOpen ? 'block' : 'none';
+    arrowEl.classList.toggle('open', willOpen);
+    toggleBtn.setAttribute('aria-expanded', String(willOpen));
+  });
+
+  saveBtn.addEventListener('click', async () => {
+    const newAddress = document.getElementById('skpKopAddress').value.trim();
+    const newPicName = document.getElementById('skpKopPicName').value.trim();
+
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Menyimpan...';
+
+    // .select() penting: tanpa ini, RLS yang menolak update tidak memberi
+    // error eksplisit (hanya 0 baris berubah), sehingga bisa salah dikira
+    // sukses. Dengan .select() kita bisa cek data.length.
+    const { data, error } = await supabaseClient
+      .from('clinics')
+      .update({ address: newAddress || null, pic_name: newPicName || null })
+      .eq('id', CURRENT_CLINIC_ID)
+      .select();
+
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'Simpan';
+
+    if (error) {
+      showSkpStatus(statusEl, 'Gagal menyimpan: ' + error.message, 'error');
+      return;
+    }
+    if (!data || data.length === 0) {
+      showSkpStatus(statusEl, 'Tidak tersimpan (tidak ada izin akses). Hubungi admin aplikasi.', 'error');
+      return;
+    }
+
+    skpClinicInfo.address = newAddress;
+    skpClinicInfo.pic_name = newPicName;
+    updateExportPicWarning();
+    showSkpStatus(statusEl, 'Pengaturan kop surat tersimpan!', 'success');
+    setTimeout(() => { statusEl.style.display = 'none'; }, 2000);
+  });
+}
+
+// ============================================
 // EXPORT PDF
 // ============================================
 let skpExportMode = 'faskes';
 
 function openExportModal() {
   document.getElementById('skpExportModal').style.display = 'flex';
+  updateExportPicWarning();
+}
+
+// Peringatan ringan (tidak memblokir): tampil kalau mode Faskes dipilih
+// tapi nama penanggung jawab belum diisi.
+function updateExportPicWarning() {
+  const el = document.getElementById('skpExportPicWarning');
+  if (!el) return;
+  const missing = skpExportMode === 'faskes' && !(skpClinicInfo.pic_name || '').trim();
+  el.style.display = missing ? 'block' : 'none';
 }
 
 function closeExportModal() {
@@ -723,6 +816,7 @@ function selectExportMode(mode) {
   skpExportMode = mode;
   document.getElementById('skpExportModeFaskes').classList.toggle('selected', mode === 'faskes');
   document.getElementById('skpExportModeMandiri').classList.toggle('selected', mode === 'mandiri');
+  updateExportPicWarning();
 }
 
 async function handleExportPdf() {
@@ -735,7 +829,7 @@ async function handleExportPdf() {
     const [recapResult, patientResult, clinicResult] = await Promise.all([
       supabaseClient.rpc('get_skp_recap', { p_dentist_id: skpCurrentDentistId, p_start_month: startMonth, p_end_month: endMonth }),
       supabaseClient.rpc('get_skp_patient_summary', { p_dentist_id: skpCurrentDentistId, p_start_month: startMonth, p_end_month: endMonth }),
-      supabaseClient.from('clinics').select('name, address').eq('id', CURRENT_CLINIC_ID).single()
+      supabaseClient.from('clinics').select('name, address, pic_name').eq('id', CURRENT_CLINIC_ID).single()
     ]);
 
     const dentist = (window._skpDentistCache || []).find(d => d.id === skpCurrentDentistId);
@@ -788,13 +882,36 @@ async function generateSkpPdf({ dentist, clinic, activities, patientCount, mode,
     return false;
   }
 
+  // Memecah teks panjang jadi beberapa baris sesuai lebar maksimum
+  function wrapPdfText(text, fontObj, size, maxWidth) {
+    const words = String(text).split(/\s+/);
+    const lines = [];
+    let current = '';
+    words.forEach(word => {
+      const test = current ? current + ' ' + word : word;
+      if (fontObj.widthOfTextAtSize(test, size) <= maxWidth || !current) {
+        current = test;
+      } else {
+        lines.push(current);
+        current = word;
+      }
+    });
+    if (current) lines.push(current);
+    return lines;
+  }
+
   // Kop surat (mode faskes) atau tanpa kop (mode mandiri) -- hanya di halaman pertama
   if (mode === 'faskes') {
     page.drawText(clinic.name || 'Nama Klinik', { x: marginLeft, y, size: 14, font: fontBold });
     y -= 18;
     if (clinic.address) {
-      page.drawText(clinic.address, { x: marginLeft, y, size: 10, font });
-      y -= 20;
+      // Alamat bisa panjang (maks 200 karakter) -- bungkus per baris supaya
+      // tidak keluar dari lebar kertas.
+      wrapPdfText(clinic.address, font, 10, 495).forEach(line => {
+        page.drawText(line, { x: marginLeft, y, size: 10, font });
+        y -= 14;
+      });
+      y -= 6;
     }
     page.drawLine({ start: { x: marginLeft, y }, end: { x: 545, y }, thickness: 1, color: rgb(0, 0, 0) });
     y -= 24;
@@ -869,7 +986,14 @@ async function generateSkpPdf({ dentist, clinic, activities, patientCount, mode,
   if (mode === 'faskes') {
     page.drawText('Penanggung Jawab', { x: 380, y, size: 9, font });
     y -= 50;
-    page.drawText('(_____________________)', { x: 380, y, size: 9, font });
+    const picName = (clinic.pic_name || '').trim();
+    if (picName) {
+      page.drawText(picName, { x: 380, y, size: 9, font: fontBold });
+      const nameWidth = fontBold.widthOfTextAtSize(picName, 9);
+      page.drawLine({ start: { x: 380, y: y - 2 }, end: { x: 380 + Math.max(nameWidth, 120), y: y - 2 }, thickness: 0.5, color: rgb(0, 0, 0) });
+    } else {
+      page.drawText('(_____________________)', { x: 380, y, size: 9, font });
+    }
   } else {
     page.drawText('(Materai Rp10.000)', { x: 380, y, size: 8, font });
     y -= 50;
