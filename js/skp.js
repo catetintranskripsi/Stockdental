@@ -13,6 +13,10 @@ let skpCurrentDentistId = null;
 // lebih sederhana -- lihat showPreview()/findPreviewRowByCategory().
 let skpPendingSaveData = null; // dipakai saat conflict modal (ganti/edit/batal)
 
+// Batas ukuran file upload (foto/PDF). Ditolak di sini supaya user langsung
+// tahu, dan di Edge Function skp-ai-extract (batas yang sama) sebagai pengaman.
+const SKP_MAX_FILE_BYTES = 8 * 1024 * 1024; // 8 MB
+
 // Dipanggil oleh auth-check.js setelah user terverifikasi login
 async function onPageReady() {
   // GATE PREMIUM: fitur ini khusus Premium. User Free tetap boleh membuka
@@ -127,7 +131,15 @@ function setupSkpEventListeners() {
 
   document.getElementById('skpFileInput').addEventListener('change', (e) => {
     const file = e.target.files[0];
-    document.getElementById('skpUploadFilename').textContent = file ? file.name : 'Belum ada file dipilih';
+    const filenameEl = document.getElementById('skpUploadFilename');
+    if (file && file.size > SKP_MAX_FILE_BYTES) {
+      // Tolak langsung: file terlalu besar bikin proses lambat/gagal
+      e.target.value = '';
+      filenameEl.textContent = 'Belum ada file dipilih';
+      alert('Ukuran file terlalu besar (maksimal 8 MB). Kecilkan atau pecah file, atau pakai opsi tempel teks manual.');
+      return;
+    }
+    filenameEl.textContent = file ? file.name : 'Belum ada file dipilih';
   });
 
   document.getElementById('skpAnalyzeBtn').addEventListener('click', handleAnalyze);
@@ -526,7 +538,7 @@ async function resolveConflict(action) {
     await executeSave();
   } else if (action === 'edit') {
     // Arahkan user ke rincian bulan itu di card (mereka edit manual dari sana)
-    alert('Silakan scroll ke card tindakan di bawah, cari rincian bulan yang dimaksud, lalu gunakan tombol edit di baris tersebut.');
+    alert('Silakan koreksi isian di form (ubah jumlah, tambah, atau hapus baris tindakan), lalu klik "Simpan ke Rekap" lagi dan pilih "Ganti dengan Data Baru". Data lama bulan itu belum diubah.');
     skpPendingSaveData = null;
   } else {
     skpPendingSaveData = null;
@@ -616,10 +628,23 @@ async function loadRecap() {
   renderHeaderStats(activities, patientSummary);
 }
 
+// Pemeriksaan/Diagnosis dihitung PER BULAN (aturan KDG: 1-25 pasien/bulan = 2 SKP,
+// >25 pasien/bulan = 3 SKP), lalu dijumlahkan untuk seluruh periode.
+// JANGAN pakai total pasien seluruh periode -- itu menghasilkan angka terlalu kecil
+// untuk periode lebih dari 1 bulan (mis. 6 bulan x 20 pasien harusnya 12 SKP, bukan 3).
+function hitungSkpPemeriksaanPeriode(patientSummary) {
+  const breakdown = patientSummary && patientSummary.monthly_breakdown;
+  if (Array.isArray(breakdown) && breakdown.length > 0) {
+    return breakdown.reduce((sum, b) => sum + hitungSkpPemeriksaan(Number(b.patient_count)), 0);
+  }
+  // Fallback kalau rincian bulanan tidak tersedia
+  return hitungSkpPemeriksaan(Number(patientSummary ? patientSummary.total_patient_count : 0));
+}
+
 function renderHeaderStats(activities, patientSummary) {
   const totalActivities = activities.reduce((sum, a) => sum + Number(a.total_quantity), 0);
   const totalSkpFromActivities = activities.reduce((sum, a) => sum + Number(a.total_skp), 0);
-  const totalSkpFromPatients = hitungSkpPemeriksaan(Number(patientSummary.total_patient_count));
+  const totalSkpFromPatients = hitungSkpPemeriksaanPeriode(patientSummary);
   const totalSkp = totalSkpFromActivities + totalSkpFromPatients;
 
   document.getElementById('skpHeaderPatients').textContent = patientSummary.total_patient_count;
@@ -634,12 +659,12 @@ function renderActivityCards(activities, patientSummary) {
   // Card khusus Pemeriksaan/Diagnosis (dari jumlah pasien manual)
   const patientCount = Number(patientSummary.total_patient_count);
   if (patientCount > 0) {
-    const skpFromPatients = hitungSkpPemeriksaan(patientCount);
+    const skpFromPatients = hitungSkpPemeriksaanPeriode(patientSummary);
     const card = document.createElement('div');
     card.className = 'skp-activity-card';
     card.innerHTML = `
       <p class="skp-activity-name">Pemeriksaan/Diagnosis</p>
-      <p class="skp-activity-unit-value">Dihitung dari jumlah pasien (1-25 pasien/bulan = 2 SKP, >25 = 3 SKP)</p>
+      <p class="skp-activity-unit-value">Dihitung per bulan dari jumlah pasien (1-25 pasien = 2 SKP, >25 pasien = 3 SKP), lalu dijumlahkan untuk seluruh periode</p>
       <div class="skp-activity-totals">
         <div class="skp-activity-total-item">
           <strong>${patientCount}</strong>
@@ -842,6 +867,7 @@ async function handleExportPdf() {
       clinic,
       activities,
       patientCount: Number(patientSummary.total_patient_count),
+      pemeriksaanSkp: hitungSkpPemeriksaanPeriode(patientSummary),
       mode: skpExportMode,
       startMonth,
       endMonth
@@ -856,7 +882,7 @@ async function handleExportPdf() {
   }
 }
 
-async function generateSkpPdf({ dentist, clinic, activities, patientCount, mode, startMonth, endMonth }) {
+async function generateSkpPdf({ dentist, clinic, activities, patientCount, pemeriksaanSkp, mode, startMonth, endMonth }) {
   const { PDFDocument, StandardFonts, rgb } = PDFLib;
   const pdfDoc = await PDFDocument.create();
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
@@ -946,7 +972,7 @@ async function generateSkpPdf({ dentist, clinic, activities, patientCount, mode,
 
   // Baris Pemeriksaan/Diagnosis
   if (patientCount > 0) {
-    const skpPemeriksaan = hitungSkpPemeriksaan(patientCount);
+    const skpPemeriksaan = pemeriksaanSkp;
     page.drawText('Pemeriksaan/Diagnosis', { x: col1, y, size: 9, font });
     page.drawText('-', { x: col2, y, size: 9, font });
     page.drawText(`${patientCount} pasien`, { x: col3, y, size: 9, font });
@@ -954,7 +980,7 @@ async function generateSkpPdf({ dentist, clinic, activities, patientCount, mode,
     y -= 16;
   }
 
-  let grandTotalSkp = patientCount > 0 ? hitungSkpPemeriksaan(patientCount) : 0;
+  let grandTotalSkp = patientCount > 0 ? pemeriksaanSkp : 0;
 
   activities.forEach(act => {
     // Kalau baris ini akan melewati batas bawah, pindah halaman baru DULU,
