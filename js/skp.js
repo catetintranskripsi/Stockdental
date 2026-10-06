@@ -739,18 +739,19 @@ function attachMonthlyToggle(cardEl) {
 // Disimpan di clinics.address dan clinics.pic_name. Dipakai di PDF
 // mode Faskes/Klinik saja (mode Praktik Mandiri tanpa kop).
 // ============================================
-let skpClinicInfo = { address: '', pic_name: '' };
+let skpClinicInfo = { address: '', phone: '', pic_name: '' };
 
 async function loadKopSuratSettings() {
   try {
     const { data, error } = await supabaseClient
       .from('clinics')
-      .select('address, pic_name')
+      .select('address, phone, pic_name')
       .eq('id', CURRENT_CLINIC_ID)
       .single();
 
     if (!error && data) {
       skpClinicInfo.address = data.address || '';
+      skpClinicInfo.phone = data.phone || '';
       skpClinicInfo.pic_name = data.pic_name || '';
     }
   } catch (e) {
@@ -758,8 +759,10 @@ async function loadKopSuratSettings() {
   }
 
   const addrEl = document.getElementById('skpKopAddress');
+  const phoneEl = document.getElementById('skpKopPhone');
   const picEl = document.getElementById('skpKopPicName');
   if (addrEl) addrEl.value = skpClinicInfo.address;
+  if (phoneEl) phoneEl.value = skpClinicInfo.phone;
   if (picEl) picEl.value = skpClinicInfo.pic_name;
 }
 
@@ -779,7 +782,10 @@ function setupKopSuratHandlers() {
   });
 
   saveBtn.addEventListener('click', async () => {
-    const newAddress = document.getElementById('skpKopAddress').value.trim();
+    // Alamat boleh beberapa baris (Enter). Rapikan: trim tiap baris, buang baris kosong.
+    const newAddress = document.getElementById('skpKopAddress').value
+      .split(/\r?\n/).map(l => l.trim()).filter(l => l).join('\n');
+    const newPhone = document.getElementById('skpKopPhone').value.trim();
     const newPicName = document.getElementById('skpKopPicName').value.trim();
 
     saveBtn.disabled = true;
@@ -790,7 +796,7 @@ function setupKopSuratHandlers() {
     // sukses. Dengan .select() kita bisa cek data.length.
     const { data, error } = await supabaseClient
       .from('clinics')
-      .update({ address: newAddress || null, pic_name: newPicName || null })
+      .update({ address: newAddress || null, phone: newPhone || null, pic_name: newPicName || null })
       .eq('id', CURRENT_CLINIC_ID)
       .select();
 
@@ -807,6 +813,7 @@ function setupKopSuratHandlers() {
     }
 
     skpClinicInfo.address = newAddress;
+    skpClinicInfo.phone = newPhone;
     skpClinicInfo.pic_name = newPicName;
     updateExportPicWarning();
     showSkpStatus(statusEl, 'Pengaturan kop surat tersimpan!', 'success');
@@ -854,7 +861,7 @@ async function handleExportPdf() {
     const [recapResult, patientResult, clinicResult] = await Promise.all([
       supabaseClient.rpc('get_skp_recap', { p_dentist_id: skpCurrentDentistId, p_start_month: startMonth, p_end_month: endMonth }),
       supabaseClient.rpc('get_skp_patient_summary', { p_dentist_id: skpCurrentDentistId, p_start_month: startMonth, p_end_month: endMonth }),
-      supabaseClient.from('clinics').select('name, address, pic_name').eq('id', CURRENT_CLINIC_ID).single()
+      supabaseClient.from('clinics').select('name, address, phone, pic_name').eq('id', CURRENT_CLINIC_ID).single()
     ]);
 
     const dentist = (window._skpDentistCache || []).find(d => d.id === skpCurrentDentistId);
@@ -926,24 +933,43 @@ async function generateSkpPdf({ dentist, clinic, activities, patientCount, pemer
     return lines;
   }
 
-  // Kop surat (mode faskes) atau tanpa kop (mode mandiri) -- hanya di halaman pertama
-  if (mode === 'faskes') {
-    page.drawText(clinic.name || 'Nama Klinik', { x: marginLeft, y, size: 14, font: fontBold });
-    y -= 18;
-    if (clinic.address) {
-      // Alamat bisa panjang (maks 200 karakter) -- bungkus per baris supaya
-      // tidak keluar dari lebar kertas.
-      wrapPdfText(clinic.address, font, 10, 495).forEach(line => {
-        page.drawText(line, { x: marginLeft, y, size: 10, font });
-        y -= 14;
-      });
-      y -= 6;
-    }
-    page.drawLine({ start: { x: marginLeft, y }, end: { x: 545, y }, thickness: 1, color: rgb(0, 0, 0) });
-    y -= 24;
-  } else {
-    y -= 10;
+  // Kop surat -- RATA TENGAH, hanya di halaman pertama, dipakai di kedua mode
+  // (Faskes/Klinik dan Praktik Mandiri). Susunan: nama (besar, tebal, kapital),
+  // alamat (boleh beberapa baris), nomor telepon di baris paling bawah, lalu
+  // garis ganda pemisah antara kop dan isi surat.
+  const kopMaxWidth = 460;
+  function drawCentered(text, fontObj, size) {
+    const w = fontObj.widthOfTextAtSize(text, size);
+    page.drawText(text, { x: (PAGE_WIDTH - w) / 2, y, size, font: fontObj });
   }
+
+  const clinicNameUpper = String(clinic.name || 'Nama Klinik').toUpperCase();
+  wrapPdfText(clinicNameUpper, fontBold, 16, kopMaxWidth).forEach(line => {
+    drawCentered(line, fontBold, 16);
+    y -= 20;
+  });
+
+  // Alamat: hormati baris baru yang diketik user (Enter), lalu bungkus tiap baris
+  // kalau terlalu panjang.
+  String(clinic.address || '').split(/\r?\n/).map(l => l.trim()).filter(Boolean).forEach(rawLine => {
+    wrapPdfText(rawLine, font, 10, kopMaxWidth).forEach(line => {
+      drawCentered(line, font, 10);
+      y -= 13;
+    });
+  });
+
+  const phoneRaw = String(clinic.phone || '').trim();
+  if (phoneRaw) {
+    const phoneLine = /^(telp|telepon|tel\b|hp|wa)/i.test(phoneRaw) ? phoneRaw : `Telp. ${phoneRaw}`;
+    drawCentered(phoneLine, font, 10);
+    y -= 13;
+  }
+
+  y -= 4;
+  page.drawLine({ start: { x: marginLeft, y }, end: { x: PAGE_WIDTH - marginLeft, y }, thickness: 2, color: rgb(0, 0, 0) });
+  y -= 3;
+  page.drawLine({ start: { x: marginLeft, y }, end: { x: PAGE_WIDTH - marginLeft, y }, thickness: 0.5, color: rgb(0, 0, 0) });
+  y -= 26;
 
   page.drawText('REKAP KEGIATAN RANAH PELAYANAN', { x: marginLeft, y, size: 13, font: fontBold });
   y -= 24;
