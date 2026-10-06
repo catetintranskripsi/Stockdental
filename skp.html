@@ -725,10 +725,15 @@
         <span class="skp-kop-arrow" id="skpKopArrow">▾</span>
       </button>
       <div class="skp-kop-body" id="skpKopBody" style="display:none;">
-        <p class="skp-kop-hint">Dipakai di kop surat dan kolom tanda tangan PDF mode Faskes/Klinik. Cukup diisi sekali.</p>
+        <p class="skp-kop-hint">Dipakai di kop surat PDF (kedua mode: Faskes/Klinik dan Praktik Mandiri). Nama penanggung jawab dipakai di kolom tanda tangan mode Faskes/Klinik. Cukup diisi sekali.</p>
         <div class="form-group">
           <label for="skpKopAddress">Alamat Klinik</label>
-          <textarea id="skpKopAddress" rows="2" maxlength="200" placeholder="Contoh: Jl. Melati No. 5, Kota Bandung"></textarea>
+          <textarea id="skpKopAddress" rows="3" maxlength="300" placeholder="Contoh:&#10;Jln. Manggis I No. 38, Manggarai Selatan&#10;Jakarta Selatan"></textarea>
+          <div style="font-size:12px; color:var(--color-text-muted); margin-top:4px;">Tekan Enter untuk pindah baris. Baris yang terlalu panjang akan dipotong otomatis di PDF.</div>
+        </div>
+        <div class="form-group">
+          <label for="skpKopPhone">Nomor Telepon</label>
+          <input type="tel" id="skpKopPhone" maxlength="30" placeholder="Contoh: 021-1234567 atau 0812-3456-7890">
         </div>
         <div class="form-group">
           <label for="skpKopPicName">Nama Penanggung Jawab</label>
